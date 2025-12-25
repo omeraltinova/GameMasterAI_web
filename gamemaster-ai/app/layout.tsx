@@ -14,6 +14,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+import { Libre_Baskerville } from "next/font/google";
+
+const libreBaskerville = Libre_Baskerville({
+  weight: ["400", "700"],
+  variable: "--font-serif",
+  subsets: ["latin"],
+});
+
 export const metadata: Metadata = {
   title: "GameMaster AI - AI-Powered D&D Game Master",
   description: "Experience D&D 5e adventures with an AI-powered Game Master. Create characters, join campaigns, and embark on epic quests.",
@@ -28,7 +36,7 @@ export default function RootLayout({
   return (
     <html lang="tr" className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${libreBaskerville.variable} antialiased min-h-screen bg-background text-foreground`}
       >
         <AuthProvider>
           <ToastProvider>

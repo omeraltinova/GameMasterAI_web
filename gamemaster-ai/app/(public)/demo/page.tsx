@@ -1,11 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button, Badge } from "@/components/ui";
-import { Play, Dice6, Swords, ArrowRight, Bot, User, Scroll, Eye, Sparkles } from "lucide-react";
+import { Dice6, Swords, ArrowRight, Bot, User, Eye, Sparkles, RotateCcw } from "lucide-react";
 
-const demoMessages = [
+type MessageType = "gm" | "player" | "dice";
+
+interface BaseMessage {
+  type: MessageType;
+}
+
+interface TextMessage extends BaseMessage {
+  type: "gm" | "player";
+  content: string;
+}
+
+interface DiceMessage extends BaseMessage {
+  type: "dice";
+  roll: string;
+  skill: string;
+  result: number;
+  modifier: number;
+  total: number;
+}
+
+type Message = TextMessage | DiceMessage;
+
+const demoMessages: Message[] = [
   {
     type: "gm",
     content:
@@ -36,17 +58,54 @@ const demoMessages = [
 ];
 
 export default function DemoPage() {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [showAll, setShowAll] = useState(false);
+  const [visibleMessages, setVisibleMessages] = useState<Message[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
+  const [isComplete, setIsComplete] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
-  const visibleMessages = showAll ? demoMessages : demoMessages.slice(0, currentStep + 1);
+  // Auto-advance demo
+  useEffect(() => {
+    if (isComplete) return;
 
-  const handleNext = () => {
-    if (currentStep < demoMessages.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      setShowAll(true);
-    }
+    const showNextMessage = () => {
+      if (currentIndex >= demoMessages.length) {
+        setIsComplete(true);
+        return;
+      }
+
+      const nextMessage = demoMessages[currentIndex];
+      
+      // If next message is from GM, show typing indicator first
+      if (nextMessage.type === "gm") {
+        setIsTyping(true);
+        
+        // Show typing for 1.5 seconds, then show message
+        const typingTimer = setTimeout(() => {
+          setIsTyping(false);
+          setVisibleMessages(prev => [...prev, nextMessage]);
+          setCurrentIndex(prev => prev + 1);
+        }, 1500);
+
+        return () => clearTimeout(typingTimer);
+      } else {
+        // Player or dice messages appear immediately
+        setVisibleMessages(prev => [...prev, nextMessage]);
+        setCurrentIndex(prev => prev + 1);
+      }
+    };
+
+    // Initial delay before first message
+    const delay = currentIndex === 0 ? 800 : 2000;
+    const timer = setTimeout(showNextMessage, delay);
+
+    return () => clearTimeout(timer);
+  }, [currentIndex, isComplete]);
+
+  const restartDemo = () => {
+    setVisibleMessages([]);
+    setIsTyping(false);
+    setIsComplete(false);
+    setCurrentIndex(0);
   };
 
   return (
@@ -69,7 +128,7 @@ export default function DemoPage() {
             Oyun <span className="text-primary">Deneyimi</span>
           </h1>
           <p className="text-lg text-foreground-secondary max-w-xl mx-auto">
-            AI Game Master ile etkileşime geç ve hikayenin nasıl şekillendiğini gör.
+            AI Game Master ile etkileşimi izle ve hikayenin nasıl şekillendiğini gör.
           </p>
         </header>
 
@@ -92,7 +151,7 @@ export default function DemoPage() {
               <div className="flex items-center gap-3">
                 <Badge variant="outline" className="bg-accent/10 text-accent border-accent/20 gap-1.5 text-xs">
                   <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                  Canlı
+                  Demo
                 </Badge>
                 
                 <div className="hidden sm:flex items-center gap-2 pl-3 border-l border-border/50">
@@ -122,7 +181,6 @@ export default function DemoPage() {
                   className={`flex gap-4 animate-slide-up ${
                     message.type === "player" ? "flex-row-reverse" : ""
                   } ${message.type === "dice" ? "justify-center" : ""}`}
-                  style={{ animationDelay: `${i * 50}ms` }}
                 >
                   {message.type === "dice" ? (
                     <div className="my-3">
@@ -189,66 +247,82 @@ export default function DemoPage() {
                 </div>
               ))}
 
-              {/* Typing Indicator */}
-              {currentStep < demoMessages.length - 1 && !showAll && (
-                <div className="flex justify-center pt-4">
-                  <div className="flex items-center gap-3 text-foreground-muted text-sm">
+              {/* Typing Indicator - Only shows when GM is "thinking" */}
+              {isTyping && (
+                <div className="flex gap-4 animate-fade-in">
+                  <div className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center border shadow-md bg-background-tertiary border-primary/30">
+                    <Bot className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex items-center gap-3 p-4 rounded-xl bg-background-tertiary border border-border/50 rounded-tl-sm">
                     <div className="flex gap-1">
-                      <span className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 rounded-full bg-primary/40 animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
-                    <span>GM düşünüyor...</span>
+                    <span className="text-sm text-foreground-muted">GM düşünüyor...</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Empty state before messages start */}
+              {visibleMessages.length === 0 && !isTyping && (
+                <div className="flex items-center justify-center h-full text-foreground-muted">
+                  <div className="text-center">
+                    <Sparkles className="w-8 h-8 mx-auto mb-3 text-primary/50" />
+                    <p className="text-sm">Macera başlıyor...</p>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Controls */}
+            {/* Bottom Bar */}
             <div className="p-5 bg-background-tertiary border-t border-border/50">
-              {!showAll ? (
-                <Button
-                  onClick={handleNext}
-                  size="lg"
-                  className="w-full gap-3 font-semibold py-6 relative overflow-hidden group"
-                >
-                  <span className="relative z-10 flex items-center gap-2">
-                    <Play className="h-5 w-5" />
-                    {currentStep < demoMessages.length - 1 ? "Hikayeyi İlerlet" : "Demoyu Tamamla"}
-                  </span>
-                </Button>
-              ) : (
+              {isComplete ? (
                 <div className="flex flex-col sm:flex-row gap-4 items-center justify-between animate-fade-in">
                   <div className="flex items-center gap-3 text-foreground-secondary">
                     <Sparkles className="w-5 h-5 text-primary" />
-                    <p className="text-sm">Bu sadece bir başlangıç. Kendi efsaneni yaz!</p>
+                    <p className="text-sm">Demo tamamlandı! Kendi efsaneni yazmaya hazır mısın?</p>
                   </div>
-                  <Link href="/register">
-                    <Button className="gap-2 px-8 py-5 font-semibold whitespace-nowrap">
-                      Maceraya Başla
-                      <ArrowRight className="h-4 w-4" />
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={restartDemo} className="gap-2">
+                      <RotateCcw className="h-4 w-4" />
+                      Tekrar İzle
                     </Button>
-                  </Link>
+                    <Link href="/register">
+                      <Button className="gap-2 px-6 font-semibold">
+                        Maceraya Başla
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-sm text-foreground-muted">
+                    <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                    <span>Demo otomatik ilerliyor...</span>
+                  </div>
+                  <div className="text-xs text-foreground-muted">
+                    {visibleMessages.length} / {demoMessages.length}
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
           {/* Progress indicator */}
-          {!showAll && (
-            <div className="flex justify-center gap-2 mt-6">
-              {demoMessages.map((_, i) => (
-                <div
-                  key={i}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    i <= currentStep 
-                      ? 'w-6 bg-primary' 
-                      : 'w-1.5 bg-border/50'
-                  }`}
-                />
-              ))}
-            </div>
-          )}
+          <div className="flex justify-center gap-2 mt-6">
+            {demoMessages.map((_, i) => (
+              <div
+                key={i}
+                className={`h-1.5 rounded-full transition-all duration-500 ${
+                  i < visibleMessages.length 
+                    ? 'w-6 bg-primary' 
+                    : 'w-1.5 bg-border/50'
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </div>
     </div>

@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
-import { Button, Card, CardContent } from "@/components/ui";
+import { Button } from "@/components/ui";
+import { FadeInView, StaggerContainer, StaggerItem } from "@/components/layout/PageTransition";
 import {
   Sword,
   Sparkles,
@@ -14,39 +17,7 @@ import {
   Flame,
   Shield,
 } from "lucide-react";
-
-const features = [
-  {
-    icon: Sparkles,
-    title: "AI Game Master",
-    description: "Yapay zeka destekli hikaye anlatımı, NPC diyalogları ve dinamik olay yönetimi.",
-  },
-  {
-    icon: Sword,
-    title: "D&D 5e Uyumlu",
-    description: "Resmi D&D 5e kurallarına uygun karakter sistemi ve oyun mekanikleri.",
-  },
-  {
-    icon: Users,
-    title: "Tek & Çok Oyunculu",
-    description: "Solo maceralar veya arkadaşlarınızla birlikte epik kampanyalar.",
-  },
-  {
-    icon: Dice6,
-    title: "Zar Sistemi",
-    description: "Tüm D&D zarları ile otomatik hesaplama ve animasyonlu atışlar.",
-  },
-  {
-    icon: Map,
-    title: "Dinamik Haritalar",
-    description: "AI tarafından oluşturulan atmosferik mekan görselleri.",
-  },
-  {
-    icon: BookOpen,
-    title: "Senaryo Kütüphanesi",
-    description: "Hazır senaryolar veya kendi maceralarınızı oluşturun.",
-  },
-];
+import { motion } from "framer-motion";
 
 export default function HomePage() {
   return (
@@ -64,25 +35,45 @@ export default function HomePage() {
           {/* Left Content */}
           <div className="flex-1 text-center lg:text-left z-10">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-sm bg-primary/5 border border-primary/20 mb-8">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-sm bg-primary/5 border border-primary/20 mb-8"
+            >
               <Flame className="h-3.5 w-3.5 text-primary animate-torch" />
               <span className="text-xs font-medium text-primary tracking-[0.2em] uppercase">Yeni Nesil TTRPG</span>
-            </div>
+            </motion.div>
 
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold mb-6 leading-[1.1] tracking-tight">
+            <motion.h1 
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
+              className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold mb-6 leading-[1.1] tracking-tight"
+            >
               <span className="block text-foreground/90">Efsanevi</span>
               <span className="block mt-2 text-transparent bg-clip-text bg-gradient-to-r from-primary via-primary to-secondary">
                 Maceralar
               </span>
               <span className="block mt-2 text-foreground/80 text-[0.7em]">AI Rehberliğinde</span>
-            </h1>
+            </motion.h1>
 
-            <p className="text-lg text-foreground-secondary mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="text-lg text-foreground-secondary mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed"
+            >
               Sınırsız hayal gücü, dinamik hikaye anlatımı ve D&D 5e kurallarına tam sadakat.
               Masaüstü rol yapma oyunlarını yeniden keşfet.
-            </p>
+            </motion.p>
 
-            <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
+            >
               <Link href="/register">
                 <Button size="lg" className="h-14 px-10 text-base font-semibold relative overflow-hidden group">
                   <span className="relative z-10 flex items-center gap-2">
@@ -97,10 +88,15 @@ export default function HomePage() {
                   Demo İzle
                 </Button>
               </Link>
-            </div>
+            </motion.div>
 
             {/* Stats Row */}
-            <div className="mt-14 pt-8 border-t border-border/30 grid grid-cols-3 gap-6 max-w-md mx-auto lg:mx-0">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5, delay: 0.5 }}
+              className="mt-14 pt-8 border-t border-border/30 grid grid-cols-3 gap-6 max-w-md mx-auto lg:mx-0"
+            >
               <div className="text-center lg:text-left">
                 <div className="text-3xl font-bold text-primary font-serif">5e</div>
                 <div className="text-xs text-foreground-muted uppercase tracking-wider mt-1">Tam Uyumlu</div>
@@ -113,11 +109,16 @@ export default function HomePage() {
                 <div className="text-3xl font-bold text-foreground font-serif">7/24</div>
                 <div className="text-xs text-foreground-muted uppercase tracking-wider mt-1">Hazır</div>
               </div>
-            </div>
+            </motion.div>
           </div>
 
           {/* Right Content - Game Session Preview */}
-          <div className="flex-1 w-full max-w-[560px] lg:max-w-none relative">
+          <motion.div 
+            initial={{ opacity: 0, x: 50, rotateY: -10 }}
+            animate={{ opacity: 1, x: 0, rotateY: 0 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="flex-1 w-full max-w-[560px] lg:max-w-none relative"
+          >
             {/* Glow behind card */}
             <div className="absolute inset-4 bg-gradient-to-br from-primary/15 via-transparent to-secondary/10 rounded-lg blur-2xl" />
             
@@ -175,13 +176,13 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Features Section */}
       <section className="py-20 lg:py-28 container mx-auto px-4 relative">
-        <div className="text-center mb-16 max-w-2xl mx-auto">
+        <FadeInView className="text-center mb-16 max-w-2xl mx-auto">
           <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary/10 border border-primary/20 mb-6">
             <Crown className="w-5 h-5 text-primary" />
           </div>
@@ -191,12 +192,12 @@ export default function HomePage() {
           <p className="text-foreground-secondary text-lg">
             Geleneksel rol yapma keyfini çağdaş teknoloji ile harmanlıyoruz.
           </p>
-        </div>
+        </FadeInView>
 
         {/* Bento Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-4 lg:gap-5">
+        <StaggerContainer className="grid grid-cols-1 md:grid-cols-6 gap-4 lg:gap-5" delay={0.2}>
           {/* Large Card - AI GM */}
-          <div className="md:col-span-4 group relative bg-gradient-to-br from-background-elevated to-background-tertiary rounded-xl border border-border/50 p-8 hover:border-primary/30 transition-all duration-500 overflow-hidden min-h-[280px]">
+          <StaggerItem className="md:col-span-4 group relative bg-gradient-to-br from-background-elevated to-background-tertiary rounded-xl border border-border/50 p-8 hover:border-primary/30 transition-all duration-500 overflow-hidden min-h-[280px]">
             <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2 group-hover:bg-primary/10 transition-colors duration-500" />
             <div className="relative z-10">
               <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-primary/10 border border-primary/20 mb-6 group-hover:scale-110 transition-transform duration-300">
@@ -208,10 +209,10 @@ export default function HomePage() {
                 Dilediğin zaman, dilediğin yerde.
               </p>
             </div>
-          </div>
+          </StaggerItem>
 
           {/* Tall Card - Dynamic Worlds */}
-          <div className="md:col-span-2 md:row-span-2 group bg-background-elevated rounded-xl border border-border/50 p-6 hover:border-accent/30 transition-all duration-300 flex flex-col">
+          <StaggerItem className="md:col-span-2 md:row-span-2 group bg-background-elevated rounded-xl border border-border/50 p-6 hover:border-accent/30 transition-all duration-300 flex flex-col">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-accent/10 border border-accent/20 mb-5">
               <Map className="w-6 h-6 text-accent" />
             </div>
@@ -222,7 +223,11 @@ export default function HomePage() {
             
             {/* Abstract Map Visual */}
             <div className="h-40 rounded-lg bg-background-tertiary border border-border/30 relative overflow-hidden">
-              <div className="absolute top-4 left-4 w-6 h-6 rounded bg-primary/20 animate-float" />
+              <motion.div 
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute top-4 left-4 w-6 h-6 rounded bg-primary/20" 
+              />
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border border-accent/20" />
               <div className="absolute bottom-6 right-6 w-4 h-4 rounded-full bg-secondary/30" />
               <div className="absolute top-8 right-8 w-3 h-3 rounded bg-accent/40" />
@@ -234,22 +239,22 @@ export default function HomePage() {
                 <div className="absolute left-2/3 top-0 bottom-0 w-px bg-foreground-muted" />
               </div>
             </div>
-          </div>
+          </StaggerItem>
 
           {/* Small Card - Dice */}
-          <div className="md:col-span-2 group bg-background-elevated rounded-xl border border-border/50 p-6 hover:border-primary/30 transition-all duration-300">
+          <StaggerItem className="md:col-span-2 group bg-background-elevated rounded-xl border border-border/50 p-6 hover:border-primary/30 transition-all duration-300">
             <Dice6 className="w-8 h-8 text-primary mb-4 group-hover:rotate-12 transition-transform duration-300" />
             <h3 className="text-lg font-bold mb-1 font-serif">Zar Motoru</h3>
             <p className="text-sm text-foreground-secondary">Fizik tabanlı gerçekçi atışlar.</p>
-          </div>
+          </StaggerItem>
 
           {/* Small Card - Rules */}
-          <div className="md:col-span-2 group bg-background-elevated rounded-xl border border-border/50 p-6 hover:border-secondary/30 transition-all duration-300">
+          <StaggerItem className="md:col-span-2 group bg-background-elevated rounded-xl border border-border/50 p-6 hover:border-secondary/30 transition-all duration-300">
             <BookOpen className="w-8 h-8 text-secondary mb-4 group-hover:scale-110 transition-transform duration-300" />
             <h3 className="text-lg font-bold mb-1 font-serif">5e Kütüphanesi</h3>
             <p className="text-sm text-foreground-secondary">Büyüler, yaratıklar, eşyalar.</p>
-          </div>
-        </div>
+          </StaggerItem>
+        </StaggerContainer>
       </section>
 
       {/* How It Works */}
@@ -257,22 +262,22 @@ export default function HomePage() {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-primary/[0.02] to-transparent" />
         
         <div className="container mx-auto px-4 relative">
-          <div className="text-center mb-16 max-w-2xl mx-auto">
+          <FadeInView className="text-center mb-16 max-w-2xl mx-auto">
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-secondary/10 border border-secondary/20 mb-6">
               <Scroll className="w-5 h-5 text-secondary" />
             </div>
             <h2 className="text-3xl md:text-4xl font-bold mb-4 font-serif">
               Macera <span className="text-secondary">Nasıl Başlar?</span>
             </h2>
-          </div>
+          </FadeInView>
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+          <StaggerContainer className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto" delay={0.1}>
             {[
               { step: 1, title: "Kahraman Yarat", desc: "Irk, sınıf ve yeteneklerini seç. Hikayeni şekillendir.", icon: Shield },
               { step: 2, title: "Kampanya Seç", desc: "Hazır senaryolar veya AI'dan yeni bir macera iste.", icon: Map },
               { step: 3, title: "Oyna", desc: "AI Game Master rehberliğinde epik hikayeler yaz.", icon: Sword },
             ].map((item, i) => (
-              <div key={i} className="relative group">
+              <StaggerItem key={i} className="relative group">
                 {/* Connector line */}
                 {i < 2 && (
                   <div className="hidden md:block absolute top-8 left-[60%] w-[80%] h-px bg-gradient-to-r from-border/50 to-transparent" />
@@ -288,16 +293,16 @@ export default function HomePage() {
                   <h3 className="text-lg font-bold mb-2 font-serif">{item.title}</h3>
                   <p className="text-sm text-foreground-secondary">{item.desc}</p>
                 </div>
-              </div>
+              </StaggerItem>
             ))}
-          </div>
+          </StaggerContainer>
         </div>
       </section>
 
       {/* CTA Section */}
       <section className="py-20 lg:py-28 relative">
         <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto relative">
+          <FadeInView className="max-w-3xl mx-auto relative">
             {/* Decorative elements */}
             <div className="absolute -top-4 -left-4 w-8 h-8 border-l-2 border-t-2 border-primary/30" />
             <div className="absolute -bottom-4 -right-4 w-8 h-8 border-r-2 border-b-2 border-primary/30" />
@@ -321,7 +326,7 @@ export default function HomePage() {
                 </Link>
               </div>
             </div>
-          </div>
+          </FadeInView>
         </div>
       </section>
     </div>

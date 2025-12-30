@@ -1,4 +1,4 @@
-import { Sword, Target, Heart, Zap, Users, Bot, Scroll, Compass, Flame, Star } from "lucide-react";
+import { Sword, Target, Heart, Zap, Users, Bot, Scroll, Compass, Flame, Star, GraduationCap } from "lucide-react";
 
 export const metadata = {
   title: "Hakkında - GameMaster AI",
@@ -52,6 +52,14 @@ export default function AboutPage() {
           <p className="text-xl text-foreground-secondary max-w-2xl mx-auto leading-relaxed">
             Masaüstü rol yapma oyunlarının büyüsünü, teknolojinin sınırsız imkanlarıyla harmanlıyoruz.
           </p>
+
+          {/* Student Project Notice */}
+          <div className="mt-8 inline-flex items-center gap-3 px-5 py-3 rounded-lg bg-accent/5 border border-accent/20">
+            <GraduationCap className="h-5 w-5 text-accent" />
+            <span className="text-sm text-foreground-secondary">
+              Bu proje, <strong className="text-accent">eğitim amaçlı</strong> geliştirilmiş bir öğrenci projesidir.
+            </span>
+          </div>
         </header>
 
         {/* Quest Scroll - Main Mission */}

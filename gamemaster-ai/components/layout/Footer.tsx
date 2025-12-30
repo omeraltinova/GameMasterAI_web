@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sword, Github, Twitter } from "lucide-react";
+import { Sword, Github, Twitter, GraduationCap } from "lucide-react";
 
 const footerLinks = {
   product: [
@@ -107,6 +107,12 @@ export function Footer() {
 
         {/* Copyright */}
         <div className="border-t border-border mt-8 pt-8 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-accent/5 border border-accent/20 mb-4">
+            <GraduationCap className="h-4 w-4 text-accent" />
+            <span className="text-xs text-foreground-secondary">
+              Bu proje <strong className="text-accent">eğitim amaçlı</strong> geliştirilmiş bir öğrenci projesidir.
+            </span>
+          </div>
           <p className="text-sm text-foreground-muted">
             © {new Date().getFullYear()} GameMaster AI. Tüm hakları saklıdır.
           </p>

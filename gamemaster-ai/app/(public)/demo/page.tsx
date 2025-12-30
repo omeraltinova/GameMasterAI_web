@@ -166,7 +166,7 @@ export default function DemoPage() {
             </div>
 
             {/* Chat Area */}
-            <div className="flex-1 p-5 md:p-6 space-y-5 overflow-y-auto custom-scrollbar relative min-h-[400px] max-h-[500px]">
+            <div className="flex-1 p-5 md:p-6 space-y-5 overflow-y-auto custom-scrollbar relative min-h-[400px]">
               {/* Subtle grid pattern */}
               <div className="absolute inset-0 opacity-[0.02] pointer-events-none">
                 <div className="w-full h-full" style={{

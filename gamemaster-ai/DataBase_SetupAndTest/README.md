@@ -41,7 +41,7 @@ gamemaster-ai/
 ├── lib/db/
 │   └── prisma.ts        # Prisma client singleton
 │
-└── Database/
+└── DataBase_SetupAndTest/
     ├── README.md        # Bu dosya
     ├── database-plan.md # Detaylı tablo planı
     └── test-db.ts       # Test script (Opsiyonel)

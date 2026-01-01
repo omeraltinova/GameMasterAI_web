@@ -1,0 +1,270 @@
+// GameMaster AI - Prisma Schema
+// D&D 5e tabanlı AI Game Master uygulaması için veritabanı şeması
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// ==========================================
+// User - Kullanıcı
+// ==========================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  role      String   @default("MEMBER") // VISITOR, MEMBER, ADMIN
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // İlişkiler
+  characters      Character[]
+  campaigns       Campaign[]       @relation("CampaignCreator")
+  scenarios       Scenario[]
+  campaignPlayers CampaignPlayer[]
+  messages        Message[]
+}
+
+// ==========================================
+// Character - Karakter
+// ==========================================
+
+model Character {
+  id         String   @id @default(cuid())
+  userId     String
+  campaignId String?
+  name       String
+  race       String
+  class      String
+  level      Int      @default(1)
+  experience Int      @default(0)
+  hp         Int
+  maxHp      Int
+  stats      String   // JSON olarak saklanacak
+  background String?
+  imageUrl   String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // İlişkiler
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign       Campaign?        @relation(fields: [campaignId], references: [id])
+  inventoryItems InventoryItem[]
+  diceRolls      DiceRoll[]
+  campaignPlayer CampaignPlayer[]
+}
+
+// ==========================================
+// Campaign - Kampanya
+// ==========================================
+
+model Campaign {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  creatorId     String
+  scenarioId    String?
+  isMultiplayer Boolean  @default(false)
+  maxPlayers    Int      @default(4)
+  inviteCode    String?  @unique
+  status        String   @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // İlişkiler
+  creator    User             @relation("CampaignCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  scenario   Scenario?        @relation(fields: [scenarioId], references: [id])
+  characters Character[]
+  sessions   GameSession[]
+  players    CampaignPlayer[]
+}
+
+// ==========================================
+// GameSession - Oyun Oturumu
+// ==========================================
+
+model GameSession {
+  id           String   @id @default(cuid())
+  campaignId   String
+  currentState String   @default("{}") // JSON
+  turnOrder    String?  // JSON
+  activePlayer String?
+  aiContext    String?  // AI için context/memory
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // İlişkiler
+  campaign  Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  messages  Message[]
+  diceRolls DiceRoll[]
+  npcs      NPC[]
+  combats   Combat[]
+  maps      Map[]
+}
+
+// ==========================================
+// Message - Mesaj
+// ==========================================
+
+model Message {
+  id         String   @id @default(cuid())
+  sessionId  String
+  senderId   String?
+  senderType String   // PLAYER, GM, SYSTEM, DICE, COMBAT
+  senderName String?
+  content    String
+  metadata   String?  // JSON
+  timestamp  DateTime @default(now())
+
+  // İlişkiler
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sender  User?       @relation(fields: [senderId], references: [id])
+}
+
+// ==========================================
+// DiceRoll - Zar Atımı
+// ==========================================
+
+model DiceRoll {
+  id          String   @id @default(cuid())
+  sessionId   String
+  characterId String?
+  diceType    String   // d4, d6, d8, d10, d12, d20, d100
+  count       Int      @default(1)
+  results     String   // JSON array
+  modifier    Int      @default(0)
+  total       Int
+  purpose     String?
+  timestamp   DateTime @default(now())
+
+  // İlişkiler
+  session   GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  character Character?  @relation(fields: [characterId], references: [id])
+}
+
+// ==========================================
+// Scenario - Senaryo
+// ==========================================
+
+model Scenario {
+  id             String   @id @default(cuid())
+  title          String
+  description    String
+  genre          String
+  difficulty     String   @default("Medium")
+  startingPrompt String
+  isOfficial     Boolean  @default(false)
+  isAIGenerated  Boolean  @default(false)
+  creatorId      String?
+  tags           String?  // JSON array
+  createdAt      DateTime @default(now())
+
+  // İlişkiler
+  creator   User?      @relation(fields: [creatorId], references: [id])
+  campaigns Campaign[]
+}
+
+// ==========================================
+// NPC - Non-Player Character
+// ==========================================
+
+model NPC {
+  id          String   @id @default(cuid())
+  sessionId   String
+  name        String
+  race        String?
+  role        String
+  personality String?
+  stats       String?  // JSON
+  isHostile   Boolean  @default(false)
+  dialogue    String?  // JSON
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+
+  // İlişkiler
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Combat - Savaş
+// ==========================================
+
+model Combat {
+  id           String   @id @default(cuid())
+  sessionId    String
+  participants String   // JSON
+  turnOrder    String   // JSON
+  currentTurn  Int      @default(0)
+  round        Int      @default(1)
+  status       String   @default("active")
+  log          String?  // JSON
+  createdAt    DateTime @default(now())
+
+  // İlişkiler
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// InventoryItem - Envanter Öğesi
+// ==========================================
+
+model InventoryItem {
+  id          String  @id @default(cuid())
+  characterId String
+  name        String
+  type        String
+  description String?
+  quantity    Int     @default(1)
+  properties  String? // JSON
+  equipped    Boolean @default(false)
+  weight      Float   @default(0)
+
+  // İlişkiler
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// Map - Harita
+// ==========================================
+
+model Map {
+  id            String   @id @default(cuid())
+  sessionId     String
+  name          String?
+  description   String?
+  imageUrl      String
+  isAIGenerated Boolean  @default(false)
+  prompt        String?
+  createdAt     DateTime @default(now())
+
+  // İlişkiler
+  session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// CampaignPlayer - Kampanya-Oyuncu İlişkisi (Pivot)
+// ==========================================
+
+model CampaignPlayer {
+  id          String   @id @default(cuid())
+  campaignId  String
+  userId      String
+  characterId String
+  joinedAt    DateTime @default(now())
+  isActive    Boolean  @default(true)
+
+  // İlişkiler
+  campaign  Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  character Character @relation(fields: [characterId], references: [id])
+
+  // Unique constraint
+  @@unique([campaignId, userId])
+}

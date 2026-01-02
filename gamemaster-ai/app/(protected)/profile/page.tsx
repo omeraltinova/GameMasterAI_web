@@ -1,31 +1,41 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Avatar, Badge } from "@/components/ui";
-import { useAuth } from "@/contexts/AuthContext";
-import { formatDate } from "@/lib/utils";
+import { useSession, signOut } from "next-auth/react";
 import { User, Mail, Calendar, Shield, Save, Lock, Bell, Palette } from "lucide-react";
 
 export default function ProfilePage() {
-  const { user, logout } = useAuth();
-  const [formData, setFormData] = useState({
-    username: user?.username || "",
-    email: user?.email || "",
-  });
+  const { data: session } = useSession();
+  const user = session?.user;
+
+  // initialize from session if available
+  const [formData, setFormData] = useState(() => ({
+    name: session?.user?.name ?? "",
+    email: session?.user?.email ?? "",
+  }));
+
   const [isSaving, setIsSaving] = useState(false);
+
+  // update only when session provides new values and defer the setState
+  useEffect(() => {
+    if (!session?.user) return;
+    const next = {
+      name: session.user.name ?? "",
+      email: session.user.email ?? "",
+    };
+    if (formData.name === next.name && formData.email === next.email) return;
+    const id = setTimeout(() => setFormData(next), 0);
+    return () => clearTimeout(id);
+  }, [session, formData.name, formData.email]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+    // API simülasyonu
     await new Promise((resolve) => setTimeout(resolve, 1000));
     console.log("Saving profile:", formData);
     setIsSaving(false);
-  };
-
-  const roleLabels = {
-    VISITOR: "Ziyaretçi",
-    MEMBER: "Üye",
-    ADMIN: "Admin",
   };
 
   return (
@@ -43,21 +53,21 @@ export default function ProfilePage() {
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <Avatar
-              src={user?.avatar}
-              fallback={user?.username}
+              src={user?.image || undefined}
+              fallback={user?.name || "U"}
               size="xl"
               className="w-24 h-24"
             />
             <div className="flex-1 text-center sm:text-left">
-              <h2 className="text-2xl font-bold">{user?.username}</h2>
+              <h2 className="text-2xl font-bold">{user?.name}</h2>
               <p className="text-foreground-secondary">{user?.email}</p>
               <div className="flex flex-wrap gap-2 mt-2 justify-center sm:justify-start">
                 <Badge variant="primary">
-                  {roleLabels[user?.role as keyof typeof roleLabels] || user?.role}
+                  MEMBER
                 </Badge>
                 <Badge variant="outline">
                   <Calendar className="h-3 w-3 mr-1" />
-                  {user?.createdAt ? formatDate(user.createdAt) : "Bugün"} tarihinden beri
+                  Aktif Üye
                 </Badge>
               </div>
             </div>
@@ -80,9 +90,10 @@ export default function ProfilePage() {
           <form onSubmit={handleSave} className="space-y-4">
             <Input
               label="Kullanıcı Adı"
-              value={formData.username}
+              // Input değeri formData.name ile eşleşmeli
+              value={formData.name} 
               onChange={(e) =>
-                setFormData({ ...formData, username: e.target.value })
+                setFormData({ ...formData, name: e.target.value })
               }
               leftIcon={<User className="h-4 w-4" />}
             />
@@ -90,9 +101,8 @@ export default function ProfilePage() {
               label="E-posta"
               type="email"
               value={formData.email}
-              onChange={(e) =>
-                setFormData({ ...formData, email: e.target.value })
-              }
+              readOnly 
+              className="opacity-70 cursor-not-allowed"
               leftIcon={<Mail className="h-4 w-4" />}
             />
             <Button type="submit" isLoading={isSaving} className="gap-2">
@@ -103,7 +113,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Security */}
+      {/* Security - Geri kalan kısımlar aynı */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -116,7 +126,7 @@ export default function ProfilePage() {
             <div>
               <h4 className="font-medium">Şifre</h4>
               <p className="text-sm text-foreground-muted">
-                Son değişiklik: Bilinmiyor
+                Daha güvenli bir şifre belirleyin
               </p>
             </div>
             <Button variant="outline" size="sm">
@@ -216,7 +226,7 @@ export default function ProfilePage() {
                 Bu cihazdan çıkış yap
               </p>
             </div>
-            <Button variant="danger" size="sm" onClick={logout}>
+            <Button variant="danger" size="sm" onClick={() => signOut({ callbackUrl: "/" })}>
               Çıkış Yap
             </Button>
           </div>
@@ -236,5 +246,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-

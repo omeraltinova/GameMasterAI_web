@@ -4,12 +4,15 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, Input } from "@/components/ui";
-import { useAuth } from "@/contexts/AuthContext";
+// DİKKAT: useAuth importunu kaldırdık çünkü artık API kullanıyoruz.
 import { Mail, Lock, Eye, EyeOff, User } from "lucide-react";
 
 export function RegisterForm() {
   const router = useRouter();
-  const { register, isLoading } = useAuth();
+  
+  // useAuth yerine kendi yükleniyor durumumuzu yönetiyoruz
+  const [isLoading, setIsLoading] = useState(false);
+  
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -23,6 +26,7 @@ export function RegisterForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    setIsLoading(true); // Yükleme başladı
 
     // Validation
     const newErrors: Record<string, string> = {};
@@ -53,21 +57,39 @@ export function RegisterForm() {
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
+      setIsLoading(false); // Hata varsa yüklemeyi durdur
       return;
     }
 
     try {
-      await register(formData.email, formData.username, formData.password);
-      router.push("/dashboard");
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          password: formData.password,
+        }),
+      });
+
+      if (res.ok) {
+        // Başarılı ise login sayfasına at
+        router.push("/login"); 
+      } else {
+        const data = await res.json();
+        setErrors({ general: data.message || "Kayıt başarısız." });
+      }
     } catch (error) {
-      setErrors({ general: "Kayıt başarısız. Lütfen tekrar deneyin." });
+      setErrors({ general: "Bir bağlantı hatası oluştu." });
+    } finally {
+      setIsLoading(false); // İşlem bitince yüklemeyi durdur
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {errors.general && (
-        <div className="p-3 rounded-lg bg-danger/10 border border-danger/30 text-danger text-sm">
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-sm">
           {errors.general}
         </div>
       )}
@@ -158,5 +180,3 @@ export function RegisterForm() {
     </form>
   );
 }
-
-

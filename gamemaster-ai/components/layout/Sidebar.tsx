@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
+import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   Users,
   Swords,
   Map,
-  BookOpen,
   User,
   Shield,
   ChevronLeft,
@@ -31,10 +30,11 @@ const adminItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { data: session } = useSession();
   const [collapsed, setCollapsed] = useState(false);
 
-  const isAdmin = user?.role === "ADMIN";
+  // DÜZELTME: 'any' yerine inline tip tanımı kullandık
+  const isAdmin = (session?.user as { role?: string })?.role === "ADMIN";
 
   return (
     <aside
@@ -128,5 +128,3 @@ export function Sidebar() {
     </aside>
   );
 }
-
-

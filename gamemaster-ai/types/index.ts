@@ -173,6 +173,39 @@ export interface GameSession {
 
 export type MessageSenderType = "PLAYER" | "GM" | "SYSTEM" | "DICE" | "COMBAT";
 
+export type GMActionType = 
+  | "dice_roll" 
+  | "choice" 
+  | "confirm" 
+  | "free_text"
+  | "skill_check"
+  | "saving_throw"
+  | "attack_roll";
+
+export interface GMAction {
+  id: string;
+  type: GMActionType;
+  label: string;
+  description?: string;
+  // Zar atışları için
+  diceType?: DiceType;
+  diceCount?: number;
+  modifier?: number;
+  skill?: string;
+  ability?: string;
+  dc?: number;
+  // Seçimler için
+  value?: string;
+  // Zorunlu mu?
+  isMandatory?: boolean;
+}
+
+export interface GMPrompt {
+  actions: GMAction[];
+  isMandatory: boolean; // Eğer true ise, kullanıcı chat yazamaz
+  promptText?: string; // Aksiyon için kısa açıklama
+}
+
 export interface Message {
   id: string;
   sessionId: string;
@@ -182,6 +215,8 @@ export interface Message {
   content: string;
   metadata?: Record<string, unknown>;
   timestamp: string;
+  // GM aksiyonları için
+  gmPrompt?: GMPrompt;
 }
 
 // ==========================================

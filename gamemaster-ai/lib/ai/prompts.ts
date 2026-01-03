@@ -234,12 +234,98 @@ export function buildContextPrompt(context: GameContext): string {
 // ============================================
 
 /**
- * Hikaye anlatımı için prompt
+ * Hikaye anlatımı için prompt - Yapılandırılmış JSON yanıt
  */
 export function getNarrationPrompt(playerAction: string): string {
   return `Oyuncunun aksiyonu: "${playerAction}"
 
-Bu aksiyona uygun bir hikaye devamı yaz. Gerekirse zar atımı iste. Oyuncunun seçimlerini etkili bir şekilde hikayeye entegre et.`;
+Bu aksiyona uygun bir hikaye devamı yaz. Yanıtını aşağıdaki JSON formatında ver:
+
+{
+  "narration": "Hikaye anlatımın buraya gelecek. Zengin betimlemeler ve atmosfer yarat.",
+  "gmPrompt": {
+    "isMandatory": false,
+    "promptText": "Zar atışı veya seçim için kısa açıklama (opsiyonel)",
+    "actions": [
+      {
+        "id": "unique_id",
+        "type": "dice_roll|choice|confirm|skill_check|saving_throw|attack_roll",
+        "label": "Buton metni",
+        "description": "Detaylı açıklama (opsiyonel)",
+        "diceType": "d20",
+        "diceCount": 1,
+        "modifier": 0,
+        "skill": "Perception|Stealth|Persuasion|vb.",
+        "ability": "STR|DEX|CON|INT|WIS|CHA",
+        "dc": 15,
+        "value": "seçim_değeri",
+        "isMandatory": true
+      }
+    ]
+  }
+}
+
+**Action Type Açıklamaları:**
+- "dice_roll": Basit zar atışı (diceType, diceCount, modifier)
+- "skill_check": Yetenek kontrolü (skill, diceType: d20, dc)
+- "saving_throw": Kurtarma atışı (ability, diceType: d20, dc)
+- "attack_roll": Saldırı zar atışı (diceType: d20, modifier)
+- "choice": Birden fazla seçenek sunma (value içinde seçimin değeri)
+- "confirm": Tek bir onay butonu
+
+**Kurallar:**
+1. Zar atışı gerektiren durumlarda isMandatory: true yap
+2. Birden fazla seçenek sunuyorsan her seçenek için ayrı action ekle
+3. Serbest metin bekleniyorsa actions dizisini boş bırak veya gmPrompt'u null yap
+4. skill_check için skill adını İngilizce yaz (Perception, Stealth, vb.)
+5. dc (Difficulty Class) D&D 5e standartlarına uygun olsun (10-25 arası)
+
+**Örnek Zar İsteği:**
+{
+  "narration": "Kapının arkasından gelen sesler kulağına ulaşıyor. Dikkatli dinlersen ne konuştuklarını anlayabilirsin.",
+  "gmPrompt": {
+    "isMandatory": true,
+    "promptText": "Kapının arkasını dinlemek için Perception kontrolü yap",
+    "actions": [
+      {
+        "id": "perception_check_1",
+        "type": "skill_check",
+        "label": "🎲 Perception Kontrolü",
+        "skill": "Perception",
+        "diceType": "d20",
+        "dc": 14,
+        "isMandatory": true
+      }
+    ]
+  }
+}
+
+**Örnek Seçenek Sunumu:**
+{
+  "narration": "Tüccar sana iki yol öneriyor: Doğudaki orman veya batıdaki dağlar.",
+  "gmPrompt": {
+    "isMandatory": false,
+    "promptText": "Hangi yolu seçeceksin?",
+    "actions": [
+      {
+        "id": "choice_forest",
+        "type": "choice",
+        "label": "🌲 Ormana Git",
+        "value": "forest",
+        "description": "Tehlikeli ama kısa"
+      },
+      {
+        "id": "choice_mountain",
+        "type": "choice",
+        "label": "⛰️ Dağlara Git",
+        "value": "mountain",
+        "description": "Güvenli ama uzun"
+      }
+    ]
+  }
+}
+
+Şimdi oyuncunun aksiyonuna yanıt ver.`;
 }
 
 /**

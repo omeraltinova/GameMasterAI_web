@@ -5,6 +5,19 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Visually hidden styles for accessibility
+const visuallyHiddenStyles = {
+  position: 'absolute' as const,
+  width: '1px',
+  height: '1px',
+  padding: 0,
+  margin: '-1px',
+  overflow: 'hidden',
+  clip: 'rect(0, 0, 0, 0)',
+  whiteSpace: 'nowrap' as const,
+  border: 0,
+};
+
 export interface ModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -47,19 +60,22 @@ function Modal({
             className
           )}
         >
-          {(title || description) && (
+          {/* Accessible title - always present but can be visually hidden */}
+          {title ? (
             <div className="p-6 pb-0">
-              {title && (
-                <Dialog.Title className="text-lg font-semibold text-foreground">
-                  {title}
-                </Dialog.Title>
-              )}
+              <Dialog.Title className="text-lg font-semibold text-foreground">
+                {title}
+              </Dialog.Title>
               {description && (
                 <Dialog.Description className="mt-1 text-sm text-foreground-secondary">
                   {description}
                 </Dialog.Description>
               )}
             </div>
+          ) : (
+            <Dialog.Title style={visuallyHiddenStyles}>
+              Dialog
+            </Dialog.Title>
           )}
           <div className="p-6">{children}</div>
           <Dialog.Close asChild>

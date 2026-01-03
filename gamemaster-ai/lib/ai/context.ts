@@ -174,7 +174,7 @@ export async function buildNPCContext(npcId: string): Promise<NPCContext> {
  */
 export function optimizeContext(
   context: GameContext,
-  maxTokens: number = 4000
+  maxTokens: number = 8000
 ): GameContext {
   // Basit token tahmini (1 token ≈ 4 karakter)
   const estimatedTokens = JSON.stringify(context).length / 4;

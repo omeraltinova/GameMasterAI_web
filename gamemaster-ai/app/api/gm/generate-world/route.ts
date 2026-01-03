@@ -86,7 +86,6 @@ GÖREV: Bir D&D kampanyası için dünya ayarları oluştur.
       userPrompt,
       {
         temperature: 0.9,
-        maxTokens: 2000,
       }
     );
 

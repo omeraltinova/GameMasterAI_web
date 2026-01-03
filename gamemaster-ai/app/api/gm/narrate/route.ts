@@ -4,6 +4,7 @@ import { getAIResponseWithContext } from '@/lib/ai/openrouter';
 import { SYSTEM_PROMPT, getNarrationPrompt } from '@/lib/ai/prompts';
 import { buildSessionContext } from '@/lib/ai/context';
 import { getUserId } from '@/lib/auth/server';
+import type { GMPrompt, GMAction } from '@/types';
 
 /**
  * POST /api/gm/narrate
@@ -89,9 +90,49 @@ export async function POST(req: NextRequest) {
       userPrompt,
       {
         temperature: 0.8,
-        maxTokens: 2000,
       }
     );
+
+    // AI yanıtını parse et
+    let narration: string = aiResponse;
+    let gmPrompt: GMPrompt | null = null;
+
+    try {
+      // JSON yanıtını parse etmeye çalış
+      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        
+        if (parsed.narration) {
+          narration = parsed.narration;
+        }
+        
+        if (parsed.gmPrompt && parsed.gmPrompt.actions && parsed.gmPrompt.actions.length > 0) {
+          gmPrompt = {
+            actions: parsed.gmPrompt.actions.map((action: any, index: number) => ({
+              id: action.id || `action_${Date.now()}_${index}`,
+              type: action.type || 'choice',
+              label: action.label || 'Seç',
+              description: action.description,
+              diceType: action.diceType,
+              diceCount: action.diceCount || 1,
+              modifier: action.modifier || 0,
+              skill: action.skill,
+              ability: action.ability,
+              dc: action.dc,
+              value: action.value,
+              isMandatory: action.isMandatory || false,
+            })) as GMAction[],
+            isMandatory: parsed.gmPrompt.isMandatory || false,
+            promptText: parsed.gmPrompt.promptText,
+          };
+        }
+      }
+    } catch (parseError) {
+      // JSON parse hatası, düz metin olarak kullan
+      console.log('AI response is not JSON, using as plain text');
+      narration = aiResponse;
+    }
 
     // Oyuncunun karakter adını bul
     const currentPlayer = gameSession.campaign.players.find(
@@ -112,13 +153,14 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // GM yanıtını kaydet
+    // GM yanıtını kaydet (metadata'da gmPrompt)
     const gmMessage = await prisma.message.create({
       data: {
         sessionId,
         senderType: 'GM',
         senderName: 'Game Master',
-        content: aiResponse,
+        content: narration,
+        metadata: gmPrompt ? JSON.stringify({ gmPrompt }) : undefined,
       },
     });
 
@@ -132,7 +174,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      narration: aiResponse,
+      narration,
+      gmPrompt,
       messageId: gmMessage.id,
       timestamp: gmMessage.timestamp,
     });

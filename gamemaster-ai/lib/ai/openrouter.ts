@@ -1,6 +1,8 @@
 // OpenRouter API Client
 // GameMaster AI için AI entegrasyonu
 
+import { logAIResponse, generateRequestId } from './logger';
+
 export interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
@@ -49,7 +51,9 @@ export async function callOpenRouter(
 
   const model = options?.model || process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet';
   const temperature = options?.temperature || 0.7;
-  const maxTokens = options?.maxTokens || 2000;
+  const maxTokens = options?.maxTokens || 10000;
+  const requestId = generateRequestId();
+  const startTime = Date.now();
 
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -70,10 +74,51 @@ export async function callOpenRouter(
 
     if (!response.ok) {
       const errorData: OpenRouterError = await response.json();
+      const duration = Date.now() - startTime;
+      
+      // Hata durumunu logla
+      logAIResponse({
+        timestamp: new Date().toISOString(),
+        requestId,
+        model,
+        temperature,
+        maxTokens,
+        messages: messages.map(m => ({ role: m.role, content: m.content.substring(0, 500) + (m.content.length > 500 ? '...' : '') })),
+        response: {
+          content: '',
+          finishReason: 'error',
+          usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+        },
+        duration,
+        error: errorData.error?.message || response.statusText,
+      });
+      
       throw new Error(`OpenRouter API Error: ${errorData.error?.message || response.statusText}`);
     }
 
     const data: OpenRouterResponse = await response.json();
+    const duration = Date.now() - startTime;
+    
+    // Başarılı yanıtı logla
+    logAIResponse({
+      timestamp: new Date().toISOString(),
+      requestId,
+      model,
+      temperature,
+      maxTokens,
+      messages: messages.map(m => ({ role: m.role, content: m.content.substring(0, 500) + (m.content.length > 500 ? '...' : '') })),
+      response: {
+        content: data.choices[0]?.message?.content || '',
+        finishReason: data.choices[0]?.finish_reason || 'unknown',
+        usage: {
+          promptTokens: data.usage?.prompt_tokens || 0,
+          completionTokens: data.usage?.completion_tokens || 0,
+          totalTokens: data.usage?.total_tokens || 0,
+        },
+      },
+      duration,
+    });
+    
     return data;
   } catch (error) {
     console.error('OpenRouter API call failed:', error);
@@ -100,7 +145,7 @@ export async function callOpenRouterStream(
 
   const model = options?.model || process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet';
   const temperature = options?.temperature || 0.7;
-  const maxTokens = options?.maxTokens || 2000;
+  const maxTokens = options?.maxTokens || 10000;
 
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',

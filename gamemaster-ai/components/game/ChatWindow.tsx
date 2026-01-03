@@ -2,11 +2,25 @@
 
 import { useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import type { Message } from "@/types";
-import { Bot, User, Dice6, Swords, AlertCircle } from "lucide-react";
+import type { Message, GMAction } from "@/types";
+import { Bot, User, Dice6, Swords, AlertCircle, RotateCcw, MoreVertical, RefreshCw } from "lucide-react";
+import { ActionButtons } from "./ActionButtons";
+import { 
+  DropdownMenu, 
+  DropdownMenuTrigger, 
+  DropdownMenuContent, 
+  DropdownMenuItem 
+} from "@/components/ui";
 
 interface ChatWindowProps {
   messages: Message[];
+  onActionSelect?: (action: GMAction, messageId: string) => void;
+  onDiceRoll?: (action: GMAction, messageId: string) => void;
+  onRestartFromMessage?: (messageId: string) => void;
+  onRegenerateMessage?: (messageId: string) => void;
+  isActionLoading?: boolean;
+  disableActions?: boolean;
+  canRestart?: boolean; // Sadece creator için göster
 }
 
 const senderConfig = {
@@ -47,7 +61,16 @@ const senderConfig = {
   },
 };
 
-export function ChatWindow({ messages }: ChatWindowProps) {
+export function ChatWindow({ 
+  messages, 
+  onActionSelect, 
+  onDiceRoll,
+  onRestartFromMessage,
+  onRegenerateMessage,
+  isActionLoading = false,
+  disableActions = false,
+  canRestart = false,
+}: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -57,6 +80,11 @@ export function ChatWindow({ messages }: ChatWindowProps) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+  
+  // En son GM mesajını bul (aksiyon butonları için)
+  const lastGMMessageWithPrompt = [...messages].reverse().find(
+    m => m.senderType === 'GM' && m.gmPrompt && m.gmPrompt.actions && m.gmPrompt.actions.length > 0
+  );
 
   // Empty state
   if (!messages || messages.length === 0) {
@@ -108,11 +136,20 @@ export function ChatWindow({ messages }: ChatWindowProps) {
 
         const isRight = config.align === "right";
 
+        // İlk mesaj değilse restart göster (en az 1 mesaj olmalı)
+        const showRestartOption = canRestart && onRestartFromMessage && index > 0;
+        
+        // GM mesajları için regenerate seçeneği
+        const showRegenerateOption = canRestart && onRegenerateMessage && message.senderType === 'GM' && index > 0;
+        
+        // En az bir seçenek varsa dropdown göster
+        const showDropdown = showRestartOption || showRegenerateOption;
+
         return (
           <div
             key={message.id || index}
             className={cn(
-              "flex gap-3 animate-slide-up",
+              "flex gap-3 animate-slide-up group relative",
               isRight && "flex-row-reverse"
             )}
             style={{ animationDelay: `${index * 0.05}s` }}
@@ -129,16 +166,51 @@ export function ChatWindow({ messages }: ChatWindowProps) {
 
             {/* Message Bubble */}
             <div className={cn("max-w-[75%]", isRight && "text-right")}>
-              {message.senderName && (
-                <p
-                  className={cn(
-                    "text-xs text-foreground-muted mb-1",
-                    isRight && "text-right"
-                  )}
-                >
-                  {message.senderName}
-                </p>
-              )}
+              <div className={cn(
+                "flex items-center gap-2 mb-1",
+                isRight && "flex-row-reverse"
+              )}>
+                {message.senderName && (
+                  <p className="text-xs text-foreground-muted">
+                    {message.senderName}
+                  </p>
+                )}
+                
+                {/* Options Dropdown - Hover'da görünür */}
+                {showDropdown && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button 
+                        className="p-1 rounded hover:bg-background-elevated transition-all duration-200 opacity-0 group-hover:opacity-100 pointer-events-auto"
+                        title="Seçenekler"
+                      >
+                        <MoreVertical className="h-3 w-3 text-foreground-muted" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align={isRight ? "end" : "start"}>
+                      {showRegenerateOption && (
+                        <DropdownMenuItem 
+                          onClick={() => onRegenerateMessage!(message.id)}
+                          className="gap-2 text-primary"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                          Mesajı Yeniden Üret
+                        </DropdownMenuItem>
+                      )}
+                      {showRestartOption && (
+                        <DropdownMenuItem 
+                          onClick={() => onRestartFromMessage!(message.id)}
+                          className="gap-2 text-warning"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Buradan Yeniden Başlat
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+              
               <div
                 className={cn(
                   "p-4 rounded-lg border",
@@ -150,6 +222,20 @@ export function ChatWindow({ messages }: ChatWindowProps) {
                   {message.content}
                 </p>
               </div>
+              
+              {/* GM Aksiyon Butonları - Sadece son GM mesajında ve gmPrompt varsa göster */}
+              {message.id === lastGMMessageWithPrompt?.id && 
+               message.gmPrompt && 
+               onActionSelect && (
+                <ActionButtons
+                  gmPrompt={message.gmPrompt}
+                  onActionSelect={(action) => onActionSelect(action, message.id)}
+                  onDiceRoll={onDiceRoll ? (action) => onDiceRoll(action, message.id) : undefined}
+                  isLoading={isActionLoading}
+                  disabled={disableActions}
+                />
+              )}
+              
               <p
                 className={cn(
                   "text-xs text-foreground-muted mt-1",

@@ -69,9 +69,28 @@ export async function GET(
       where: { sessionId },
     });
 
+    // Mesajları işle - metadata'dan gmPrompt'u çıkar
+    const processedMessages = messages.map((msg) => {
+      let gmPrompt = undefined;
+      if (msg.metadata) {
+        try {
+          const metadata = JSON.parse(msg.metadata);
+          if (metadata.gmPrompt) {
+            gmPrompt = metadata.gmPrompt;
+          }
+        } catch (e) {
+          // metadata parse edilemezse ignore et
+        }
+      }
+      return {
+        ...msg,
+        gmPrompt,
+      };
+    });
+
     return NextResponse.json({
       success: true,
-      messages: messages.reverse(), // Kronolojik sıraya koy
+      messages: processedMessages.reverse(), // Kronolojik sıraya koy
       pagination: {
         limit,
         offset,

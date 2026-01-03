@@ -10,7 +10,8 @@ import type {
   GameState, 
   Character, 
   Campaign,
-  DiceType
+  DiceType,
+  GMPrompt
 } from '@/types';
 
 /**
@@ -227,6 +228,7 @@ export function useGM(sessionId: string) {
       const data = await post<{ 
         success: boolean;
         narration: string;
+        gmPrompt?: GMPrompt;
         messageId: string;
         timestamp: string;
       }>(
@@ -336,6 +338,73 @@ export function useGM(sessionId: string) {
     npcDialogue,
     describeLocation,
     combatAction,
+  };
+}
+
+/**
+ * Suggestion tipi
+ */
+export interface Suggestion {
+  id: string;
+  shortLabel: string;
+  detailedAction: string;
+}
+
+/**
+ * useSuggestions Hook - AI aksiyon önerileri
+ */
+export function useSuggestions(sessionId: string) {
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Önerileri getir
+   */
+  const fetchSuggestions = useCallback(async (lastGMMessage: string) => {
+    if (!sessionId) return null;
+    
+    setIsLoading(true);
+    setError(null);
+    setSuggestions([]);
+    
+    try {
+      const data = await post<{ 
+        success: boolean;
+        suggestions: Suggestion[];
+      }>(
+        '/gm/suggestions',
+        {
+          sessionId,
+          lastGMMessage,
+        }
+      );
+      
+      if (data.success && data.suggestions) {
+        setSuggestions(data.suggestions);
+      }
+      return data;
+    } catch (err) {
+      setError(err instanceof APIError ? err.message : 'Öneriler yüklenemedi');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  /**
+   * Önerileri temizle
+   */
+  const clearSuggestions = useCallback(() => {
+    setSuggestions([]);
+  }, []);
+
+  return {
+    suggestions,
+    isLoading,
+    error,
+    fetchSuggestions,
+    clearSuggestions,
   };
 }
 

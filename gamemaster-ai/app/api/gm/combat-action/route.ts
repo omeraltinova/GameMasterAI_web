@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
       userPrompt,
       {
         temperature: 0.7,
-        maxTokens: 1500,
+        maxTokens: 10000,
       }
     );
 

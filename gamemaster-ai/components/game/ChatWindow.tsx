@@ -49,12 +49,32 @@ const senderConfig = {
 
 export function ChatWindow({ messages }: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+  // Empty state
+  if (!messages || messages.length === 0) {
+    return (
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-4 flex items-center justify-center"
+      >
+        <div className="text-center text-foreground-muted">
+          <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <h3 className="font-medium mb-2">Maceraya Hoş Geldin!</h3>
+          <p className="text-sm">
+            Aksiyonunu yazarak hikayeye başla.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -145,6 +165,8 @@ export function ChatWindow({ messages }: ChatWindowProps) {
           </div>
         );
       })}
+      {/* Auto-scroll anchor */}
+      <div ref={messagesEndRef} />
     </div>
   );
 }

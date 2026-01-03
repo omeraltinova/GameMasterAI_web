@@ -51,3 +51,17 @@ Thumbs.db
 .eslintcache
 .turbo
 *.local
+
+# Database
+*.db
+*.db-journal
+prisma/*.db
+prisma/*.db-journal
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/

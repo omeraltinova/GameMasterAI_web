@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Badge } from "@/components/ui";
 import { mockScenarios } from "@/lib/mock-data";
-import { ArrowLeft, Swords, Users, User, Map, Check } from "lucide-react";
+import { post } from "@/lib/api/client";
+import { ArrowLeft, Swords, Users, User, Map, Check, Loader2 } from "lucide-react";
 
 export default function NewCampaignPage() {
   const router = useRouter();
@@ -16,13 +17,37 @@ export default function NewCampaignPage() {
     isMultiplayer: false,
     maxPlayers: 4,
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const selectedScenario = mockScenarios.find((s) => s.id === formData.scenarioId);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Creating campaign:", formData);
-    router.push("/campaigns");
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await post<{ success: boolean; campaign: { id: string }; message?: string }>('/campaigns', {
+        name: formData.name,
+        description: formData.description || undefined,
+        scenarioId: formData.scenarioId || undefined,
+        isMultiplayer: formData.isMultiplayer,
+        maxPlayers: formData.maxPlayers,
+      });
+
+      if (response.success && response.campaign) {
+        // Yeni oluşturulan kampanyaya yönlendir
+        router.push(`/campaigns/${response.campaign.id}`);
+      } else {
+        setError('Kampanya oluşturulamadı');
+      }
+    } catch (err: any) {
+      console.error('Kampanya oluşturma hatası:', err);
+      setError(err?.message || 'Bir hata oluştu');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -246,16 +271,32 @@ export default function NewCampaignPage() {
           </Card>
         )}
 
+        {/* Error Message */}
+        {error && (
+          <div className="p-4 rounded-lg bg-destructive/10 border border-destructive text-destructive text-sm">
+            {error}
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex gap-4">
           <Link href="/campaigns" className="flex-1">
-            <Button variant="outline" className="w-full">
+            <Button variant="outline" className="w-full" disabled={isLoading}>
               İptal
             </Button>
           </Link>
-          <Button type="submit" className="flex-1 gap-2" disabled={!formData.name}>
-            <Check className="h-4 w-4" />
-            Kampanyayı Oluştur
+          <Button type="submit" className="flex-1 gap-2" disabled={!formData.name || isLoading}>
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Oluşturuluyor...
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4" />
+                Kampanyayı Oluştur
+              </>
+            )}
           </Button>
         </div>
       </form>

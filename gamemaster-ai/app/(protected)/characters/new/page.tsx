@@ -6,8 +6,9 @@ import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Badge, Progress } from "@/components/ui";
 import { races, classes, backgrounds } from "@/lib/mock-data";
 import { rollAbilityScore, formatModifier, calculateModifier } from "@/lib/utils";
+import { post } from "@/lib/api/client";
 import type { CharacterStats } from "@/types";
-import { ArrowLeft, ArrowRight, Dices, Check, User, Swords, Sparkles, BookOpen } from "lucide-react";
+import { ArrowLeft, ArrowRight, Dices, Check, User, Swords, Sparkles, BookOpen, Loader2 } from "lucide-react";
 
 type WizardStep = "race" | "class" | "stats" | "details";
 
@@ -38,6 +39,8 @@ export default function NewCharacterPage() {
     background: "",
     backstory: "",
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep);
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
@@ -83,10 +86,41 @@ export default function NewCharacterPage() {
     });
   };
 
-  const handleSubmit = () => {
-    console.log("Creating character:", formData);
-    // In a real app, this would save to the database
-    router.push("/characters");
+  const handleSubmit = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // HP hesapla - sınıfa göre hit die + constitution modifier
+      const selectedClass = classes.find(c => c.name === formData.class);
+      const hitDie = selectedClass ? parseInt(selectedClass.hitDie.replace('d', '')) : 10;
+      const conModifier = calculateModifier(formData.stats.constitution);
+      const maxHp = hitDie + conModifier;
+
+      const response = await post<{ success: boolean; character: { id: string }; message?: string }>('/characters', {
+        name: formData.name,
+        race: formData.race,
+        class: formData.class,
+        level: 1,
+        experience: 0,
+        hp: maxHp,
+        maxHp: maxHp,
+        stats: formData.stats,
+        background: formData.background || undefined,
+      });
+
+      if (response.success && response.character) {
+        // Yeni oluşturulan karaktere yönlendir
+        router.push(`/characters/${response.character.id}`);
+      } else {
+        setError('Karakter oluşturulamadı');
+      }
+    } catch (err: any) {
+      console.error('Karakter oluşturma hatası:', err);
+      setError(err?.message || 'Bir hata oluştu');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -307,6 +341,13 @@ export default function NewCharacterPage() {
                   {formData.background && `(${formData.background})`}
                 </p>
               </div>
+
+              {/* Error Message */}
+              {error && (
+                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive text-destructive text-sm">
+                  {error}
+                </div>
+              )}
             </div>
           )}
         </CardContent>
@@ -327,11 +368,20 @@ export default function NewCharacterPage() {
         {currentStep === "details" ? (
           <Button
             onClick={handleSubmit}
-            disabled={!canProceed()}
+            disabled={!canProceed() || isLoading}
             className="gap-2"
           >
-            <Check className="h-4 w-4" />
-            Karakteri Oluştur
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Oluşturuluyor...
+              </>
+            ) : (
+              <>
+                <Check className="h-4 w-4" />
+                Karakteri Oluştur
+              </>
+            )}
           </Button>
         ) : (
           <Button

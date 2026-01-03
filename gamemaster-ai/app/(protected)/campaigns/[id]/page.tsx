@@ -1,9 +1,8 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar } from "@/components/ui";
-import { mockCampaigns, mockCampaignPlayers, mockScenarios, mockCharacters } from "@/lib/mock-data";
 import {
   ArrowLeft,
   Play,
@@ -15,24 +14,156 @@ import {
   Map,
   Clock,
   UserPlus,
+  Loader2,
+  Crown,
+  LogOut,
+  UserCheck,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatDate } from "@/lib/utils";
+import { get, post, del } from "@/lib/api/client";
+import { useSession } from "next-auth/react";
 
 export default function CampaignLobbyPage() {
   const params = useParams();
+  const router = useRouter();
+  const { data: session } = useSession();
   const [codeCopied, setCodeCopied] = useState(false);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
+  const [campaign, setCampaign] = useState<any>(null);
+  const [scenario, setScenario] = useState<any>(null);
+  const [players, setPlayers] = useState<any[]>([]);
+  const [availableCharacters, setAvailableCharacters] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [myPlayer, setMyPlayer] = useState<any>(null);
 
-  const campaign = mockCampaigns.find((c) => c.id === params.id);
-  const scenario = campaign?.scenarioId
-    ? mockScenarios.find((s) => s.id === campaign.scenarioId)
-    : null;
-  const players = mockCampaignPlayers.filter((p) => p.campaignId === params.id);
+  const currentUserId = session?.user?.id;
+  const isCreator = campaign?.creatorId === currentUserId;
 
-  // Get user's available characters for this campaign
-  const availableCharacters = mockCharacters.filter(
-    (c) => c.userId === "user_1" && !c.campaignId
-  );
+  // Fetch campaign data
+  useEffect(() => {
+    const fetchCampaignData = async () => {
+      if (!params.id) return;
+
+      setIsLoading(true);
+      try {
+        const response = await get(`/campaigns/${params.id}`) as { success: boolean; campaign: any };
+        if (response && response.success && response.campaign) {
+          setCampaign(response.campaign);
+          
+          // Set scenario if exists
+          if (response.campaign.scenario) {
+            setScenario(response.campaign.scenario);
+          }
+          
+          // Set players
+          if (response.campaign.players) {
+            setPlayers(response.campaign.players);
+            
+            // Kullanıcının player kaydını bul
+            const myPlayerRecord = response.campaign.players.find(
+              (p: any) => p.userId === currentUserId
+            );
+            setMyPlayer(myPlayerRecord || null);
+            
+            if (myPlayerRecord?.characterId) {
+              setSelectedCharacterId(myPlayerRecord.characterId);
+            }
+          }
+          
+          // Get user's available characters
+          const charsResponse = await get('/characters') as { success: boolean; characters: any[] };
+          if (charsResponse && charsResponse.success && charsResponse.characters) {
+            // Başka kampanyada olmayan veya bu kampanyada olan karakterler
+            const available = charsResponse.characters.filter(
+              (c: any) => !c.campaignId || c.campaignId === response.campaign.id
+            );
+            setAvailableCharacters(available);
+          }
+        }
+      } catch (error) {
+        console.error('Campaign alınamadı:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCampaignData();
+  }, [params.id, currentUserId]);
+
+  // Fetch active session for this campaign
+  useEffect(() => {
+    const fetchActiveSession = async () => {
+      if (!campaign) return;
+      
+      setIsLoadingSession(true);
+      try {
+        const sessions = await get(`/campaigns/${campaign.id}/sessions`);
+        if (Array.isArray(sessions) && sessions.length > 0) {
+          setActiveSessionId(sessions[0].id);
+        }
+      } catch (error) {
+        console.error('Session alınamadı:', error);
+      } finally {
+        setIsLoadingSession(false);
+      }
+    };
+
+    fetchActiveSession();
+  }, [campaign]);
+
+  // Karakter seçimi ile lobiye katıl
+  const handleJoinWithCharacter = async (characterId: string) => {
+    if (!campaign) return;
+    
+    setIsJoining(true);
+    try {
+      const response = await post<{ success: boolean; message?: string }>(
+        `/campaigns/${campaign.id}/join`,
+        { characterId }
+      );
+      if (response && response.success) {
+        setSelectedCharacterId(characterId);
+        // Sayfayı yenile
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Lobiye katılma hatası:', error);
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
+  // Lobiden ayrıl
+  const handleLeaveLobby = async () => {
+    if (!campaign) return;
+    
+    setIsLeaving(true);
+    try {
+      const response = await del<{ success: boolean; message?: string }>(
+        `/campaigns/${campaign.id}/join`
+      );
+      if (response && response.success) {
+        router.push('/campaigns');
+      }
+    } catch (error) {
+      console.error('Lobiden ayrılma hatası:', error);
+    } finally {
+      setIsLeaving(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-foreground-muted" />
+      </div>
+    );
+  }
 
   if (!campaign) {
     return (
@@ -53,12 +184,44 @@ export default function CampaignLobbyPage() {
     }
   };
 
-  const statusColors = {
+  const statusColors: Record<string, "default" | "success" | "warning" | "secondary" | "outline" | "primary" | "danger"> = {
     DRAFT: "default",
     ACTIVE: "success",
     PAUSED: "warning",
     COMPLETED: "secondary",
-  } as const;
+  };
+
+  // Creator'ı ve players'ı birleştir
+  const getAllParticipants = () => {
+    const participants: any[] = [];
+    
+    // Creator'ı ekle (players listesinde değilse)
+    const creatorInPlayers = players.find((p: any) => p.userId === campaign.creatorId);
+    
+    if (!creatorInPlayers && campaign.creator) {
+      participants.push({
+        id: 'creator',
+        userId: campaign.creatorId,
+        user: campaign.creator,
+        character: null,
+        isActive: true,
+        isCreator: true,
+      });
+    }
+    
+    // Players'ı ekle
+    players.forEach((player: any) => {
+      participants.push({
+        ...player,
+        isCreator: player.userId === campaign.creatorId,
+      });
+    });
+    
+    return participants;
+  };
+
+  const allParticipants = getAllParticipants();
+  const hasJoined = myPlayer !== null || isCreator;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -84,20 +247,84 @@ export default function CampaignLobbyPage() {
           )}
         </div>
         <div className="flex gap-3">
-          <Link href={`/campaigns/${campaign.id}/settings`}>
-            <Button variant="outline" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Ayarlar
-            </Button>
-          </Link>
-          {campaign.status === "ACTIVE" && (
-            <Link href={`/campaigns/${campaign.id}/play`}>
-              <Button className="gap-2">
-                <Play className="h-4 w-4" />
-                Oyuna Başla
+          {isCreator && (
+            <Link href={`/campaigns/${campaign.id}/settings`}>
+              <Button variant="outline" className="gap-2">
+                <Settings className="h-4 w-4" />
+                Ayarlar
               </Button>
             </Link>
           )}
+          <div className="flex gap-2">
+            {/* Play/Resume Button - sadece karakter seçilmişse */}
+            {(campaign.status === "ACTIVE" || campaign.status === "PAUSED") && hasJoined && (
+              <Link href={`/campaigns/${campaign.id}/play`}>
+                <Button className="gap-2" disabled={isLoadingSession}>
+                  {isLoadingSession ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                  {campaign.status === "PAUSED" ? "Oyuna Devam Et" : "Oyuna Başla"}
+                </Button>
+              </Link>
+            )}
+
+            {/* Draft durumunda oyuna başla - sadece creator */}
+            {campaign.status === "DRAFT" && isCreator && (
+              <Button
+                className="gap-2"
+                onClick={async () => {
+                  try {
+                    // Kampanya durumunu ACTIVE yap
+                    await post(`/campaigns/${campaign.id}/pause`); // Bu endpoint ACTIVE'e de çevirebilir
+                    window.location.reload();
+                  } catch (err) {
+                    console.error('Başlatma hatası:', err);
+                  }
+                }}
+              >
+                <Play className="h-4 w-4" />
+                Kampanyayı Başlat
+              </Button>
+            )}
+
+            {/* Pause Button */}
+            {campaign.status === "ACTIVE" && isCreator && (
+              <Button
+                variant="outline"
+                className="gap-2"
+                onClick={async () => {
+                  try {
+                    await post(`/campaigns/${campaign.id}/pause`);
+                    window.location.reload();
+                  } catch (err) {
+                    console.error('Pause hatası:', err);
+                  }
+                }}
+              >
+                <Clock className="h-4 w-4" />
+                Duraklat
+              </Button>
+            )}
+
+            {/* Lobiden Ayrıl - creator değilse */}
+            {hasJoined && !isCreator && (
+              <Button
+                variant="outline"
+                className="gap-2 text-danger hover:bg-danger/10"
+                onClick={handleLeaveLobby}
+                disabled={isLeaving}
+              >
+                {isLeaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <LogOut className="h-4 w-4" />
+                )}
+                Lobiden Ayrıl
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -146,16 +373,20 @@ export default function CampaignLobbyPage() {
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
                   <Users className="h-5 w-5 text-primary" />
-                  Oyuncular ({players.length}/{campaign.maxPlayers})
+                  Oyuncular ({allParticipants.length}/{campaign.maxPlayers})
                 </CardTitle>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {players.map((player) => (
+                {allParticipants.map((player: any) => (
                   <div
                     key={player.id}
-                    className="flex items-center gap-4 p-4 rounded-lg bg-background-elevated"
+                    className={`flex items-center gap-4 p-4 rounded-lg ${
+                      player.userId === currentUserId
+                        ? 'bg-primary/10 border border-primary/30'
+                        : 'bg-background-elevated'
+                    }`}
                   >
                     <Avatar
                       src={player.user?.avatar}
@@ -164,27 +395,37 @@ export default function CampaignLobbyPage() {
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">{player.user?.username}</h4>
-                        {player.userId === campaign.creatorId && (
-                          <Badge variant="primary" size="sm">
+                        <h4 className="font-semibold">
+                          {player.user?.username}
+                          {player.userId === currentUserId && (
+                            <span className="text-primary ml-1">(Sen)</span>
+                          )}
+                        </h4>
+                        {player.isCreator && (
+                          <Badge variant="warning" size="sm" className="gap-1">
+                            <Crown className="h-3 w-3" />
                             Kurucu
                           </Badge>
                         )}
                       </div>
-                      {player.character && (
+                      {player.character ? (
                         <p className="text-sm text-foreground-secondary">
                           {player.character.name} - Lv.{player.character.level}{" "}
                           {player.character.race} {player.character.class}
                         </p>
+                      ) : (
+                        <p className="text-sm text-foreground-muted italic">
+                          Karakter seçmedi
+                        </p>
                       )}
                     </div>
                     <Badge variant={player.isActive ? "success" : "default"}>
-                      {player.isActive ? "Aktif" : "Pasif"}
+                      {player.isActive ? "Hazır" : "Bekliyor"}
                     </Badge>
                   </div>
                 ))}
 
-                {players.length < campaign.maxPlayers && (
+                {allParticipants.length < campaign.maxPlayers && (
                   <div className="flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-border text-foreground-muted">
                     <UserPlus className="h-5 w-5" />
                     <span>Oyuncu bekleniyor...</span>
@@ -197,8 +438,8 @@ export default function CampaignLobbyPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Invite Code */}
-          {campaign.inviteCode && campaign.isMultiplayer && (
+          {/* Invite Code - her zaman göster */}
+          {campaign.inviteCode && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Davet Kodu</CardTitle>
@@ -242,6 +483,10 @@ export default function CampaignLobbyPage() {
                 </Badge>
               </div>
               <div className="flex items-center justify-between text-sm">
+                <span className="text-foreground-muted">Kurucu</span>
+                <span>{campaign.creator?.username}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
                 <span className="text-foreground-muted">Oluşturulma</span>
                 <span>{formatDate(campaign.createdAt)}</span>
               </div>
@@ -255,25 +500,43 @@ export default function CampaignLobbyPage() {
           {/* Character Selection */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Karakterin</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-primary" />
+                Karakterini Seç
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {availableCharacters.length > 0 ? (
                 <div className="space-y-2">
-                  {availableCharacters.slice(0, 3).map((char) => (
-                    <button
-                      key={char.id}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all text-left"
-                    >
-                      <Avatar fallback={char.name} size="sm" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{char.name}</p>
-                        <p className="text-xs text-foreground-muted">
-                          Lv.{char.level} {char.class}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
+                  {availableCharacters.map((char: any) => {
+                    const isSelected = selectedCharacterId === char.id;
+                    return (
+                      <button
+                        key={char.id}
+                        onClick={() => handleJoinWithCharacter(char.id)}
+                        disabled={isJoining || isSelected}
+                        className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
+                          isSelected
+                            ? 'border-primary bg-primary/10'
+                            : 'border-border hover:border-primary/50 hover:bg-background-elevated'
+                        } ${isJoining ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Avatar fallback={char.name} size="sm" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{char.name}</p>
+                          <p className="text-xs text-foreground-muted">
+                            Lv.{char.level} {char.race} {char.class}
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <Badge variant="success" size="sm">
+                            <Check className="h-3 w-3 mr-1" />
+                            Seçili
+                          </Badge>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-4">
@@ -287,6 +550,13 @@ export default function CampaignLobbyPage() {
                   </Link>
                 </div>
               )}
+              
+              {isJoining && (
+                <div className="flex items-center justify-center gap-2 mt-3 text-sm text-foreground-muted">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Lobiye katılınıyor...
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -294,5 +564,3 @@ export default function CampaignLobbyPage() {
     </div>
   );
 }
-
-

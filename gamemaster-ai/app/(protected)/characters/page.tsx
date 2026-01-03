@@ -1,19 +1,38 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import { Button, Card, CardContent } from "@/components/ui";
 import { CharacterCard } from "@/components/character";
-import { mockCharacters } from "@/lib/mock-data";
-import { Plus, Users, Search } from "lucide-react";
-import { useState } from "react";
+import { Plus, Users, Search, Loader2 } from "lucide-react";
+import { get } from "@/lib/api/client";
+import type { Character } from "@/types";
 
 export default function CharactersPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  
-  // Filter to user's characters (mock: user_1)
-  const userCharacters = mockCharacters.filter(c => c.userId === "user_1");
-  
-  const filteredCharacters = userCharacters.filter(c =>
+  const [characters, setCharacters] = useState<Character[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch characters from API
+  useEffect(() => {
+    const fetchCharacters = async () => {
+      setIsLoading(true);
+      try {
+        const response = await get('/characters') as { success: boolean; characters: Character[] };
+        if (response?.success && Array.isArray(response.characters)) {
+          setCharacters(response.characters);
+        }
+      } catch (error) {
+        console.error('Karakterler alınamadı:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCharacters();
+  }, []);
+
+  const filteredCharacters = characters.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.class.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.race.toLowerCase().includes(searchQuery.toLowerCase())
@@ -26,7 +45,7 @@ export default function CharactersPage() {
         <div>
           <h1 className="text-3xl font-bold">Karakterlerim</h1>
           <p className="text-foreground-secondary">
-            {userCharacters.length} karakter
+            {characters.length} karakter
           </p>
         </div>
         <Link href="/characters/new">
@@ -50,13 +69,17 @@ export default function CharactersPage() {
       </div>
 
       {/* Characters Grid */}
-      {filteredCharacters.length > 0 ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="h-8 w-8 animate-spin text-foreground-muted" />
+        </div>
+      ) : filteredCharacters.length > 0 ? (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {filteredCharacters.map((character) => (
-            <CharacterCard key={character.id} character={character} />
+            <CharacterCard key={character.id} character={character as any} />
           ))}
         </div>
-      ) : userCharacters.length === 0 ? (
+      ) : characters.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
             <Users className="h-16 w-16 text-foreground-muted mx-auto mb-4" />

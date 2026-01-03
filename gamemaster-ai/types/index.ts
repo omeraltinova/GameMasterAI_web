@@ -68,6 +68,7 @@ export interface Character {
   imageUrl?: string;
   createdAt: string;
   updatedAt: string;
+  inventory?: InventoryItem[];
 }
 
 // ==========================================
@@ -161,6 +162,9 @@ export interface GameSession {
   aiContext?: string;
   createdAt: string;
   updatedAt: string;
+  campaign?: Campaign & {
+    players?: CampaignPlayer[];
+  };
 }
 
 // ==========================================

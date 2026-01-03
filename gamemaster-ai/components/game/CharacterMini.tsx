@@ -8,11 +8,37 @@ interface CharacterMiniProps {
 }
 
 export function CharacterMini({ character }: CharacterMiniProps) {
-  const hpPercentage = (character.hp / character.maxHp) * 100;
+  // Safe defaults to prevent NaN errors
+  const stats = character?.stats;
+  const hp = character?.hp ?? 0;
+  const maxHp = character?.maxHp ?? 100;
+  const name = character?.name ?? '';
+  const level = character?.level ?? 1;
+  const race = character?.race ?? '';
+  const charClass = character?.class ?? '';
+  const imageUrl = character?.imageUrl;
+  const inventory = character?.inventory;
+
+  // Return loading state if no character or no stats
+  if (!character || !stats) {
+    return (
+      <Card>
+        <CardContent className="p-4">
+          <div className="text-center py-8">
+            <p className="text-sm text-foreground-secondary">
+              Karakter bilgisi yükleniyor...
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const hpPercentage = (hp / maxHp) * 100;
   const hpVariant =
     hpPercentage < 33 ? "danger" : hpPercentage < 66 ? "warning" : "success";
 
-  const ac = 10 + calculateModifier(character.stats.dexterity);
+  const ac = 10 + calculateModifier(stats.dexterity ?? 10);
 
   return (
     <Card>
@@ -20,19 +46,19 @@ export function CharacterMini({ character }: CharacterMiniProps) {
         {/* Header */}
         <div className="flex items-center gap-3 mb-4">
           <Avatar
-            src={character.imageUrl}
-            fallback={character.name}
+            src={imageUrl}
+            fallback={name}
             size="lg"
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <h4 className="font-semibold truncate">{character.name}</h4>
+              <h4 className="font-semibold truncate">{name}</h4>
               <Badge variant="primary" size="sm">
-                Lv.{character.level}
+                Lv.{level}
               </Badge>
             </div>
             <p className="text-sm text-foreground-secondary">
-              {character.race} {character.class}
+              {race} {charClass}
             </p>
           </div>
         </div>
@@ -45,12 +71,12 @@ export function CharacterMini({ character }: CharacterMiniProps) {
               HP
             </span>
             <span className="font-mono">
-              {character.hp}/{character.maxHp}
+              {hp}/{maxHp}
             </span>
           </div>
           <Progress
-            value={character.hp}
-            max={character.maxHp}
+            value={hp}
+            max={maxHp}
             variant={hpVariant}
             size="md"
           />
@@ -67,14 +93,14 @@ export function CharacterMini({ character }: CharacterMiniProps) {
             <Sword className="h-4 w-4 mx-auto mb-1 text-secondary" />
             <p className="text-xs text-foreground-muted">STR</p>
             <p className="font-bold">
-              {formatModifier(calculateModifier(character.stats.strength))}
+              {formatModifier(calculateModifier(stats.strength ?? 10))}
             </p>
           </div>
           <div className="p-2 rounded-lg bg-background-elevated text-center">
             <Sparkles className="h-4 w-4 mx-auto mb-1 text-accent" />
             <p className="text-xs text-foreground-muted">DEX</p>
             <p className="font-bold">
-              {formatModifier(calculateModifier(character.stats.dexterity))}
+              {formatModifier(calculateModifier(stats.dexterity ?? 10))}
             </p>
           </div>
         </div>
@@ -82,5 +108,3 @@ export function CharacterMini({ character }: CharacterMiniProps) {
     </Card>
   );
 }
-
-

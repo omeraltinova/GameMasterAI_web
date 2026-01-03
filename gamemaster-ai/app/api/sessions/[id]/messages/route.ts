@@ -72,9 +72,10 @@ export async function GET(
     // Mesajları işle - metadata'dan gmPrompt'u çıkar
     const processedMessages = messages.map((msg) => {
       let gmPrompt = undefined;
+      let metadata: Record<string, unknown> | undefined = undefined;
       if (msg.metadata) {
         try {
-          const metadata = JSON.parse(msg.metadata);
+          metadata = JSON.parse(msg.metadata);
           if (metadata.gmPrompt) {
             gmPrompt = metadata.gmPrompt;
           }
@@ -84,7 +85,10 @@ export async function GET(
       }
       return {
         ...msg,
+        metadata,
         gmPrompt,
+        locationImageUrl: msg.locationImageUrl,
+        locationName: msg.locationName,
       };
     });
 

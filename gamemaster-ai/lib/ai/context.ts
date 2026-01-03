@@ -67,11 +67,32 @@ export async function buildSessionContext(sessionId: string): Promise<GameContex
       hp: char.hp,
       maxHp: char.maxHp,
     })),
-    recentMessages: session.messages.reverse().map((msg: any) => ({
-      senderType: msg.senderType,
-      content: msg.content,
-      timestamp: msg.timestamp.toISOString(),
-    })),
+    recentMessages: session.messages
+      .reverse()
+      .reduce((acc, msg: any) => {
+        let excludeFromContext = false;
+        if (msg.metadata) {
+          try {
+            const metadata = JSON.parse(msg.metadata);
+            excludeFromContext = metadata?.excludeFromContext === true;
+          } catch {
+            excludeFromContext = false;
+          }
+        }
+
+        if (msg.senderType === 'SYSTEM' && msg.locationImageUrl) {
+          excludeFromContext = true;
+        }
+
+        if (!excludeFromContext) {
+          acc.push({
+            senderType: msg.senderType,
+            content: msg.content,
+            timestamp: msg.timestamp.toISOString(),
+          });
+        }
+        return acc;
+      }, [] as NonNullable<GameContext['recentMessages']>),
     gameState: {
       inCombat: gameState.inCombat,
       currentQuest: gameState.activeQuests?.[0],

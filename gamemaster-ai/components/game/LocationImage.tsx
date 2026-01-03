@@ -1,0 +1,135 @@
+"use client";
+
+import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { MapPin, Loader2, X, Maximize2, Minimize2 } from "lucide-react";
+import { Button } from "@/components/ui";
+
+interface LocationImageProps {
+  imageUrl: string | null;
+  locationName: string | null;
+  isLoading?: boolean;
+  onClose?: () => void;
+}
+
+export function LocationImage({
+  imageUrl,
+  locationName,
+  isLoading = false,
+  onClose,
+}: LocationImageProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  if (!imageUrl && !isLoading) {
+    return null;
+  }
+
+  return (
+    <>
+      {/* Compact view */}
+      <div
+        className={cn(
+          "relative rounded-lg border border-border overflow-hidden transition-all duration-300 max-w-2xl mx-auto",
+          isLoading ? "animate-pulse bg-muted" : "bg-card"
+        )}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-3 py-2 bg-background-secondary border-b border-border">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-4 w-4 text-primary" />
+            <span className="text-sm font-medium text-foreground">
+              {isLoading ? "Görsel üretiliyor..." : locationName || "Mekan Görseli"}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            {imageUrl && !imageError && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => setIsExpanded(true)}
+              >
+                <Maximize2 className="h-3 w-3" />
+              </Button>
+            )}
+            {onClose && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={onClose}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* Image container */}
+        <div className="relative aspect-[16/9] w-full">
+          {isLoading ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted">
+              <div className="flex flex-col items-center gap-2">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <span className="text-xs text-muted-foreground">
+                  AI görsel üretiyor...
+                </span>
+              </div>
+            </div>
+          ) : imageUrl && !imageError ? (
+            <img
+              src={imageUrl}
+              alt={locationName || "Mekan görseli"}
+              className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+              onClick={() => setIsExpanded(true)}
+              onError={() => setImageError(true)}
+            />
+          ) : imageError ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-muted">
+              <span className="text-xs text-muted-foreground">
+                Görsel yüklenemedi
+              </span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Expanded modal */}
+      {isExpanded && imageUrl && !imageError && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+          onClick={() => setIsExpanded(false)}
+        >
+          <div className="relative w-full h-full flex items-center justify-center">
+            <img
+              src={imageUrl}
+              alt={locationName || "Mekan görseli"}
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className="absolute top-4 left-4 px-3 py-2 rounded-lg bg-black/70 backdrop-blur-sm border border-white/20">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-white" />
+                <span className="text-sm font-medium text-white">
+                  {locationName}
+                </span>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-4 right-4 h-10 w-10 p-0 bg-black/70 hover:bg-black/90 text-white border border-white/20 rounded-lg"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(false);
+              }}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

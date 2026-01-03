@@ -206,6 +206,13 @@ export interface GMPrompt {
   promptText?: string; // Aksiyon için kısa açıklama
 }
 
+export interface LocationChange {
+  changed: boolean;
+  newLocation?: string;
+  locationType?: 'tavern' | 'dungeon' | 'forest' | 'cave' | 'castle' | 'town' | 'port' | 'road' | 'camp' | 'other';
+  description?: string; // İngilizce görsel açıklaması
+}
+
 export interface Message {
   id: string;
   sessionId: string;
@@ -217,6 +224,9 @@ export interface Message {
   timestamp: string;
   // GM aksiyonları için
   gmPrompt?: GMPrompt;
+  // Mekan görseli için
+  locationImageUrl?: string;
+  locationName?: string;
 }
 
 // ==========================================

@@ -5,10 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, ConfirmDialog } from "@/components/ui";
-import { ChatWindow, MessageInput, DiceRoller, CharacterMini, GameSetupWizard, rollDiceForAction, ActionSuggestions } from "@/components/game";
-import { useGame, useGM, useDice, useSuggestions } from "@/hooks/useGame";
+import { ChatWindow, MessageInput, DiceRoller, CharacterMini, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage } from "@/components/game";
+import { useGame, useGM, useDice, useSuggestions, useLocationImage } from "@/hooks/useGame";
 import { get, post, put } from "@/lib/api/client";
-import type { Message, DiceType, Character, Campaign, GMAction, GMPrompt } from "@/types";
+import type { Message, DiceType, Character, Campaign, GMAction, GMPrompt, LocationChange } from "@/types";
 import {
   Dice6,
   Backpack,
@@ -196,6 +196,14 @@ export default function PlayPage() {
     clearSuggestions,
   } = useSuggestions(sessionId || '');
 
+  const {
+    locationImage,
+    currentLocation,
+    isLoading: isImageLoading,
+    generateImage: generateLocationImage,
+    clearImage: clearLocationImage,
+  } = useLocationImage(sessionId || '');
+
   // Handle setup complete
   const handleSetupComplete = async (settings: WorldSettings) => {
     if (!sessionId) return;
@@ -285,6 +293,9 @@ export default function PlayPage() {
     );
   }
 
+  // Kullanıcı kampanya creator mı? (erken tanımlama)
+  const isCreator = campaign?.creatorId === authSession?.user?.id;
+
   if (campaign?.status === 'COMPLETED') {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -293,6 +304,29 @@ export default function PlayPage() {
         <Link href="/campaigns">
           <Button variant="outline">Kampanyalara Dön</Button>
         </Link>
+      </div>
+    );
+  }
+
+  // Karakter seçimi zorunlu - karakter yoksa uyarı göster
+  if (!character && !isCreator) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-4">
+        <div className="text-center max-w-md">
+          <Users className="h-16 w-16 mx-auto mb-4 text-primary opacity-50" />
+          <h1 className="text-2xl font-bold mb-4">Karakter Gerekli</h1>
+          <p className="text-muted-foreground mb-6">
+            Bu kampanyaya katılmak için önce bir karakter oluşturmanız gerekiyor.
+          </p>
+          <div className="flex flex-col gap-3">
+            <Link href={`/campaigns/${campaignId}/characters/new`}>
+              <Button className="w-full">Karakter Oluştur</Button>
+            </Link>
+            <Link href={`/campaigns/${campaignId}`}>
+              <Button variant="outline" className="w-full">Kampanyaya Dön</Button>
+            </Link>
+          </div>
+        </div>
       </div>
     );
   }
@@ -335,7 +369,7 @@ export default function PlayPage() {
     const result = await narrate(content);
     
     if (result && result.narration) {
-      // GM yanıtını mesajlara ekle
+      // GM yanıtını önce mesajlara ekle
       const gmMessage: Message = {
         id: result.messageId || `gm-${Date.now()}`,
         sessionId: sessionId || '',
@@ -346,6 +380,26 @@ export default function PlayPage() {
         gmPrompt: result.gmPrompt,
       };
       addMessage(gmMessage);
+      
+      // Lokasyon değişikliği varsa görsel üret ve mesajı güncelle
+      if (result.locationChange?.changed && result.locationChange.newLocation && result.locationChange.description) {
+        const imageResult = await generateLocationImage(
+          result.locationChange.newLocation,
+          result.locationChange.locationType || 'other',
+          result.locationChange.description
+        );
+        
+        if (imageResult?.success && imageResult.imageUrl) {
+          // Mesajı veritabanında güncelle
+          await put(`/messages/${gmMessage.id}`, {
+            locationImageUrl: imageResult.imageUrl,
+            locationName: result.locationChange.newLocation,
+          });
+          
+          // Mesajları yeniden yükle
+          await fetchMessages();
+        }
+      }
       
       // Eğer zorunlu aksiyon varsa, state'i güncelle
       if (result.gmPrompt?.isMandatory) {
@@ -392,6 +446,23 @@ export default function PlayPage() {
       };
       addMessage(gmMessage);
       
+      // Lokasyon değişikliği varsa görsel üret ve mesajı güncelle
+      if (result.locationChange?.changed && result.locationChange.newLocation && result.locationChange.description) {
+        const imageResult = await generateLocationImage(
+          result.locationChange.newLocation,
+          result.locationChange.locationType || 'other',
+          result.locationChange.description
+        );
+        
+        if (imageResult?.success && imageResult.imageUrl) {
+          await put(`/messages/${gmMessage.id}`, {
+            locationImageUrl: imageResult.imageUrl,
+            locationName: result.locationChange.newLocation,
+          });
+          await fetchMessages();
+        }
+      }
+      
       if (result.gmPrompt?.isMandatory) {
         setPendingMandatoryAction(result.gmPrompt);
       } else {
@@ -405,8 +476,7 @@ export default function PlayPage() {
   const handleActionDiceRoll = async (action: GMAction, messageId: string) => {
     // Zarı at
     const rollResult = rollDiceForAction(action);
-    
-    // Zar sonucunu sistem mesajı olarak ekle
+    // Gorsel basarili uretildiyse, sohbete GM mesaji olarak ekle
     const skillText = action.skill ? ` ${action.skill}` : '';
     const dcText = action.dc ? ` (DC ${action.dc})` : '';
     const successText = rollResult.success !== undefined 
@@ -442,6 +512,23 @@ export default function PlayPage() {
       };
       addMessage(gmMessage);
       
+      // Lokasyon değişikliği varsa görsel üret ve mesajı güncelle
+      if (result.locationChange?.changed && result.locationChange.newLocation && result.locationChange.description) {
+        const imageResult = await generateLocationImage(
+          result.locationChange.newLocation,
+          result.locationChange.locationType || 'other',
+          result.locationChange.description
+        );
+        
+        if (imageResult?.success && imageResult.imageUrl) {
+          await put(`/messages/${gmMessage.id}`, {
+            locationImageUrl: imageResult.imageUrl,
+            locationName: result.locationChange.newLocation,
+          });
+          await fetchMessages();
+        }
+      }
+      
       if (result.gmPrompt?.isMandatory) {
         setPendingMandatoryAction(result.gmPrompt);
       }
@@ -468,12 +555,52 @@ export default function PlayPage() {
     addMessage(diceMessage);
   };
 
+  // Sahne görseli üretme handler'ı
+  const handleGenerateSceneImage = async () => {
+    if (!sessionId) return;
+    
+    // Son GM mesajından sahne bilgisini al
+    const lastGMMessages = messages
+      .filter(m => m.senderType === 'GM')
+      .slice(-2);
+    
+    if (lastGMMessages.length === 0) return;
+    
+    // Son mesajlardan sahne açıklaması oluştur
+    const sceneContext = lastGMMessages.map(m => m.content).join(' ');
+    
+    // Mevcut lokasyon bilgisini al
+    const locationName = currentLocation || 'Bilinmeyen Mekan';
+    
+    // Sahne açıklamasını İngilizce'ye çevirmeden direkt kullan
+    // API bunu handle edecek
+    const sceneDescription = `Current scene: ${sceneContext.substring(0, 500)}`;
+    
+    // Görseli üret
+    const imageResult = await generateLocationImage(
+      locationName,
+      'other',
+      sceneDescription,
+      {
+        createMessage: true,
+        messageContent: `Scene image: ${locationName}`,
+        excludeFromContext: true,
+      }
+    );
+    
+    // Gorsel basarili uretildiyse, sohbete GM mesaji olarak ekle
+    if (imageResult?.success && imageResult.imageUrl) {
+      if (imageResult.message) {
+        addMessage(imageResult.message);
+      } else {
+        await fetchMessages();
+      }
+    }
+  };
+
   const toggleSidePanel = (view: SidePanelView) => {
     setSidePanelView(sidePanelView === view ? null : view);
   };
-
-  // Kullanıcı kampanya creator mı?
-  const isCreator = campaign?.creatorId === authSession?.user?.id;
 
   // Belirli mesajdan itibaren yeniden başlatma handler'ı
   const handleRestartFromMessage = async () => {
@@ -559,6 +686,23 @@ export default function PlayPage() {
         };
         addMessage(gmMessage);
         
+        // Lokasyon değişikliği varsa görsel üret ve mesajı güncelle
+        if (result.locationChange?.changed && result.locationChange.newLocation && result.locationChange.description) {
+          const imageResult = await generateLocationImage(
+            result.locationChange.newLocation,
+            result.locationChange.locationType || 'other',
+            result.locationChange.description
+          );
+          
+          if (imageResult?.success && imageResult.imageUrl) {
+            await put(`/messages/${gmMessage.id}`, {
+              locationImageUrl: imageResult.imageUrl,
+              locationName: result.locationChange.newLocation,
+            });
+            await fetchMessages();
+          }
+        }
+        
         if (result.gmPrompt?.isMandatory) {
           setPendingMandatoryAction(result.gmPrompt);
         } else {
@@ -628,6 +772,18 @@ export default function PlayPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Chat Area */}
         <div className="flex-1 flex flex-col">
+          {/* Location Image - Mekan değiştiğinde göster */}
+          {(locationImage || isImageLoading) && (
+            <div className="px-4 pt-4">
+              <LocationImage
+                imageUrl={locationImage}
+                locationName={currentLocation}
+                isLoading={isImageLoading}
+                onClose={clearLocationImage}
+              />
+            </div>
+          )}
+          
           <ChatWindow 
             messages={messages}
             onActionSelect={handleActionSelect}
@@ -699,6 +855,8 @@ export default function PlayPage() {
             
             <MessageInput
               onSend={handleSendMessage}
+              onGenerateImage={handleGenerateSceneImage}
+              isGeneratingImage={isImageLoading}
               disabled={isGMLoading || isGameLoading || !!pendingMandatoryAction?.isMandatory}
               placeholder={
                 pendingMandatoryAction?.isMandatory 

@@ -114,14 +114,16 @@ model GameSession {
 // ==========================================
 
 model Message {
-  id         String   @id @default(cuid())
-  sessionId  String
-  senderId   String?
-  senderType String   // PLAYER, GM, SYSTEM, DICE, COMBAT
-  senderName String?
-  content    String
-  metadata   String?  // JSON
-  timestamp  DateTime @default(now())
+  id               String   @id @default(cuid())
+  sessionId        String
+  senderId         String?
+  senderType       String   // PLAYER, GM, SYSTEM, DICE, COMBAT
+  senderName       String?
+  content          String
+  metadata         String?  // JSON
+  locationImageUrl String?  // Mekan görseli URL'i
+  locationName     String?  // Mekan adı
+  timestamp        DateTime @default(now())
 
   // İlişkiler
   session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)

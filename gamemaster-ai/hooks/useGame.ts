@@ -229,6 +229,12 @@ export function useGM(sessionId: string) {
         success: boolean;
         narration: string;
         gmPrompt?: GMPrompt;
+        locationChange?: {
+          changed: boolean;
+          newLocation?: string;
+          locationType?: string;
+          description?: string;
+        };
         messageId: string;
         timestamp: string;
       }>(
@@ -350,6 +356,12 @@ export interface Suggestion {
   detailedAction: string;
 }
 
+interface LocationImageOptions {
+  createMessage?: boolean;
+  messageContent?: string;
+  excludeFromContext?: boolean;
+}
+
 /**
  * useSuggestions Hook - AI aksiyon önerileri
  */
@@ -405,6 +417,95 @@ export function useSuggestions(sessionId: string) {
     error,
     fetchSuggestions,
     clearSuggestions,
+  };
+}
+
+/**
+ * useLocationImage Hook - Mekan görseli üretimi
+ */
+export function useLocationImage(sessionId: string) {
+  const [locationImage, setLocationImage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<string | null>(null);
+
+  /**
+   * Mekan görseli üret
+   */
+  const generateImage = useCallback(async (
+    locationName: string,
+    locationType: string,
+    description: string,
+    options?: LocationImageOptions
+  ) => {
+    if (!sessionId) {
+      console.log('[useLocationImage] No sessionId, skipping');
+      return null;
+    }
+    
+    console.log(`[useLocationImage] Generating image for: ${locationName}`);
+    console.log(`[useLocationImage] Type: ${locationType}, Description length: ${description.length}`);
+    
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const payload: Record<string, unknown> = {
+        sessionId,
+        locationName,
+        locationType,
+        description,
+      };
+
+      if (options?.createMessage) {
+        payload.createMessage = true;
+        payload.messageContent = options.messageContent;
+        payload.excludeFromContext = options.excludeFromContext;
+      }
+
+      const data = await post<{ 
+        success: boolean;
+        imageUrl?: string;
+        error?: string;
+        message?: Message;
+      }>(
+        '/gm/generate-location-image',
+        payload
+      );
+      
+      console.log(`[useLocationImage] Response:`, { success: data.success, hasUrl: !!data.imageUrl, error: data.error });
+      
+      if (data.success && data.imageUrl) {
+        setLocationImage(data.imageUrl);
+        setCurrentLocation(locationName);
+      } else if (data.error) {
+        setError(data.error);
+      }
+      return data;
+    } catch (err) {
+      console.error('[useLocationImage] Error:', err);
+      setError(err instanceof APIError ? err.message : 'Görsel üretilemedi');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  /**
+   * Görseli temizle
+   */
+  const clearImage = useCallback(() => {
+    setLocationImage(null);
+    setCurrentLocation(null);
+  }, []);
+
+  return {
+    locationImage,
+    currentLocation,
+    isLoading,
+    error,
+    generateImage,
+    clearImage,
   };
 }
 

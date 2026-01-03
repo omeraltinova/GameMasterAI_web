@@ -243,6 +243,12 @@ Bu aksiyona uygun bir hikaye devamı yaz. Yanıtını aşağıdaki JSON formatı
 
 {
   "narration": "Hikaye anlatımın buraya gelecek. Zengin betimlemeler ve atmosfer yarat.",
+  "locationChange": {
+    "changed": false,
+    "newLocation": "Yeni lokasyon adı (sadece değiştiyse)",
+    "locationType": "tavern|dungeon|forest|cave|castle|town|port|road|camp|other",
+    "description": "Lokasyonun kısa görsel açıklaması (İngilizce, resim üretimi için)"
+  },
   "gmPrompt": {
     "isMandatory": false,
     "promptText": "Zar atışı veya seçim için kısa açıklama (opsiyonel)",
@@ -303,6 +309,9 @@ Bu aksiyona uygun bir hikaye devamı yaz. Yanıtını aşağıdaki JSON formatı
 **Örnek Seçenek Sunumu:**
 {
   "narration": "Tüccar sana iki yol öneriyor: Doğudaki orman veya batıdaki dağlar.",
+  "locationChange": {
+    "changed": false
+  },
   "gmPrompt": {
     "isMandatory": false,
     "promptText": "Hangi yolu seçeceksin?",
@@ -324,6 +333,34 @@ Bu aksiyona uygun bir hikaye devamı yaz. Yanıtını aşağıdaki JSON formatı
     ]
   }
 }
+
+**Örnek Lokasyon Değişikliği:**
+{
+  "narration": "Uzun bir yürüyüşün ardından nihayet tavernaya ulaşıyorsun. Ahşap kapıyı iterek içeri girdiğinde, sıcak hava ve bira kokusu yüzüne çarpıyor.",
+  "locationChange": {
+    "changed": true,
+    "newLocation": "Altın Boynuz Tavernası",
+    "locationType": "tavern",
+    "description": "A cozy medieval tavern with wooden beams, flickering fireplace, patrons at tables, mugs of ale, warm candlelight, fantasy RPG style"
+  },
+  "gmPrompt": null
+}
+
+**locationChange Kuralları (ZORUNLU ALAN):**
+1. "locationChange" alanı HER ZAMAN JSON yanıtında bulunmalı
+2. Oyuncu farklı bir mekana geçtiğinde:
+   - "changed": true
+   - "newLocation": Mekanın adı (Türkçe)
+   - "locationType": tavern|dungeon|forest|cave|castle|town|port|road|camp|other
+   - "description": İNGİLİZCE detaylı görsel açıklama (50-100 kelime, atmosfer, ışık, objeler)
+3. Aynı mekanda kalınıyorsa:
+   - "changed": false (sadece bu alan yeterli)
+4. Mekan değişikliği sayılan durumlar:
+   - Farklı bir binaya/odaya giriş
+   - Farklı bir bölgeye geçiş
+   - Önemli çevre değişikliği (içeri/dışarı, kat değişimi vb.)
+
+**ÖNEMLİ:** locationChange alanını ASLA atlama. Her yanıtta mutlaka ekle.
 
 Şimdi oyuncunun aksiyonuna yanıt ver.`;
 }

@@ -4,7 +4,7 @@ import { getAIResponseWithContext } from '@/lib/ai/openrouter';
 import { SYSTEM_PROMPT, getNarrationPrompt } from '@/lib/ai/prompts';
 import { buildSessionContext } from '@/lib/ai/context';
 import { getUserId } from '@/lib/auth/server';
-import type { GMPrompt, GMAction } from '@/types';
+import type { GMPrompt, GMAction, LocationChange } from '@/types';
 
 /**
  * POST /api/gm/narrate
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     // AI yanıtını parse et
     let narration: string = aiResponse;
     let gmPrompt: GMPrompt | null = null;
+    let locationChange: LocationChange | null = null;
 
     try {
       // JSON yanıtını parse etmeye çalış
@@ -105,6 +106,16 @@ export async function POST(req: NextRequest) {
         
         if (parsed.narration) {
           narration = parsed.narration;
+        }
+        
+        // LocationChange parse et
+        if (parsed.locationChange && parsed.locationChange.changed) {
+          locationChange = {
+            changed: true,
+            newLocation: parsed.locationChange.newLocation,
+            locationType: parsed.locationChange.locationType || 'other',
+            description: parsed.locationChange.description,
+          };
         }
         
         if (parsed.gmPrompt && parsed.gmPrompt.actions && parsed.gmPrompt.actions.length > 0) {
@@ -153,29 +164,49 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // GM yanıtını kaydet (metadata'da gmPrompt)
+    // GM yanıtını kaydet (metadata'da gmPrompt ve locationChange)
     const gmMessage = await prisma.message.create({
       data: {
         sessionId,
         senderType: 'GM',
         senderName: 'Game Master',
         content: narration,
-        metadata: gmPrompt ? JSON.stringify({ gmPrompt }) : undefined,
+        metadata: (gmPrompt || locationChange) ? JSON.stringify({ gmPrompt, locationChange }) : undefined,
       },
     });
 
-    // Session'ı güncelle
-    await prisma.gameSession.update({
-      where: { id: sessionId },
-      data: {
-        updatedAt: new Date(),
-      },
-    });
+    // Session state'i güncelle (lokasyon değişikliği varsa)
+    if (locationChange && locationChange.changed && locationChange.newLocation) {
+      const currentState = gameSession.currentState ? 
+        (typeof gameSession.currentState === 'string' ? JSON.parse(gameSession.currentState) : gameSession.currentState) : 
+        {};
+
+      await prisma.gameSession.update({
+        where: { id: sessionId },
+        data: {
+          currentState: JSON.stringify({
+            ...currentState,
+            location: locationChange.newLocation,
+            locationType: locationChange.locationType,
+          }),
+          updatedAt: new Date(),
+        },
+      });
+    } else {
+      // Sadece updatedAt güncelle
+      await prisma.gameSession.update({
+        where: { id: sessionId },
+        data: {
+          updatedAt: new Date(),
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,
       narration,
       gmPrompt,
+      locationChange,
       messageId: gmMessage.id,
       timestamp: gmMessage.timestamp,
     });

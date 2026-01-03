@@ -48,7 +48,7 @@ export function ActionSuggestions({
             const isExpanded = expandedId === suggestion.id;
             
             return (
-              <div key={suggestion.id} className="relative">
+              <div key={suggestion.id} className="relative z-10">
                 <button
                   onClick={() => {
                     if (isExpanded) {
@@ -63,7 +63,7 @@ export function ActionSuggestions({
                   disabled={disabled}
                   className={cn(
                     "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium",
-                    "border transition-all duration-200",
+                    "border transition-all duration-200 relative z-20",
                     isExpanded
                       ? "bg-primary text-primary-foreground border-primary shadow-md"
                       : "bg-background border-border hover:border-primary/50 hover:bg-primary/5",
@@ -78,14 +78,20 @@ export function ActionSuggestions({
                   )}
                 </button>
                 
-                {/* Expanded detail tooltip */}
+                {/* Expanded detail tooltip - tıklanabilir */}
                 {isExpanded && (
-                  <div className="absolute bottom-full left-0 mb-2 z-10 w-64 p-3 rounded-lg bg-card border border-border shadow-lg animate-fade-in">
+                  <div 
+                    className="absolute bottom-full left-0 mb-2 z-30 w-64 p-3 rounded-lg bg-card border border-border shadow-lg animate-fade-in cursor-pointer hover:bg-card/80"
+                    onClick={() => {
+                      onSelect(suggestion.detailedAction);
+                      setExpandedId(null);
+                    }}
+                  >
                     <p className="text-sm text-foreground mb-2">
                       {suggestion.detailedAction}
                     </p>
-                    <p className="text-xs text-foreground-muted">
-                      Göndermek için tekrar tıkla
+                    <p className="text-xs text-primary font-medium">
+                      👆 Göndermek için tıkla
                     </p>
                   </div>
                 )}

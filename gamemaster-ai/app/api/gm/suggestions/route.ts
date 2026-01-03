@@ -149,15 +149,54 @@ Yanıtını aşağıdaki JSON formatında ver:
     }> = [];
 
     try {
+      // JSON'u bulmaya çalış
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
-          suggestions = parsed.suggestions.map((s: any, index: number) => ({
-            id: s.id || `suggestion_${Date.now()}_${index}`,
-            shortLabel: s.shortLabel || 'Aksiyon',
-            detailedAction: s.detailedAction || s.shortLabel || 'Aksiyon yap',
-          }));
+        let jsonStr = jsonMatch[0];
+        
+        // JSON'u temizle - yaygın sorunları düzelt
+        // Trailing comma'ları kaldır
+        jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
+        // Escape edilmemiş newline'ları düzelt
+        jsonStr = jsonStr.replace(/\n/g, '\\n');
+        // Escape edilmemiş tab'ları düzelt
+        jsonStr = jsonStr.replace(/\t/g, '\\t');
+        
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
+            suggestions = parsed.suggestions.map((s: any, index: number) => ({
+              id: s.id || `suggestion_${Date.now()}_${index}`,
+              shortLabel: s.shortLabel || 'Aksiyon',
+              detailedAction: s.detailedAction || s.shortLabel || 'Aksiyon yap',
+            }));
+          }
+        } catch (innerError) {
+          // İlk parse başarısız olduysa, suggestions array'ini doğrudan bulmaya çalış
+          const suggestionsMatch = aiResponse.match(/"suggestions"\s*:\s*\[([\s\S]*?)\]/);
+          if (suggestionsMatch) {
+            // Her suggestion objesini ayrı ayrı parse etmeye çalış
+            const suggestionObjects = suggestionsMatch[1].match(/\{[^{}]*\}/g);
+            if (suggestionObjects) {
+              suggestionObjects.forEach((objStr, index) => {
+                try {
+                  const cleanedStr = objStr.replace(/,\s*}/g, '}');
+                  const obj = JSON.parse(cleanedStr);
+                  suggestions.push({
+                    id: obj.id || `suggestion_${Date.now()}_${index}`,
+                    shortLabel: obj.shortLabel || 'Aksiyon',
+                    detailedAction: obj.detailedAction || obj.shortLabel || 'Aksiyon yap',
+                  });
+                } catch {
+                  // Tek obje parse edilemedi, atla
+                }
+              });
+            }
+          }
+          
+          if (suggestions.length === 0) {
+            throw innerError;
+          }
         }
       }
     } catch (parseError) {

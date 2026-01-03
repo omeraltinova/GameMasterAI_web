@@ -10,6 +10,7 @@ interface LocationImageProps {
   locationName: string | null;
   isLoading?: boolean;
   onClose?: () => void;
+  fillHeight?: boolean;
 }
 
 export function LocationImage({
@@ -17,9 +18,11 @@ export function LocationImage({
   locationName,
   isLoading = false,
   onClose,
+  fillHeight = false,
 }: LocationImageProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const useFullHeight = fillHeight;
 
   if (!imageUrl && !isLoading) {
     return null;
@@ -30,7 +33,8 @@ export function LocationImage({
       {/* Compact view */}
       <div
         className={cn(
-          "relative rounded-lg border border-border overflow-hidden transition-all duration-300 max-w-2xl mx-auto",
+          "relative rounded-lg border border-border overflow-hidden transition-all duration-300 flex flex-col max-w-2xl mx-auto",
+          useFullHeight && "h-full",
           isLoading ? "animate-pulse bg-muted" : "bg-card"
         )}
       >
@@ -67,7 +71,12 @@ export function LocationImage({
         </div>
 
         {/* Image container */}
-        <div className="relative aspect-[16/9] w-full">
+        <div
+          className={cn(
+            "relative w-full",
+            useFullHeight ? "flex-1 min-h-0" : "aspect-[16/9]"
+          )}
+        >
           {isLoading ? (
             <div className="absolute inset-0 flex items-center justify-center bg-muted">
               <div className="flex flex-col items-center gap-2">

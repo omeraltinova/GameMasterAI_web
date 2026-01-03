@@ -773,75 +773,79 @@ export default function PlayPage() {
         {/* Chat Area */}
         <div className="flex-1 flex flex-col">
           {/* Location Image - Mekan değiştiğinde göster */}
-          {(locationImage || isImageLoading) && (
-            <div className="px-4 pt-4">
-              <LocationImage
-                imageUrl={locationImage}
-                locationName={currentLocation}
-                isLoading={isImageLoading}
-                onClose={clearLocationImage}
-              />
-            </div>
-          )}
           
-          <ChatWindow 
-            messages={messages}
-            onActionSelect={handleActionSelect}
-            onDiceRoll={handleActionDiceRoll}
-            onRestartFromMessage={handleRestartFromMessageRequest}
-            onRegenerateMessage={handleRegenerateMessage}
-            isActionLoading={isGMLoading}
-            disableActions={isGMLoading}
-            canRestart={isCreator}
-          />
-
-          {/* Error Message */}
-          {(gameError || gmError) && (
-            <div className="px-4 pb-2">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive/10 text-destructive text-sm">
-                <span>{gameError || gmError}</span>
-              </div>
-            </div>
-          )}
-
-          {/* Typing Indicator */}
-          {isGMLoading && (
-            <div className="px-4 pb-2">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary text-sm">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-primary rounded-full animate-bounce" />
-                  <span
-                    className="w-2 h-2 bg-primary rounded-full animate-bounce"
-                    style={{ animationDelay: "0.1s" }}
-                  />
-                  <span
-                    className="w-2 h-2 bg-primary rounded-full animate-bounce"
-                    style={{ animationDelay: "0.2s" }}
-                  />
-                </div>
-                Game Master yazıyor...
-              </div>
-            </div>
-          )}
-
-          {/* Loading Indicator */}
-          {(isGameLoading || isDiceLoading) && (
-            <div className="px-4 pb-2">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-muted-foreground text-sm">
-                <span>Yükleniyor...</span>
-              </div>
-            </div>
-          )}
-
-          {/* AI Action Suggestions - Sadece GM prompt yoksa göster */}
-          {!pendingMandatoryAction?.isMandatory && !messages.some(m => m.senderType === 'GM' && m.gmPrompt && m.gmPrompt.actions && m.gmPrompt.actions.length > 0) && (
-            <ActionSuggestions
-              suggestions={suggestions}
-              isLoading={isSuggestionsLoading}
-              onSelect={(detailedAction) => handleSendMessage(detailedAction)}
-              disabled={isGMLoading}
+          <div className="relative flex-1 flex flex-col min-h-0">
+            <ChatWindow 
+              messages={messages}
+              onActionSelect={handleActionSelect}
+              onDiceRoll={handleActionDiceRoll}
+              onRestartFromMessage={handleRestartFromMessageRequest}
+              onRegenerateMessage={handleRegenerateMessage}
+              isActionLoading={isGMLoading}
+              disableActions={isGMLoading}
+              canRestart={isCreator}
             />
-          )}
+
+            {/* Error Message */}
+            {(gameError || gmError) && (
+              <div className="px-4 pb-2">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive/10 text-destructive text-sm">
+                  <span>{gameError || gmError}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Typing Indicator */}
+            {isGMLoading && (
+              <div className="px-4 pb-2">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary/10 text-primary text-sm">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+                    <span
+                      className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                      style={{ animationDelay: "0.1s" }}
+                    />
+                    <span
+                      className="w-2 h-2 bg-primary rounded-full animate-bounce"
+                      style={{ animationDelay: "0.2s" }}
+                    />
+                  </div>
+                  Game Master yazıyor...
+                </div>
+              </div>
+            )}
+
+            {/* Loading Indicator */}
+            {(isGameLoading || isDiceLoading) && (
+              <div className="px-4 pb-2">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-muted text-muted-foreground text-sm">
+                  <span>Yükleniyor...</span>
+                </div>
+              </div>
+            )}
+
+            {/* AI Action Suggestions - Sadece GM prompt yoksa göster */}
+            {!pendingMandatoryAction?.isMandatory && !messages.some(m => m.senderType === 'GM' && m.gmPrompt && m.gmPrompt.actions && m.gmPrompt.actions.length > 0) && (
+              <ActionSuggestions
+                suggestions={suggestions}
+                isLoading={isSuggestionsLoading}
+                onSelect={(detailedAction) => handleSendMessage(detailedAction)}
+                disabled={isGMLoading}
+              />
+            )}
+
+            {(locationImage || isImageLoading) && (
+              <div className="absolute inset-0 z-20 px-4 pt-4 pb-4">
+                <LocationImage
+                  imageUrl={locationImage}
+                  locationName={currentLocation}
+                  isLoading={isImageLoading}
+                  onClose={clearLocationImage}
+                  fillHeight
+                />
+              </div>
+            )}
+          </div>
 
           {/* Input Area */}
           <div className="p-4 border-t border-border bg-background">

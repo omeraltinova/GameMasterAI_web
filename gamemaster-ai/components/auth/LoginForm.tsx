@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signIn } from "next-auth/react"; // <-- Burası useAuth değil signIn olmalı
 import { Button, Input } from "@/components/ui";
-import { useAuth } from "@/contexts/AuthContext";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 export function LoginForm() {
   const router = useRouter();
-  const { login, isLoading } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -20,35 +20,43 @@ export function LoginForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrors({});
+    setIsLoading(true);
 
-    // Basic validation
     const newErrors: Record<string, string> = {};
-    if (!formData.email) {
-      newErrors.email = "E-posta adresi gerekli";
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = "Geçerli bir e-posta adresi girin";
-    }
-    if (!formData.password) {
-      newErrors.password = "Şifre gerekli";
-    }
+    if (!formData.email) newErrors.email = "E-posta adresi gerekli";
+    if (!formData.password) newErrors.password = "Şifre gerekli";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
+      setIsLoading(false);
       return;
     }
 
     try {
-      await login(formData.email, formData.password);
-      router.push("/dashboard");
+      // NextAuth signIn fonksiyonu
+      const result = await signIn("credentials", {
+        redirect: false,
+        email: formData.email,
+        password: formData.password,
+      });
+
+      if (result?.error) {
+        setErrors({ general: "Giriş başarısız. Bilgilerinizi kontrol edin." });
+      } else {
+        router.push("/dashboard");
+        router.refresh();
+      }
     } catch (error) {
-      setErrors({ general: "Giriş başarısız. Lütfen bilgilerinizi kontrol edin." });
+      setErrors({ general: "Bir hata oluştu." });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {errors.general && (
-        <div className="p-3 rounded-lg bg-danger/10 border border-danger/30 text-danger text-sm">
+        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-sm">
           {errors.general}
         </div>
       )}
@@ -107,5 +115,3 @@ export function LoginForm() {
     </form>
   );
 }
-
-

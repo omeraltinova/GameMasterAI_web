@@ -12,7 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/Dropdown";
-import { useAuth } from "@/contexts/AuthContext";
+// DEĞİŞİKLİK 1: useAuth yerine useSession ve signOut'u import ediyoruz
+import { useSession, signOut } from "next-auth/react";
 import { Sword, Menu, X, User, Settings, LogOut } from "lucide-react";
 import { useState } from "react";
 
@@ -25,8 +26,15 @@ const publicNavItems = [
 
 export function Header() {
   const pathname = usePathname();
-  const { user, isAuthenticated, logout } = useAuth();
+  // DEĞİŞİKLİK 2: useAuth kancasını kaldırıp yerine useSession kullanıyoruz
+  const { data: session, status } = useSession();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // DEĞİŞİKLİK 3: Değişkenleri yeni sisteme uyarlıyoruz
+  const isAuthenticated = status === "authenticated";
+  // NextAuth'ta kullanıcı bilgileri session.user altında gelir
+  // username yerine name, avatar yerine image kullanılır (NextAuth standardı)
+  const user = session?.user; 
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-background/80 backdrop-blur-lg">
@@ -72,13 +80,14 @@ export function Header() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-2 p-1 rounded-lg hover:bg-background-elevated transition-colors">
-                      <Avatar src={user?.avatar} fallback={user?.username} size="sm" />
+                      {/* user.username yerine user.name kullanıyoruz */}
+                      <Avatar src={user?.image || undefined} fallback={user?.name || "U"} size="sm" />
                     </button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel>
                       <div className="flex flex-col">
-                        <span className="font-medium">{user?.username}</span>
+                        <span className="font-medium">{user?.name}</span>
                         <span className="text-xs text-foreground-muted">{user?.email}</span>
                       </div>
                     </DropdownMenuLabel>
@@ -96,7 +105,8 @@ export function Header() {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={logout} className="text-danger">
+                    {/* DEĞİŞİKLİK 4: logout fonksiyonu yerine signOut() kullanıyoruz */}
+                    <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })} className="text-danger">
                       <LogOut className="h-4 w-4 mr-2" />
                       Çıkış Yap
                     </DropdownMenuItem>
@@ -158,7 +168,8 @@ export function Header() {
                       Dashboard
                     </Button>
                   </Link>
-                  <Button variant="ghost" onClick={logout} className="w-full text-danger">
+                  {/* Mobil çıkış butonu güncellemesi */}
+                  <Button variant="ghost" onClick={() => signOut({ callbackUrl: "/" })} className="w-full text-danger">
                     Çıkış Yap
                   </Button>
                 </>
@@ -181,5 +192,3 @@ export function Header() {
     </header>
   );
 }
-
-

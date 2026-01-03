@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Avatar, Progress } from "@/components/ui";
-import { useAuth } from "@/contexts/AuthContext";
-import { mockCharacters, mockCampaigns, mockMessages } from "@/lib/mock-data";
+import { useSession } from "next-auth/react";
 import {
   Users,
   Swords,
@@ -15,42 +14,69 @@ import {
   Play,
 } from "lucide-react";
 
-const statCards = [
-  {
-    title: "Karakterler",
-    value: mockCharacters.filter(c => c.userId === "user_1").length,
-    icon: Users,
-    color: "primary",
-    href: "/characters",
-  },
-  {
-    title: "Kampanyalar",
-    value: mockCampaigns.filter(c => c.creatorId === "user_1").length,
-    icon: Swords,
-    color: "secondary",
-    href: "/campaigns",
-  },
-  {
-    title: "Aktif Oturumlar",
-    value: mockCampaigns.filter(c => c.status === "ACTIVE").length,
-    icon: Play,
-    color: "success",
-    href: "/campaigns",
-  },
-  {
-    title: "Toplam Mesaj",
-    value: mockMessages.length,
-    icon: TrendingUp,
-    color: "info",
-    href: "#",
-  },
-];
+// TİP TANIMLAMALARI (Hataları gidermek için)
+type Character = {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  level: number;
+  race: string;
+  class: string;
+  hp: number;
+  maxHp: number;
+  userId: string;
+};
+
+type Campaign = {
+  id: string;
+  name: string;
+  status: string;
+  description: string;
+  playerCount: number;
+  maxPlayers: number;
+  isMultiplayer: boolean;
+  creatorId: string;
+};
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { data: session } = useSession();
+  const user = session?.user;
 
-  const userCharacters = mockCharacters.filter(c => c.userId === "user_1").slice(0, 3);
-  const activeCampaigns = mockCampaigns.filter(c => c.status === "ACTIVE").slice(0, 2);
+  // ARTIK 'any' YERİNE YUKARIDAKİ TİPLERİ KULLANIYORUZ
+  const userCharacters: Character[] = []; 
+  const activeCampaigns: Campaign[] = [];
+  const totalMessages = 0;
+
+  const statCards = [
+    {
+      title: "Karakterler",
+      value: userCharacters.length,
+      icon: Users,
+      color: "primary",
+      href: "/characters",
+    },
+    {
+      title: "Kampanyalar",
+      value: activeCampaigns.length,
+      icon: Swords,
+      color: "secondary",
+      href: "/campaigns",
+    },
+    {
+      title: "Aktif Oturumlar",
+      value: activeCampaigns.filter((c) => c.status === "ACTIVE").length,
+      icon: Play,
+      color: "success",
+      href: "/campaigns",
+    },
+    {
+      title: "Toplam Mesaj",
+      value: totalMessages,
+      icon: TrendingUp,
+      color: "info",
+      href: "#",
+    },
+  ];
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -58,7 +84,7 @@ export default function DashboardPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold mb-1">
-            Hoş geldin, <span className="text-primary">{user?.username}</span>!
+            Hoş geldin, <span className="text-primary">{user?.name || "Maceracı"}</span>!
           </h1>
           <p className="text-foreground-secondary">
             Bugün ne macerası istiyorsun?
@@ -86,7 +112,7 @@ export default function DashboardPage() {
           const Icon = stat.icon;
           return (
             <Link key={i} href={stat.href}>
-              <Card hover className="h-full">
+              <Card className="hover:border-primary/50 transition-colors h-full cursor-pointer">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -95,8 +121,8 @@ export default function DashboardPage() {
                       </p>
                       <p className="text-3xl font-bold">{stat.value}</p>
                     </div>
-                    <div className={`p-3 rounded-xl bg-${stat.color}/10`}>
-                      <Icon className={`h-6 w-6 text-${stat.color}`} />
+                    <div className={`p-3 rounded-xl bg-primary/10`}>
+                      <Icon className={`h-6 w-6 text-primary`} />
                     </div>
                   </div>
                 </CardContent>
@@ -152,7 +178,6 @@ export default function DashboardPage() {
                           value={character.hp}
                           max={character.maxHp}
                           size="sm"
-                          variant={character.hp < character.maxHp / 3 ? "danger" : character.hp < character.maxHp / 2 ? "warning" : "success"}
                         />
                       </div>
                     </div>
@@ -240,7 +265,7 @@ export default function DashboardPage() {
               const Icon = action.icon;
               return (
                 <Link key={i} href={action.href}>
-                  <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
+                  <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group h-full">
                     <Icon className="h-6 w-6 text-primary mb-3 group-hover:scale-110 transition-transform" />
                     <h4 className="font-medium mb-1">{action.label}</h4>
                     <p className="text-sm text-foreground-secondary">{action.desc}</p>
@@ -254,5 +279,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-

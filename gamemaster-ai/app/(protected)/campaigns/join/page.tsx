@@ -3,31 +3,42 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input } from "@/components/ui";
-import { ArrowLeft, Users, Ticket, Search } from "lucide-react";
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Badge } from "@/components/ui";
+import { ArrowLeft, Users, Ticket, Search, Play, Loader2 } from "lucide-react";
+import { post } from "@/lib/api/client";
 
 export default function JoinCampaignPage() {
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState("");
+  const [foundCampaign, setFoundCampaign] = useState<any>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setIsSearching(true);
+    setFoundCampaign(null);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Mock validation
-    if (inviteCode.toUpperCase() === "MINE2024") {
-      router.push("/campaigns/camp_1");
-    } else {
-      setError("Geçersiz davet kodu. Lütfen kontrol edip tekrar deneyin.");
+    try {
+      const response = await post('/campaigns/join', { inviteCode }) as any;
+      
+      if (response && response.success) {
+        setFoundCampaign(response.campaign);
+      } else {
+        setError(response?.error || "Geçersiz davet kodu. Lütfen kontrol edip tekrar deneyin.");
+      }
+    } catch (err: any) {
+      setError(err?.message || "Kampanya aranırken bir hata oluştu.");
+    } finally {
+      setIsSearching(false);
     }
+  };
 
-    setIsSearching(false);
+  const handleJoinCampaign = () => {
+    if (foundCampaign) {
+      router.push(`/campaigns/${foundCampaign.id}`);
+    }
   };
 
   return (
@@ -67,6 +78,7 @@ export default function JoinCampaignPage() {
               onChange={(e) => {
                 setInviteCode(e.target.value.toUpperCase());
                 setError("");
+                setFoundCampaign(null);
               }}
               error={error}
               className="text-center font-mono text-lg tracking-widest uppercase"
@@ -85,6 +97,55 @@ export default function JoinCampaignPage() {
         </CardContent>
       </Card>
 
+      {/* Found Campaign */}
+      {foundCampaign && (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="text-lg">Kampanya Bulundu!</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <h3 className="text-xl font-bold">{foundCampaign.name}</h3>
+              {foundCampaign.description && (
+                <p className="text-sm text-foreground-secondary mt-1">
+                  {foundCampaign.description}
+                </p>
+              )}
+            </div>
+            
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="outline">
+                Kurucu: {foundCampaign.creatorName}
+              </Badge>
+              <Badge variant="outline">
+                {foundCampaign.playerCount}/{foundCampaign.maxPlayers} Oyuncu
+              </Badge>
+              {foundCampaign.scenarioTitle && (
+                <Badge variant="secondary">
+                  {foundCampaign.scenarioTitle}
+                </Badge>
+              )}
+            </div>
+
+            {foundCampaign.isAlreadyPlayer ? (
+              <Button onClick={handleJoinCampaign} className="w-full gap-2">
+                <Play className="h-4 w-4" />
+                Lobiye Git
+              </Button>
+            ) : foundCampaign.isFull ? (
+              <Button disabled className="w-full">
+                Kampanya Dolu
+              </Button>
+            ) : (
+              <Button onClick={handleJoinCampaign} className="w-full gap-2">
+                <Users className="h-4 w-4" />
+                Lobiye Katıl
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Info */}
       <div className="p-4 rounded-lg bg-background-elevated text-center">
         <p className="text-sm text-foreground-secondary">
@@ -92,16 +153,6 @@ export default function JoinCampaignPage() {
           davet kodunu bulabilirsin.
         </p>
       </div>
-
-      {/* Demo Code Hint */}
-      <div className="p-4 rounded-lg border border-primary/30 bg-primary/5 text-center">
-        <p className="text-sm text-foreground-secondary">
-          <strong className="text-primary">Demo için:</strong> MINE2024 kodunu
-          kullanarak örnek kampanyaya katılabilirsin.
-        </p>
-      </div>
     </div>
   );
 }
-
-

@@ -19,7 +19,6 @@ import { useState } from "react";
 
 const publicNavItems = [
   { href: "/", label: "Ana Sayfa" },
-  { href: "/about", label: "Hakkında" },
   { href: "/rules", label: "Kurallar" },
   { href: "/demo", label: "Demo" },
 ];

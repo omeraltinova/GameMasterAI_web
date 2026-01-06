@@ -2,17 +2,21 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui";
-import { Send } from "lucide-react";
+import { Send, ImageIcon, Loader2 } from "lucide-react";
 
 interface MessageInputProps {
   onSend: (message: string) => void;
+  onGenerateImage?: () => void;
   disabled?: boolean;
+  isGeneratingImage?: boolean;
   placeholder?: string;
 }
 
 export function MessageInput({
   onSend,
+  onGenerateImage,
   disabled = false,
+  isGeneratingImage = false,
   placeholder = "Aksiyonunu yaz...",
 }: MessageInputProps) {
   const [message, setMessage] = useState("");
@@ -45,7 +49,7 @@ export function MessageInput({
   }, [message]);
 
   return (
-    <form onSubmit={handleSubmit} className="flex gap-3">
+    <form onSubmit={handleSubmit} className="flex gap-2">
       <div className="flex-1 relative">
         <textarea
           ref={textareaRef}
@@ -58,6 +62,22 @@ export function MessageInput({
           className="w-full resize-none rounded-lg bg-input border border-border px-4 py-3 pr-12 text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
         />
       </div>
+      {onGenerateImage && (
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onGenerateImage}
+          disabled={disabled || isGeneratingImage}
+          className="shrink-0"
+          title="Sahne Görseli Üret"
+        >
+          {isGeneratingImage ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <ImageIcon className="h-4 w-4" />
+          )}
+        </Button>
+      )}
       <Button
         type="submit"
         disabled={!message.trim() || disabled}

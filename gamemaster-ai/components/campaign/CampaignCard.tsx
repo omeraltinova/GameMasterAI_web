@@ -1,11 +1,17 @@
 import Link from "next/link";
 import { Card, CardContent, Badge } from "@/components/ui";
 import type { Campaign } from "@/types";
-import { Users, Calendar, Play, Pause, CheckCircle, FileEdit } from "lucide-react";
+import { Users, Calendar, Play, Pause, CheckCircle, FileEdit, User } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 
+type CampaignWithCreator = Campaign & {
+  creator?: {
+    username?: string | null;
+  };
+};
+
 interface CampaignCardProps {
-  campaign: Campaign;
+  campaign: CampaignWithCreator;
 }
 
 const statusConfig = {
@@ -65,6 +71,13 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
               <span>{formatRelativeTime(campaign.updatedAt)}</span>
             </div>
           </div>
+
+          {campaign.creator?.username && (
+            <div className="mt-3 flex items-center gap-1 text-xs text-foreground-muted">
+              <User className="h-3 w-3" />
+              <span>Oluşturan: {campaign.creator.username}</span>
+            </div>
+          )}
 
           {/* Invite Code (if exists) */}
           {campaign.inviteCode && campaign.status === "ACTIVE" && (

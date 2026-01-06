@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, Button, Badge, Avatar, Progress } from "@/components/ui";
 import { useSession } from "next-auth/react";
 import {
@@ -12,7 +13,9 @@ import {
   ArrowRight,
   Plus,
   Play,
+  Loader2,
 } from "lucide-react";
+import { get } from "@/lib/api/client";
 
 // TİP TANIMLAMALARI (Hataları gidermek için)
 type Character = {
@@ -25,27 +28,100 @@ type Character = {
   hp: number;
   maxHp: number;
   userId: string;
+  experience: number;
+  stats?: Record<string, number>;
+  campaign?: {
+    id: string;
+    name: string;
+    status: string;
+  } | null;
 };
 
 type Campaign = {
   id: string;
   name: string;
   status: string;
-  description: string;
+  description?: string | null;
   playerCount: number;
   maxPlayers: number;
   isMultiplayer: boolean;
   creatorId: string;
+  lastSession?: {
+    id: string;
+  } | null;
 };
 
 export default function DashboardPage() {
   const { data: session } = useSession();
   const user = session?.user;
 
-  // ARTIK 'any' YERİNE YUKARIDAKİ TİPLERİ KULLANIYORUZ
-  const userCharacters: Character[] = []; 
-  const activeCampaigns: Campaign[] = [];
-  const totalMessages = 0;
+  const [userCharacters, setUserCharacters] = useState<Character[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [totalMessages, setTotalMessages] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchDashboardData = async () => {
+      setIsLoading(true);
+      try {
+        const [charactersResponse, campaignsResponse] = await Promise.all([
+          get<{ success: boolean; characters: Character[] }>("/characters"),
+          get<{ success: boolean; campaigns: Campaign[] }>("/campaigns"),
+        ]);
+
+        if (!isMounted) return;
+
+        const nextCharacters = charactersResponse?.characters ?? [];
+        const nextCampaigns = campaignsResponse?.campaigns ?? [];
+
+        setUserCharacters(nextCharacters);
+        setCampaigns(nextCampaigns);
+
+        const sessionIds = nextCampaigns
+          .map((campaign) => campaign.lastSession?.id)
+          .filter(Boolean) as string[];
+
+        if (sessionIds.length === 0) {
+          setTotalMessages(0);
+          return;
+        }
+
+        const messageCounts = await Promise.all(
+          sessionIds.map(async (sessionId) => {
+            try {
+              const response = await get<{
+                success: boolean;
+                pagination?: { total: number };
+              }>(`/sessions/${sessionId}/messages?limit=1&offset=0`);
+              return response?.pagination?.total ?? 0;
+            } catch (error) {
+              console.error("Mesaj sayısı alınamadı:", error);
+              return 0;
+            }
+          })
+        );
+
+        if (!isMounted) return;
+        setTotalMessages(messageCounts.reduce((sum, count) => sum + count, 0));
+      } catch (error) {
+        console.error("Dashboard verisi alınamadı:", error);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchDashboardData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const activeCampaigns = campaigns.filter((campaign) => campaign.status === "ACTIVE");
 
   const statCards = [
     {
@@ -56,15 +132,15 @@ export default function DashboardPage() {
       href: "/characters",
     },
     {
-      title: "Kampanyalar",
-      value: activeCampaigns.length,
+      title: "Oturumlar",
+      value: campaigns.length,
       icon: Swords,
       color: "secondary",
       href: "/campaigns",
     },
     {
       title: "Aktif Oturumlar",
-      value: activeCampaigns.filter((c) => c.status === "ACTIVE").length,
+      value: activeCampaigns.length,
       icon: Play,
       color: "success",
       href: "/campaigns",
@@ -149,7 +225,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y divide-border">
-              {userCharacters.length > 0 ? (
+              {isLoading ? (
+                <div className="p-8 text-center text-sm text-foreground-muted">
+                  <Loader2 className="h-5 w-5 animate-spin mx-auto mb-3" />
+                  Karakterler yükleniyor...
+                </div>
+              ) : userCharacters.length > 0 ? (
                 userCharacters.map((character) => (
                   <Link
                     key={character.id}
@@ -203,11 +284,16 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Swords className="h-5 w-5 text-secondary" />
-              Aktif Kampanyalar
+              Aktif Oturumlar
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {activeCampaigns.length > 0 ? (
+            {isLoading ? (
+              <div className="p-6 text-center text-sm text-foreground-muted">
+                <Loader2 className="h-5 w-5 animate-spin mx-auto mb-3" />
+                Oturumlar yükleniyor...
+              </div>
+            ) : activeCampaigns.length > 0 ? (
               activeCampaigns.map((campaign) => (
                 <Link
                   key={campaign.id}
@@ -220,9 +306,11 @@ export default function DashboardPage() {
                       {campaign.status === "ACTIVE" ? "Aktif" : campaign.status}
                     </Badge>
                   </div>
-                  <p className="text-sm text-foreground-secondary line-clamp-2 mb-3">
-                    {campaign.description}
-                  </p>
+                  {campaign.description && (
+                    <p className="text-sm text-foreground-secondary line-clamp-2 mb-3">
+                      {campaign.description}
+                    </p>
+                  )}
                   <div className="flex items-center gap-4 text-xs text-foreground-muted">
                     <span className="flex items-center gap-1">
                       <Users className="h-3 w-3" />

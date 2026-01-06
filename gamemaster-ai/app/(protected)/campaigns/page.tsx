@@ -1,23 +1,48 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button, Card, CardContent, Badge } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { CampaignCard } from "@/components/campaign";
-import { mockCampaigns } from "@/lib/mock-data";
-import { Plus, Swords, Search, Users } from "lucide-react";
+import { Plus, Swords, Search, Users, Loader2 } from "lucide-react";
+import { get } from "@/lib/api/client";
+import { useSession } from "next-auth/react";
+import type { Campaign } from "@/types";
 
 export default function CampaignsPage() {
+  const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState("");
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Filter campaigns (mock: all for display)
-  const myCampaigns = mockCampaigns.filter((c) => c.creatorId === "user_1");
-  const joinedCampaigns = mockCampaigns.filter(
-    (c) => c.creatorId !== "user_1" && c.status === "ACTIVE"
+  // Fetch campaigns from API
+  useEffect(() => {
+    const fetchCampaigns = async () => {
+      setIsLoading(true);
+      try {
+        const response = await get('/campaigns') as { success: boolean; campaigns: Campaign[] };
+        if (response && response.success && Array.isArray(response.campaigns)) {
+          setCampaigns(response.campaigns);
+        }
+      } catch (error) {
+        console.error('Campaigns alınamadı:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCampaigns();
+  }, []);
+
+  // Filter campaigns
+  const userId = session?.user?.id;
+  const myCampaigns = campaigns.filter((c) => c.creatorId === userId);
+  const joinedCampaigns = campaigns.filter(
+    (c) => c.creatorId !== userId && c.status === "ACTIVE"
   );
 
-  const filterCampaigns = (campaigns: typeof mockCampaigns) =>
+  const filterCampaigns = (campaigns: Campaign[]) =>
     campaigns.filter(
       (c) =>
         c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -29,9 +54,9 @@ export default function CampaignsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Kampanyalar</h1>
+          <h1 className="text-3xl font-bold">Oturumlar</h1>
           <p className="text-foreground-secondary">
-            {mockCampaigns.length} kampanya
+            {campaigns.length} kampanya
           </p>
         </div>
         <div className="flex gap-3">
@@ -66,7 +91,7 @@ export default function CampaignsPage() {
       <Tabs defaultValue="my">
         <TabsList>
           <TabsTrigger value="my">
-            Kampanyalarım
+            Oturumlarım
             <Badge variant="primary" size="sm" className="ml-2">
               {myCampaigns.length}
             </Badge>
@@ -81,9 +106,13 @@ export default function CampaignsPage() {
 
         {/* My Campaigns */}
         <TabsContent value="my">
-          {filterCampaigns(myCampaigns).length > 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-foreground-muted" />
+            </div>
+          ) : filterCampaigns(myCampaigns).length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filterCampaigns(myCampaigns).map((campaign) => (
+              {filterCampaigns(myCampaigns).map((campaign: any) => (
                 <CampaignCard key={campaign.id} campaign={campaign} />
               ))}
             </div>
@@ -119,7 +148,7 @@ export default function CampaignsPage() {
         <TabsContent value="joined">
           {filterCampaigns(joinedCampaigns).length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filterCampaigns(joinedCampaigns).map((campaign) => (
+              {filterCampaigns(joinedCampaigns).map((campaign: any) => (
                 <CampaignCard key={campaign.id} campaign={campaign} />
               ))}
             </div>
@@ -147,5 +176,3 @@ export default function CampaignsPage() {
     </div>
   );
 }
-
-

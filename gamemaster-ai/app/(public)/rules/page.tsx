@@ -4,21 +4,21 @@ import { useState } from "react";
 import { BookOpen, Dice6, Sword, Heart, Shield, Sparkles, Scroll, Flame, Zap } from "lucide-react";
 
 const abilityScores = [
-  { name: "Strength", abbr: "STR", description: "Fiziksel güç, yakın dövüş, taşıma kapasitesi", color: "secondary" },
-  { name: "Dexterity", abbr: "DEX", description: "Çeviklik, refleksler, denge, uzak saldırı", color: "accent" },
-  { name: "Constitution", abbr: "CON", description: "Dayanıklılık, sağlık, can puanları", color: "secondary" },
-  { name: "Intelligence", abbr: "INT", description: "Mantık, hafıza, araştırma, büyü (Wizard)", color: "primary" },
-  { name: "Wisdom", abbr: "WIS", description: "Algı, sezgi, irade gücü, büyü (Cleric/Druid)", color: "primary" },
-  { name: "Charisma", abbr: "CHA", description: "Karizma, liderlik, ikna, büyü (Bard/Sorcerer)", color: "primary" },
+  { name: "Güç", abbr: "STR", description: "Yakın dövüş, atletizm ve taşıma gücü.", color: "secondary" },
+  { name: "Çeviklik", abbr: "DEX", description: "Refleksler, inisiyatif, denge ve uzak saldırılar.", color: "accent" },
+  { name: "Dayanıklılık", abbr: "CON", description: "Can puanı, zehir direnci ve fiziksel dayanım.", color: "secondary" },
+  { name: "Zeka", abbr: "INT", description: "Bilgi, araştırma ve büyü kuramı.", color: "primary" },
+  { name: "Bilgelik", abbr: "WIS", description: "Algı, sezgi, irade ve doğa farkındalığı.", color: "primary" },
+  { name: "Karizma", abbr: "CHA", description: "İkna, liderlik ve büyüsel karizma.", color: "primary" },
 ];
 
 const diceTypes = [
-  { type: "d4", uses: "Küçük silah hasarı, minor healing", sides: 4 },
-  { type: "d6", uses: "Orta silahlar, sneak attack, fireball", sides: 6 },
-  { type: "d8", uses: "Longsword, çoğu silah hasarı", sides: 8 },
-  { type: "d10", uses: "Heavy silahlar, cantrip damage", sides: 10 },
-  { type: "d12", uses: "Greataxe, barbarian hit die", sides: 12 },
-  { type: "d20", uses: "Attack roll, saving throw, ability check", sides: 20 },
+  { type: "d4", uses: "Küçük silahlar ve ufak büyü etkileri", sides: 4 },
+  { type: "d6", uses: "Yaygın silah hasarı ve basit büyüler", sides: 6 },
+  { type: "d8", uses: "Çoğu silah hasarı ve orta seviye etkiler", sides: 8 },
+  { type: "d10", uses: "Ağır silahlar ve sınıf hasarları", sides: 10 },
+  { type: "d12", uses: "Büyük silahlar ve barbar can zarı", sides: 12 },
+  { type: "d20", uses: "Saldırı, kurtarma ve yetenek kontrolleri", sides: 20 },
 ];
 
 const tabs = [
@@ -44,14 +44,14 @@ export default function RulesPage() {
         <header className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-sm bg-primary/5 border border-primary/20 mb-6">
             <Scroll className="h-3.5 w-3.5 text-primary" />
-            <span className="text-xs font-medium text-primary tracking-[0.2em] uppercase">Compendium</span>
+            <span className="text-xs font-medium text-primary tracking-[0.2em] uppercase">Hızlı Rehber</span>
           </div>
           
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 font-serif tracking-tight">
             D&D 5e <span className="text-primary">Kuralları</span>
           </h1>
           <p className="text-lg text-foreground-secondary max-w-xl mx-auto">
-            Temel mekaniklerin hızlı referans rehberi
+            Mevcut oyun sistemi D&D 5e SRD temellidir. Temel mekanikler için hızlı referans.
           </p>
         </header>
 
@@ -86,7 +86,7 @@ export default function RulesPage() {
                   <div className="w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
                     <Sparkles className="w-5 h-5 text-primary" />
                   </div>
-                  <h2 className="text-xl lg:text-2xl font-bold font-serif">Ability Scores</h2>
+                  <h2 className="text-xl lg:text-2xl font-bold font-serif">Yetenek Puanları</h2>
                 </div>
 
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -97,9 +97,9 @@ export default function RulesPage() {
                     >
                       <div className="flex items-center gap-3 mb-2">
                         <span className={`text-xs font-bold px-2 py-1 rounded ${
-                          ability.color === 'primary' ? 'bg-primary/20 text-primary' :
-                          ability.color === 'secondary' ? 'bg-secondary/20 text-secondary' :
-                          'bg-accent/20 text-accent'
+                          ability.color === "primary" ? "bg-primary/20 text-primary" :
+                          ability.color === "secondary" ? "bg-secondary/20 text-secondary" :
+                          "bg-accent/20 text-accent"
                         }`}>
                           {ability.abbr}
                         </span>
@@ -115,16 +115,16 @@ export default function RulesPage() {
 
               {/* Modifier Calculation */}
               <div className="bg-background-elevated/50 rounded-xl border border-border/30 p-6 lg:p-8">
-                <h3 className="text-lg font-bold font-serif mb-4">Modifier Hesaplama</h3>
+                <h3 className="text-lg font-bold font-serif mb-4">Modifikatör Hesaplama</h3>
                 
                 <div className="flex flex-col md:flex-row gap-6 items-start">
                   <div className="flex-1 p-5 rounded-lg bg-background-tertiary border border-primary/20 text-center">
-                    <div className="font-mono text-2xl text-primary mb-2">(Score - 10) ÷ 2</div>
+                    <div className="font-mono text-2xl text-primary mb-2">(Skor - 10) / 2</div>
                     <p className="text-xs text-foreground-muted">Sonucu aşağı yuvarla</p>
                   </div>
                   
                   <div className="flex-1 space-y-2">
-                    {[
+                    {[ 
                       { score: 8, mod: -1 },
                       { score: 10, mod: 0 },
                       { score: 14, mod: +2 },
@@ -132,12 +132,23 @@ export default function RulesPage() {
                       { score: 20, mod: +5 },
                     ].map((item) => (
                       <div key={item.score} className="flex items-center justify-between p-2.5 px-4 rounded-lg bg-background-tertiary border border-border/30">
-                        <span className="text-foreground-secondary text-sm">Score {item.score}</span>
-                        <span className={`font-mono font-bold ${item.mod >= 0 ? 'text-accent' : 'text-secondary'}`}>
-                          {item.mod > 0 ? '+' : ''}{item.mod}
+                        <span className="text-foreground-secondary text-sm">Skor {item.score}</span>
+                        <span className={`font-mono font-bold ${item.mod >= 0 ? "text-accent" : "text-secondary"}`}>
+                          {item.mod > 0 ? "+" : ""}{item.mod}
                         </span>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                <div className="mt-6 grid md:grid-cols-2 gap-4">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-background-tertiary border border-border/30">
+                    <span className="text-sm text-foreground-secondary">Yeterlilik Bonusu</span>
+                    <span className="font-mono font-bold text-accent">Seviyeye göre +2 → +6</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-background-tertiary border border-border/30">
+                    <span className="text-sm text-foreground-secondary">Zorluk Sınıfı (DC)</span>
+                    <span className="font-mono font-bold text-secondary">Kolay 10 • Orta 15 • Zor 20</span>
                   </div>
                 </div>
               </div>
@@ -158,13 +169,14 @@ export default function RulesPage() {
 
                 <div className="space-y-4">
                   {[
-                    { step: 1, title: "Initiative", desc: "d20 + DEX modifier ile sıra belirlenir.", icon: Zap },
-                    { step: 2, title: "Tur Aksiyonları", desc: "Movement, Action ve Bonus Action kullan.", icon: Flame },
-                    { step: 3, title: "Saldırı", desc: "d20 + modifiers vs hedefin Armor Class (AC).", icon: Sword },
-                    { step: 4, title: "Hasar", desc: "İsabet halinde silah zarını at.", icon: Heart },
-                  ].map((item, i) => (
+                    { step: 1, title: "İnisiyatif", desc: "d20 + DEX ile sıra belirlenir.", icon: Zap },
+                    { step: 2, title: "Tur Yapısı", desc: "Hareket + Aksiyon + Bonus Aksiyon + Tepki.", icon: Flame },
+                    { step: 3, title: "Saldırı Atışı", desc: "d20 + uygun bonus, hedefin AC değeri ile karşılaştırılır.", icon: Sword },
+                    { step: 4, title: "Hasar", desc: "İsabet halinde silah veya büyü hasar zarları atılır.", icon: Heart },
+                    { step: 5, title: "Kurtarma Atışı", desc: "Etkiye göre d20 + ilgili kurtarma bonusu.", icon: Shield },
+                  ].map((item) => (
                     <div 
-                      key={i} 
+                      key={item.step} 
                       className="flex gap-4 p-4 rounded-lg bg-background-tertiary border border-border/30 hover:border-primary/20 transition-colors group"
                     >
                       <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center font-serif font-bold text-primary group-hover:bg-primary/20 transition-colors">
@@ -184,16 +196,16 @@ export default function RulesPage() {
                 <div className="bg-secondary/5 rounded-xl border border-secondary/20 p-6">
                   <div className="flex items-center gap-2 mb-4">
                     <Heart className="w-5 h-5 text-secondary" />
-                    <h3 className="font-bold font-serif text-secondary">Critical Hits</h3>
+                    <h3 className="font-bold font-serif text-secondary">Kritik Vuruşlar</h3>
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <div className="font-bold text-foreground mb-1">Natural 20</div>
-                      <p className="text-sm text-secondary/80">Tüm hasar zarlarını iki kez at.</p>
+                      <div className="font-bold text-foreground mb-1">Doğal 20</div>
+                      <p className="text-sm text-secondary/80">Hasar zarlarını iki kez at.</p>
                     </div>
                     <div className="w-full h-px bg-secondary/20" />
                     <div>
-                      <div className="font-bold text-foreground mb-1">Natural 1</div>
+                      <div className="font-bold text-foreground mb-1">Doğal 1</div>
                       <p className="text-sm text-secondary/80">Otomatik ıskalama.</p>
                     </div>
                   </div>
@@ -202,19 +214,19 @@ export default function RulesPage() {
                 <div className="bg-accent/5 rounded-xl border border-accent/20 p-6">
                   <div className="flex items-center gap-2 mb-4">
                     <Shield className="w-5 h-5 text-accent" />
-                    <h3 className="font-bold font-serif text-accent">Armor Class</h3>
+                    <h3 className="font-bold font-serif text-accent">Zırh Sınıfı (AC)</h3>
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-accent/80">Zırhsız (Base)</span>
+                      <span className="text-sm text-accent/80">Zırhsız</span>
                       <span className="font-bold font-mono">10 + DEX</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-accent/80">Leather</span>
+                      <span className="text-sm text-accent/80">Hafif Zırh</span>
                       <span className="font-bold font-mono">11 + DEX</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-accent/80">Plate</span>
+                      <span className="text-sm text-accent/80">Ağır Zırh</span>
                       <span className="font-bold font-mono">18</span>
                     </div>
                   </div>
@@ -248,18 +260,18 @@ export default function RulesPage() {
               {/* Advantage/Disadvantage */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="p-6 rounded-xl bg-accent/5 border border-accent/20">
-                  <h4 className="font-bold font-serif text-accent mb-2">Advantage</h4>
+                  <h4 className="font-bold font-serif text-accent mb-2">Avantaj</h4>
                   <p className="text-sm text-foreground-secondary mb-4">2d20 at, yüksek olanı al.</p>
                   <div className="font-mono text-xs text-accent/70">
-                    Örnek: 13 ve 18 → <span className="text-accent font-bold">18</span> kullan
+                    Örnek: 13 ve 18 atışında <span className="text-accent font-bold">18</span> kullan
                   </div>
                 </div>
                 
                 <div className="p-6 rounded-xl bg-secondary/5 border border-secondary/20">
-                  <h4 className="font-bold font-serif text-secondary mb-2">Disadvantage</h4>
+                  <h4 className="font-bold font-serif text-secondary mb-2">Dezavantaj</h4>
                   <p className="text-sm text-foreground-secondary mb-4">2d20 at, düşük olanı al.</p>
                   <div className="font-mono text-xs text-secondary/70">
-                    Örnek: 13 ve 18 → <span className="text-secondary font-bold">13</span> kullan
+                    Örnek: 13 ve 18 atışında <span className="text-secondary font-bold">13</span> kullan
                   </div>
                 </div>
               </div>
@@ -277,12 +289,12 @@ export default function RulesPage() {
                       <Flame className="w-5 h-5 text-primary" />
                     </div>
                     <div>
-                      <h4 className="font-bold font-serif text-primary">Cantrips</h4>
+                      <h4 className="font-bold font-serif text-primary">Cantrip</h4>
                       <span className="text-xs text-primary/70">Seviye 0</span>
                     </div>
                   </div>
                   <p className="text-sm text-foreground-secondary leading-relaxed">
-                    Sınırsız kullanım. Kaynak harcamadan sürekli atılabilir. 
+                    Sınırsız kullanım. Kaynak harcamadan her tur atılabilir.
                     Fire Bolt, Prestidigitation gibi.
                   </p>
                 </div>
@@ -293,12 +305,12 @@ export default function RulesPage() {
                       <Sparkles className="w-5 h-5 text-secondary" />
                     </div>
                     <div>
-                      <h4 className="font-bold font-serif text-secondary">Leveled Spells</h4>
+                      <h4 className="font-bold font-serif text-secondary">Seviyeli Büyüler</h4>
                       <span className="text-xs text-secondary/70">Seviye 1-9</span>
                     </div>
                   </div>
                   <p className="text-sm text-foreground-secondary leading-relaxed">
-                    Spell slot harcar. Slotlar Long Rest ile yenilenir.
+                    Büyü slotu harcar. Slotlar Long Rest ile yenilenir.
                     Fireball, Healing Word gibi.
                   </p>
                 </div>
@@ -324,9 +336,9 @@ export default function RulesPage() {
                     >
                       <span className="font-medium text-sm">{item.class}</span>
                       <span className={`text-xs font-bold px-2 py-1 rounded font-mono ${
-                        item.color === 'primary' ? 'bg-primary/20 text-primary' :
-                        item.color === 'secondary' ? 'bg-secondary/20 text-secondary' :
-                        'bg-accent/20 text-accent'
+                        item.color === "primary" ? "bg-primary/20 text-primary" :
+                        item.color === "secondary" ? "bg-secondary/20 text-secondary" :
+                        "bg-accent/20 text-accent"
                       }`}>
                         {item.stat}
                       </span>
@@ -337,13 +349,13 @@ export default function RulesPage() {
 
               {/* Spell Save DC */}
               <div className="bg-background-elevated/50 rounded-xl border border-border/30 p-6">
-                <h3 className="font-bold font-serif mb-4">Spell Save DC Hesaplama</h3>
+                <h3 className="font-bold font-serif mb-4">Büyü Kurtarma DC Hesaplama</h3>
                 <div className="p-4 rounded-lg bg-background-tertiary border border-primary/20 text-center">
                   <div className="font-mono text-xl text-primary mb-2">
-                    8 + Proficiency + Spellcasting Modifier
+                    8 + Yeterlilik + Büyü Modifikatörü
                   </div>
                   <p className="text-xs text-foreground-muted">
-                    Hedefin saving throw'da yenmesi gereken değer
+                    Hedefin kurtarma atışında geçmesi gereken değer
                   </p>
                 </div>
               </div>

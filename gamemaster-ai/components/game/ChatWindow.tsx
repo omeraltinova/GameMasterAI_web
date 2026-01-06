@@ -1,12 +1,26 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import type { Message } from "@/types";
-import { Bot, User, Dice6, Swords, AlertCircle } from "lucide-react";
+import type { Message, GMAction } from "@/types";
+import { Bot, User, Dice6, Swords, AlertCircle, RotateCcw, MoreVertical, RefreshCw, MapPin } from "lucide-react";
+import { ActionButtons } from "./ActionButtons";
+import { 
+  DropdownMenu, 
+  DropdownMenuTrigger, 
+  DropdownMenuContent, 
+  DropdownMenuItem 
+} from "@/components/ui";
 
 interface ChatWindowProps {
   messages: Message[];
+  onActionSelect?: (action: GMAction, messageId: string) => void;
+  onDiceRoll?: (action: GMAction, messageId: string) => void;
+  onRestartFromMessage?: (messageId: string) => void;
+  onRegenerateMessage?: (messageId: string) => void;
+  isActionLoading?: boolean;
+  disableActions?: boolean;
+  canRestart?: boolean; // Sadece creator için göster
 }
 
 const senderConfig = {
@@ -47,14 +61,49 @@ const senderConfig = {
   },
 };
 
-export function ChatWindow({ messages }: ChatWindowProps) {
+export function ChatWindow({ 
+  messages, 
+  onActionSelect, 
+  onDiceRoll,
+  onRestartFromMessage,
+  onRegenerateMessage,
+  isActionLoading = false,
+  disableActions = false,
+  canRestart = false,
+}: ChatWindowProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [expandedImage, setExpandedImage] = useState<{ url: string; name: string } | null>(null);
 
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+  
+  // En son GM mesajını bul (aksiyon butonları için)
+  const lastGMMessageWithPrompt = [...messages].reverse().find(
+    m => m.senderType === 'GM' && m.gmPrompt && m.gmPrompt.actions && m.gmPrompt.actions.length > 0
+  );
+
+  // Empty state
+  if (!messages || messages.length === 0) {
+    return (
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto p-4 flex items-center justify-center"
+      >
+        <div className="text-center text-foreground-muted">
+          <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <h3 className="font-medium mb-2">Maceraya Hoş Geldin!</h3>
+          <p className="text-sm">
+            Aksiyonunu yazarak hikayeye başla.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -62,8 +111,11 @@ export function ChatWindow({ messages }: ChatWindowProps) {
       className="flex-1 overflow-y-auto p-4 space-y-4"
     >
       {messages.map((message, index) => {
-        const config = senderConfig[message.senderType];
+        const isImageSystemMessage = message.senderType === 'SYSTEM' && !!message.locationImageUrl;
+        const senderType = isImageSystemMessage ? 'GM' : message.senderType;
+        const config = senderConfig[senderType];
         const Icon = config.icon;
+        const displaySenderName = isImageSystemMessage ? 'Game Master' : message.senderName;
 
         if (config.align === "center") {
           return (
@@ -88,11 +140,20 @@ export function ChatWindow({ messages }: ChatWindowProps) {
 
         const isRight = config.align === "right";
 
+        // İlk mesaj değilse restart göster (en az 1 mesaj olmalı)
+        const showRestartOption = canRestart && onRestartFromMessage && index > 0;
+        
+        // GM mesajları için regenerate seçeneği
+        const showRegenerateOption = canRestart && onRegenerateMessage && message.senderType === 'GM' && index > 0;
+        
+        // En az bir seçenek varsa dropdown göster
+        const showDropdown = showRestartOption || showRegenerateOption;
+
         return (
           <div
             key={message.id || index}
             className={cn(
-              "flex gap-3 animate-slide-up",
+              "flex gap-3 animate-slide-up group relative",
               isRight && "flex-row-reverse"
             )}
             style={{ animationDelay: `${index * 0.05}s` }}
@@ -109,16 +170,51 @@ export function ChatWindow({ messages }: ChatWindowProps) {
 
             {/* Message Bubble */}
             <div className={cn("max-w-[75%]", isRight && "text-right")}>
-              {message.senderName && (
-                <p
-                  className={cn(
-                    "text-xs text-foreground-muted mb-1",
-                    isRight && "text-right"
-                  )}
-                >
-                  {message.senderName}
-                </p>
-              )}
+              <div className={cn(
+                "flex items-center gap-2 mb-1",
+                isRight && "flex-row-reverse"
+              )}>
+                {displaySenderName && (
+                  <p className="text-xs text-foreground-muted">
+                    {displaySenderName}
+                  </p>
+                )}
+                
+                {/* Options Dropdown - Hover'da görünür */}
+                {showDropdown && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button 
+                        className="p-1 rounded hover:bg-background-elevated transition-all duration-200 opacity-0 group-hover:opacity-100 pointer-events-auto"
+                        title="Seçenekler"
+                      >
+                        <MoreVertical className="h-3 w-3 text-foreground-muted" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align={isRight ? "end" : "start"}>
+                      {showRegenerateOption && (
+                        <DropdownMenuItem 
+                          onClick={() => onRegenerateMessage!(message.id)}
+                          className="gap-2 text-primary"
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                          Mesajı Yeniden Üret
+                        </DropdownMenuItem>
+                      )}
+                      {showRestartOption && (
+                        <DropdownMenuItem 
+                          onClick={() => onRestartFromMessage!(message.id)}
+                          className="gap-2 text-warning"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Buradan Yeniden Başlat
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </div>
+              
               <div
                 className={cn(
                   "p-4 rounded-lg border",
@@ -130,6 +226,42 @@ export function ChatWindow({ messages }: ChatWindowProps) {
                   {message.content}
                 </p>
               </div>
+              
+              {/* Mekan Görseli - GM mesajlarında */}
+              {message.locationImageUrl && (
+                <div 
+                  className="mt-2 rounded-lg overflow-hidden border border-border cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => setExpandedImage({ url: message.locationImageUrl!, name: message.locationName || 'Mekan Görseli' })}
+                >
+                  <div className="flex items-center gap-2 px-3 py-2 bg-background-secondary border-b border-border">
+                    <MapPin className="h-3 w-3 text-primary" />
+                    <span className="text-xs font-medium text-foreground">
+                      {message.locationName || 'Mekan Görseli'}
+                    </span>
+                  </div>
+                  <div className="relative aspect-[16/9] w-full">
+                    <img
+                      src={message.locationImageUrl}
+                      alt={message.locationName || "Mekan görseli"}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {/* GM Aksiyon Butonları - Sadece son GM mesajında ve gmPrompt varsa göster */}
+              {message.id === lastGMMessageWithPrompt?.id && 
+               message.gmPrompt && 
+               onActionSelect && (
+                <ActionButtons
+                  gmPrompt={message.gmPrompt}
+                  onActionSelect={(action) => onActionSelect(action, message.id)}
+                  onDiceRoll={onDiceRoll ? (action) => onDiceRoll(action, message.id) : undefined}
+                  isLoading={isActionLoading}
+                  disabled={disableActions}
+                />
+              )}
+              
               <p
                 className={cn(
                   "text-xs text-foreground-muted mt-1",
@@ -145,6 +277,42 @@ export function ChatWindow({ messages }: ChatWindowProps) {
           </div>
         );
       })}
+      {/* Auto-scroll anchor */}
+      <div ref={messagesEndRef} />
+      
+      {/* Full Screen Image Modal */}
+      {expandedImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+          onClick={() => setExpandedImage(null)}
+        >
+          <div className="relative w-full h-full flex items-center justify-center">
+            <img
+              src={expandedImage.url}
+              alt={expandedImage.name}
+              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <div className="absolute top-4 left-4 px-3 py-2 rounded-lg bg-black/70 backdrop-blur-sm border border-white/20">
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-white" />
+                <span className="text-sm font-medium text-white">
+                  {expandedImage.name}
+                </span>
+              </div>
+            </div>
+            <button
+              className="absolute top-4 right-4 h-10 w-10 p-0 bg-black/70 hover:bg-black/90 text-white border border-white/20 rounded-lg flex items-center justify-center transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setExpandedImage(null);
+              }}
+            >
+              <span className="text-2xl leading-none">×</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

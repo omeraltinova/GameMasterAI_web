@@ -1,6 +1,12 @@
 export { DiceRoller } from "./DiceRoller";
+export { DiceModal } from "./DiceModal";
+export { DiceAnimation, DiceAnimationInline } from "./DiceAnimation";
+export { DiceHistory } from "./DiceHistory";
+export { NPCModal } from "./NPCModal";
 export { ChatWindow } from "./ChatWindow";
 export { MessageInput } from "./MessageInput";
 export { CharacterMini } from "./CharacterMini";
-
-
+export { GameSetupWizard } from "./GameSetupWizard";
+export { ActionButtons, rollDiceForAction } from "./ActionButtons";
+export { ActionSuggestions } from "./ActionSuggestions";
+export { LocationImage } from './LocationImage';

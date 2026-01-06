@@ -408,7 +408,7 @@ export async function callOpenRouterWithTools(
       throw new Error('No response from AI');
     }
 
-    const content = choice.message.content || '';
+    let content = choice.message.content || '';
     const toolCalls = choice.message.tool_calls;
 
     // If there are tool calls, execute them
@@ -419,6 +419,61 @@ export async function callOpenRouterWithTools(
         options.sessionId,
         options.characterId
       );
+
+      // If content is empty after tool calls, get a follow-up response
+      if (!content || content.trim() === '') {
+        console.log('[AI] Content empty after tool calls, getting follow-up response...');
+
+        // Build tool results summary for follow-up
+        const toolResultsSummary = toolResults.map(r => {
+          if (r.toolName === 'create_npc' && r.success) {
+            return `NPC "${r.result?.name}" (${r.result?.role || 'unknown role'}) oluşturuldu.`;
+          } else if (r.toolName === 'give_item' && r.success) {
+            return `"${r.result?.itemName}" oyuncuya verildi.`;
+          } else if (r.toolName === 'request_dice_roll' && r.success) {
+            return `${r.result?.skill} için ${r.result?.diceType} atışı istendi (DC ${r.result?.dc}).`;
+          } else if (r.toolName === 'update_npc' && r.success) {
+            return `NPC güncellendi.`;
+          }
+          return null;
+        }).filter(Boolean).join(' ');
+
+        // Make follow-up call to get narrative
+        const followUpMessages: OpenRouterMessage[] = [
+          ...messages,
+          {
+            role: 'assistant',
+            content: `[Tool işlemleri tamamlandı: ${toolResultsSummary}]`
+          },
+          {
+            role: 'user',
+            content: 'Şimdi hikayeyi devam ettir ve yukarıdaki işlemleri anlatıma entegre et. Tool çağrısı yapma, sadece hikaye anlatımını yap.'
+          },
+        ];
+
+        const followUpResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+            'X-Title': 'GameMaster AI',
+          },
+          body: JSON.stringify({
+            model,
+            messages: followUpMessages,
+            temperature,
+            max_tokens: maxTokens,
+            // No tools in follow-up to force text response
+          }),
+        });
+
+        if (followUpResponse.ok) {
+          const followUpData: OpenRouterResponseWithTools = await followUpResponse.json();
+          content = followUpData.choices[0]?.message?.content || '';
+          console.log('[AI] Got follow-up response with content');
+        }
+      }
 
       return {
         content,

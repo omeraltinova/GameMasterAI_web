@@ -2,10 +2,12 @@
 
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar, Progress } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
-import { mockCharacters, mockInventoryItems } from "@/lib/mock-data";
 import { formatModifier, calculateModifier, getProficiencyBonus } from "@/lib/utils";
+import { get } from "@/lib/api/client";
+import type { Character as CharacterType, InventoryItem, ItemProperties } from "@/types";
 import {
   ArrowLeft,
   Edit,
@@ -16,6 +18,7 @@ import {
   Backpack,
   BookOpen,
   User,
+  Loader2,
 } from "lucide-react";
 
 const abilityNames: Record<string, string> = {
@@ -27,14 +30,121 @@ const abilityNames: Record<string, string> = {
   charisma: "CHA",
 };
 
+type Character = CharacterType & {
+  campaign?: {
+    id: string;
+    name: string;
+    status: string;
+  } | null;
+};
+
+type InventoryItemData = InventoryItem & {
+  properties?: ItemProperties | string | null;
+};
+
+const defaultStats = {
+  strength: 10,
+  dexterity: 10,
+  constitution: 10,
+  intelligence: 10,
+  wisdom: 10,
+  charisma: 10,
+};
+
 export default function CharacterDetailPage() {
   const params = useParams();
-  const character = mockCharacters.find((c) => c.id === params.id);
+  const characterId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const [character, setCharacter] = useState<Character | null>(null);
+  const [equippedItems, setEquippedItems] = useState<InventoryItemData[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<InventoryItemData[]>([]);
+  const [totalWeight, setTotalWeight] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!characterId) return;
+    let isMounted = true;
+
+    const fetchCharacterDetails = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      try {
+        const characterResponse = await get<{ success: boolean; characters: Character[] }>("/characters");
+        const foundCharacter =
+          characterResponse?.characters?.find((item) => item.id === characterId) || null;
+
+        if (!isMounted) return;
+
+        if (!foundCharacter) {
+          setCharacter(null);
+          setEquippedItems([]);
+          setInventoryItems([]);
+          setTotalWeight(null);
+          setLoadError("Karakter bulunamadı.");
+          return;
+        }
+
+        setCharacter(foundCharacter);
+
+        try {
+          const inventoryResponse = await get<{
+            success: boolean;
+            equipped: InventoryItemData[];
+            inventory: InventoryItemData[];
+            totalWeight: number;
+          }>(`/characters/${characterId}/inventory`);
+
+          if (!isMounted) return;
+
+          if (inventoryResponse?.success) {
+            setEquippedItems(inventoryResponse.equipped ?? []);
+            setInventoryItems(inventoryResponse.inventory ?? []);
+            setTotalWeight(
+              typeof inventoryResponse.totalWeight === "number" ? inventoryResponse.totalWeight : null
+            );
+          }
+        } catch (error) {
+          console.error("Envanter yüklenemedi:", error);
+          if (isMounted) {
+            setEquippedItems([]);
+            setInventoryItems([]);
+            setTotalWeight(null);
+          }
+        }
+      } catch (error) {
+        console.error("Karakter bilgileri yüklenemedi:", error);
+        if (isMounted) {
+          setLoadError("Karakter bilgileri yüklenemedi.");
+          setCharacter(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchCharacterDetails();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [characterId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-foreground-muted" />
+      </div>
+    );
+  }
 
   if (!character) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <h1 className="text-2xl font-bold mb-4">Karakter bulunamadı</h1>
+        <h1 className="text-2xl font-bold mb-4">
+          {loadError || "Karakter bulunamadı"}
+        </h1>
         <Link href="/characters">
           <Button variant="outline">Karakterlere Dön</Button>
         </Link>
@@ -42,16 +152,73 @@ export default function CharacterDetailPage() {
     );
   }
 
-  const characterItems = mockInventoryItems.filter(
-    (item) => item.characterId === character.id
-  );
-
+  const stats = character.stats || defaultStats;
   const hpPercentage = (character.hp / character.maxHp) * 100;
   const hpVariant =
     hpPercentage < 33 ? "danger" : hpPercentage < 66 ? "warning" : "success";
-
   const proficiencyBonus = getProficiencyBonus(character.level);
-  const baseAC = 10 + calculateModifier(character.stats.dexterity);
+  const baseAC = 10 + calculateModifier(stats.dexterity);
+  const experience = character.experience || 0;
+  const nextLevelProgress = 1000 - (experience % 1000);
+
+  const hasItems = equippedItems.length > 0 || inventoryItems.length > 0;
+
+  const getItemProperties = (item: InventoryItemData): ItemProperties | undefined => {
+    if (!item.properties) return undefined;
+    if (typeof item.properties === "string") {
+      try {
+        return JSON.parse(item.properties) as ItemProperties;
+      } catch (error) {
+        return undefined;
+      }
+    }
+    return item.properties;
+  };
+
+  const renderItem = (item: InventoryItemData) => {
+    const properties = getItemProperties(item);
+    return (
+      <div
+        key={item.id}
+        className="flex items-start gap-4 p-4 rounded-lg bg-background-elevated"
+      >
+        <div className="flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h4 className="font-medium">{item.name}</h4>
+            {item.quantity > 1 && (
+              <Badge variant="outline" size="sm">
+                x{item.quantity}
+              </Badge>
+            )}
+            {item.equipped && (
+              <Badge variant="success" size="sm">
+                Kuşanıldı
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-foreground-secondary">{item.type}</p>
+          {item.description && (
+            <p className="text-xs text-foreground-muted mt-1">
+              {item.description}
+            </p>
+          )}
+        </div>
+        <div className="text-right text-xs text-foreground-muted">
+          {properties?.damage && (
+            <p className="text-primary font-mono text-sm">
+              {properties.damage}
+            </p>
+          )}
+          {properties?.armorClass && (
+            <p className="text-primary font-mono text-sm">
+              AC +{properties.armorClass}
+            </p>
+          )}
+          {item.weight > 0 && <p>{item.weight} lb</p>}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -83,8 +250,17 @@ export default function CharacterDetailPage() {
                 <div>
                   <h1 className="text-3xl font-bold mb-1">{character.name}</h1>
                   <p className="text-lg text-foreground-secondary">
-                    Level {character.level} {character.race} {character.class}
+                    Seviye {character.level} {character.race} {character.class}
                   </p>
+                  {character.campaign && (
+                    <div className="mt-2">
+                      <Link href={`/campaigns/${character.campaign.id}`}>
+                        <Badge variant="outline">
+                          Kampanya: {character.campaign.name}
+                        </Badge>
+                      </Link>
+                    </div>
+                  )}
                 </div>
                 <Link href={`/characters/${character.id}/edit`}>
                   <Button variant="outline" size="sm" className="gap-2">
@@ -101,22 +277,22 @@ export default function CharacterDetailPage() {
                   <p className="text-2xl font-bold">
                     {character.hp}/{character.maxHp}
                   </p>
-                  <p className="text-xs text-foreground-muted">Hit Points</p>
+                  <p className="text-xs text-foreground-muted">Can Puanı</p>
                 </div>
                 <div className="p-4 rounded-lg bg-background-elevated text-center">
                   <Shield className="h-5 w-5 mx-auto mb-1 text-primary" />
                   <p className="text-2xl font-bold">{baseAC}</p>
-                  <p className="text-xs text-foreground-muted">Armor Class</p>
+                  <p className="text-xs text-foreground-muted">Zırh Sınıfı</p>
                 </div>
                 <div className="p-4 rounded-lg bg-background-elevated text-center">
                   <Sparkles className="h-5 w-5 mx-auto mb-1 text-secondary" />
                   <p className="text-2xl font-bold">+{proficiencyBonus}</p>
-                  <p className="text-xs text-foreground-muted">Proficiency</p>
+                  <p className="text-xs text-foreground-muted">Yeterlilik</p>
                 </div>
                 <div className="p-4 rounded-lg bg-background-elevated text-center">
                   <Sword className="h-5 w-5 mx-auto mb-1 text-warning" />
                   <p className="text-2xl font-bold">30 ft</p>
-                  <p className="text-xs text-foreground-muted">Speed</p>
+                  <p className="text-xs text-foreground-muted">Hız</p>
                 </div>
               </div>
             </div>
@@ -140,12 +316,12 @@ export default function CharacterDetailPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-primary" />
-                  Ability Scores
+                  Yetenek Puanları
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 gap-4">
-                  {Object.entries(character.stats).map(([ability, score]) => {
+                  {Object.entries(stats).map(([ability, score]) => {
                     const modifier = calculateModifier(score);
                     return (
                       <div
@@ -178,7 +354,7 @@ export default function CharacterDetailPage() {
                 {/* HP */}
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="font-medium">Hit Points</span>
+                    <span className="font-medium">Can Puanı</span>
                     <span className="text-lg">
                       {character.hp}/{character.maxHp}
                     </span>
@@ -194,25 +370,25 @@ export default function CharacterDetailPage() {
                 {/* XP */}
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="font-medium">Experience Points</span>
+                    <span className="font-medium">Deneyim Puanı</span>
                     <span className="text-lg">
-                      {character.experience.toLocaleString()} XP
+                      {experience.toLocaleString()} XP
                     </span>
                   </div>
                   <Progress
-                    value={character.experience % 1000}
+                    value={experience % 1000}
                     max={1000}
                     variant="primary"
                     size="lg"
                   />
                   <p className="text-xs text-foreground-muted mt-1">
-                    Sonraki seviyeye: {1000 - (character.experience % 1000)} XP
+                    Sonraki seviyeye: {nextLevelProgress} XP
                   </p>
                 </div>
 
                 {/* Level */}
                 <div className="p-4 rounded-lg bg-primary/10 text-center">
-                  <p className="text-sm text-foreground-secondary mb-1">Level</p>
+                  <p className="text-sm text-foreground-secondary mb-1">Seviye</p>
                   <p className="text-4xl font-bold text-primary">
                     {character.level}
                   </p>
@@ -232,48 +408,32 @@ export default function CharacterDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {characterItems.length > 0 ? (
-                <div className="space-y-3">
-                  {characterItems.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center gap-4 p-4 rounded-lg bg-background-elevated"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-medium">{item.name}</h4>
-                          {item.equipped && (
-                            <Badge variant="success" size="sm">
-                              Kuşanılmış
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-foreground-secondary">
-                          {item.type}
-                          {item.quantity > 1 && ` x${item.quantity}`}
-                        </p>
-                        {item.description && (
-                          <p className="text-xs text-foreground-muted mt-1">
-                            {item.description}
-                          </p>
-                        )}
-                      </div>
-                      {item.properties && (
-                        <div className="text-right text-sm">
-                          {item.properties.damage && (
-                            <p className="text-primary font-mono">
-                              {item.properties.damage}
-                            </p>
-                          )}
-                          {item.properties.armorClass && (
-                            <p className="text-primary font-mono">
-                              AC +{item.properties.armorClass}
-                            </p>
-                          )}
-                        </div>
-                      )}
+              {hasItems ? (
+                <div className="space-y-6">
+                  {typeof totalWeight === "number" && (
+                    <div className="flex items-center justify-between text-xs text-foreground-muted">
+                      <span>Toplam Ağırlık</span>
+                      <span>{totalWeight} lb</span>
                     </div>
-                  ))}
+                  )}
+
+                  {equippedItems.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-3">Kuşanılanlar</h4>
+                      <div className="space-y-3">
+                        {equippedItems.map((item) => renderItem(item))}
+                      </div>
+                    </div>
+                  )}
+
+                  {inventoryItems.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold mb-3">Envanter</h4>
+                      <div className="space-y-3">
+                        {inventoryItems.map((item) => renderItem(item))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="py-12 text-center">

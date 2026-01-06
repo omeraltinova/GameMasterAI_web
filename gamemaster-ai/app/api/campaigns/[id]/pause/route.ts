@@ -29,6 +29,23 @@ export async function POST(
       );
     }
 
+    if (campaign.status === 'DRAFT') {
+      const creatorPlayer = await prisma.campaignPlayer.findFirst({
+        where: {
+          campaignId,
+          userId,
+        },
+        select: { id: true },
+      });
+
+      if (!creatorPlayer) {
+        return NextResponse.json(
+          { error: 'Kampanyayi baslatmak icin once karakter secmelisiniz' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Update campaign status to PAUSED
     await prisma.campaign.update({
       where: { id: campaignId },

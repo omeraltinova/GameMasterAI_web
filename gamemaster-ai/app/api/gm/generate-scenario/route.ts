@@ -92,6 +92,8 @@ export async function POST(req: NextRequest) {
         isAIGenerated: true,
         creatorId: userId,
         tags: JSON.stringify(scenarioData.tags || []),
+        // @ts-ignore - Prisma client out of sync
+        worldSettings: scenarioData.worldSettings ? JSON.stringify(scenarioData.worldSettings) : null,
       },
     });
 
@@ -105,6 +107,7 @@ export async function POST(req: NextRequest) {
         difficulty: scenario.difficulty,
         startingPrompt: scenario.startingPrompt,
         tags: scenarioData.tags || [],
+        worldSettings: scenarioData.worldSettings || null,
         isAIGenerated: true,
       },
     });

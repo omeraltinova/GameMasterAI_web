@@ -64,20 +64,36 @@ export async function GET(
       });
     } else {
       // CASE 2: No active session - create new one
+      let worldSettings = null;
+      // @ts-ignore - Prisma client out of sync
+      if (campaign.scenario?.worldSettings) {
+        try {
+          // @ts-ignore
+          worldSettings = typeof campaign.scenario.worldSettings === 'string' 
+            // @ts-ignore
+            ? JSON.parse(campaign.scenario.worldSettings) 
+            // @ts-ignore
+            : campaign.scenario.worldSettings;
+        } catch (e) {
+          console.error('Scenario world settings parsing err', e);
+        }
+      }
+
       const initialState = {
-        location: campaign.scenario?.startingPrompt ? 
-          campaign.scenario.startingPrompt.substring(0, 50) : 'Başlangıç',
+        worldSettings: worldSettings || {},
+        location: worldSettings?.startingLocation?.name || 
+                 (campaign.scenario?.startingPrompt ? campaign.scenario.startingPrompt.substring(0, 50) : 'Başlangıç'),
         timeOfDay: 'morning',
-        weather: 'clear',
+        weather: worldSettings?.startingLocation?.atmosphere?.split(',')[0] || 'clear', // Try to guess weather from atmosphere or default
         activeNPCs: [],
         activeQuests: [],
-        notes: 'Yeni macera başlıyor',
+        notes: worldSettings?.setting || 'Yeni macera başlıyor',
       };
 
       session = await prisma.gameSession.create({
         data: {
           campaignId,
-          currentState: JSON.stringify(initialState), // String olarak kaydet
+          currentState: JSON.stringify(initialState),
           aiContext: campaign.scenario?.startingPrompt || '',
         },
         include: {

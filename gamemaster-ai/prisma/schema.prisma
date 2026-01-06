@@ -166,6 +166,7 @@ model Scenario {
   isAIGenerated  Boolean  @default(false)
   creatorId      String?
   tags           String?  // JSON array
+  worldSettings  String?  // JSON object for WorldSettings
   createdAt      DateTime @default(now())
 
   // İlişkiler

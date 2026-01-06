@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar } from "@/components/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar, Modal } from "@/components/ui";
 import {
   ArrowLeft,
   Play,
@@ -18,10 +18,11 @@ import {
   Crown,
   LogOut,
   UserCheck,
+  Search,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { formatDate } from "@/lib/utils";
-import { get, post, del } from "@/lib/api/client";
+import { get, post, del, put } from "@/lib/api/client";
 import { useSession } from "next-auth/react";
 
 export default function CampaignLobbyPage() {
@@ -40,6 +41,12 @@ export default function CampaignLobbyPage() {
   const [isJoining, setIsJoining] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [myPlayer, setMyPlayer] = useState<any>(null);
+  const [availableScenarios, setAvailableScenarios] = useState<any[]>([]);
+  const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false);
+  const [scenarioSearch, setScenarioSearch] = useState("");
+  const [isLoadingScenarios, setIsLoadingScenarios] = useState(false);
+  const [isUpdatingScenario, setIsUpdatingScenario] = useState(false);
+  const [scenarioUpdateError, setScenarioUpdateError] = useState<string | null>(null);
 
   const currentUserId = session?.user?.id;
   const isCreator = campaign?.creatorId === currentUserId;
@@ -116,6 +123,28 @@ export default function CampaignLobbyPage() {
     fetchActiveSession();
   }, [campaign]);
 
+  const loadScenarios = async () => {
+    setIsLoadingScenarios(true);
+    setScenarioUpdateError(null);
+    try {
+      const res = await fetch("/api/scenarios?limit=50");
+      const data = await res.json();
+      const items = Array.isArray(data) ? data : data.data || [];
+      setAvailableScenarios(items);
+    } catch (error) {
+      console.error("Senaryolar alınamadı:", error);
+      setScenarioUpdateError("Senaryolar yüklenemedi");
+    } finally {
+      setIsLoadingScenarios(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isScenarioModalOpen) return;
+    if (availableScenarios.length > 0) return;
+    loadScenarios();
+  }, [isScenarioModalOpen, availableScenarios.length]);
+
   // Karakter seçimi ile lobiye katıl
   const handleJoinWithCharacter = async (characterId: string) => {
     if (!campaign) return;
@@ -157,6 +186,37 @@ export default function CampaignLobbyPage() {
     }
   };
 
+  const handleScenarioChange = async (scenarioId: string | null) => {
+    if (!campaign) return;
+
+    setIsUpdatingScenario(true);
+    setScenarioUpdateError(null);
+    try {
+      const response = await put(`/campaigns/${campaign.id}`, {
+        scenarioId: scenarioId || null,
+      }) as { success: boolean };
+
+      if (response && response.success) {
+        setCampaign((prev: any) =>
+          prev ? { ...prev, scenarioId: scenarioId || null } : prev
+        );
+        if (!scenarioId) {
+          setScenario(null);
+        } else {
+          const nextScenario =
+            availableScenarios.find((item) => item.id === scenarioId) || null;
+          setScenario(nextScenario);
+        }
+        setIsScenarioModalOpen(false);
+      }
+    } catch (error) {
+      console.error("Scenario update failed:", error);
+      setScenarioUpdateError("Senaryo güncellenemedi");
+    } finally {
+      setIsUpdatingScenario(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -191,6 +251,18 @@ export default function CampaignLobbyPage() {
     COMPLETED: "secondary",
   };
 
+  const hasCharacterSelected = Boolean(selectedCharacterId);
+  const canChangeScenario = isCreator && campaign?.status === "DRAFT";
+  const filteredScenarios = availableScenarios.filter((item) => {
+    if (!scenarioSearch) return true;
+    const query = scenarioSearch.toLowerCase();
+    return (
+      item.title?.toLowerCase().includes(query) ||
+      item.description?.toLowerCase().includes(query) ||
+      item.genre?.toLowerCase().includes(query)
+    );
+  });
+
   // Creator'ı ve players'ı birleştir
   const getAllParticipants = () => {
     const participants: any[] = [];
@@ -222,6 +294,7 @@ export default function CampaignLobbyPage() {
 
   const allParticipants = getAllParticipants();
   const hasJoined = myPlayer !== null || isCreator;
+  const canEnterPlay = hasCharacterSelected;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -257,7 +330,7 @@ export default function CampaignLobbyPage() {
           )}
           <div className="flex gap-2">
             {/* Play/Resume Button - sadece karakter seçilmişse */}
-            {(campaign.status === "ACTIVE" || campaign.status === "PAUSED") && hasJoined && (
+            {(campaign.status === "ACTIVE" || campaign.status === "PAUSED") && canEnterPlay && (
               <Link href={`/campaigns/${campaign.id}/play`}>
                 <Button className="gap-2" disabled={isLoadingSession}>
                   {isLoadingSession ? (
@@ -274,7 +347,10 @@ export default function CampaignLobbyPage() {
             {campaign.status === "DRAFT" && isCreator && (
               <Button
                 className="gap-2"
+                disabled={!hasCharacterSelected}
+                title={!hasCharacterSelected ? "Kampanyayı başlatmak için önce karakter seçmelisin" : undefined}
                 onClick={async () => {
+                  if (!hasCharacterSelected) return;
                   try {
                     // Kampanya durumunu ACTIVE yap
                     await post(`/campaigns/${campaign.id}/pause`); // Bu endpoint ACTIVE'e de çevirebilir
@@ -331,8 +407,8 @@ export default function CampaignLobbyPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Scenario Info */}
-          {scenario && (
+                    {/* Scenario Info */}
+          {(scenario || canChangeScenario) && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -341,28 +417,61 @@ export default function CampaignLobbyPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex items-start gap-4">
-                  <div className="p-4 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20">
-                    <Swords className="h-8 w-8 text-primary" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-semibold">{scenario.title}</h3>
-                      {scenario.isOfficial && (
-                        <Badge variant="primary" size="sm">
-                          Resmi
-                        </Badge>
-                      )}
+                {scenario ? (
+                  <div className="flex items-start gap-4">
+                    <div className="p-4 rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20">
+                      <Swords className="h-8 w-8 text-primary" />
                     </div>
-                    <p className="text-foreground-secondary mb-3">
-                      {scenario.description}
-                    </p>
-                    <div className="flex gap-2">
-                      <Badge variant="outline">{scenario.genre}</Badge>
-                      <Badge variant="outline">{scenario.difficulty}</Badge>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="text-lg font-semibold">{scenario.title}</h3>
+                        {scenario.isOfficial && (
+                          <Badge variant="primary" size="sm">
+                            Resmi
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-foreground-secondary mb-3">
+                        {scenario.description}
+                      </p>
+                      <div className="flex gap-2">
+                        <Badge variant="outline">{scenario.genre}</Badge>
+                        <Badge variant="outline">{scenario.difficulty}</Badge>
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="text-sm text-foreground-muted">
+                    Bu lobi için henüz bir senaryo seçilmedi.
+                  </div>
+                )}
+
+                {canChangeScenario && (
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsScenarioModalOpen(true)}
+                      disabled={isUpdatingScenario}
+                    >
+                      {scenario ? "Senaryoyu Değiştir" : "Senaryo Seç"}
+                    </Button>
+                    {scenario && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleScenarioChange(null)}
+                        disabled={isUpdatingScenario}
+                      >
+                        Senaryoyu Kaldır
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {scenarioUpdateError && (
+                  <div className="mt-3 text-sm text-destructive">{scenarioUpdateError}</div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -561,6 +670,93 @@ export default function CampaignLobbyPage() {
           </Card>
         </div>
       </div>
+
+      <Modal
+        open={isScenarioModalOpen}
+        onOpenChange={setIsScenarioModalOpen}
+        title="Senaryo Seç"
+        description="Lobi başlatılmadan önce senaryoyu değiştirebilirsin."
+        size="full"
+      >
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground-muted" />
+            <input
+              type="text"
+              placeholder="Senaryo ara..."
+              value={scenarioSearch}
+              onChange={(e) => setScenarioSearch(e.target.value)}
+              className="w-full h-10 pl-10 pr-4 rounded-lg bg-input border border-border text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-sm text-foreground-secondary">
+            <span>{filteredScenarios.length} senaryo</span>
+            {scenario && (
+              <button
+                type="button"
+                className="text-primary hover:underline"
+                onClick={() => handleScenarioChange(null)}
+                disabled={isUpdatingScenario}
+              >
+                Senaryoyu kaldır
+              </button>
+            )}
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+            {isLoadingScenarios ? (
+              <div className="sm:col-span-2 flex items-center justify-center p-6 rounded-lg border border-dashed border-border text-sm text-foreground-muted">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Senaryolar yükleniyor...
+              </div>
+            ) : filteredScenarios.length === 0 ? (
+              <div className="sm:col-span-2 p-6 rounded-lg border border-dashed border-border text-center text-sm text-foreground-muted">
+                Eşleşen senaryo bulunamadı.
+              </div>
+            ) : (
+              filteredScenarios.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleScenarioChange(item.id)}
+                  disabled={isUpdatingScenario}
+                  className={`p-4 rounded-lg border text-left transition-all ${
+                    scenario?.id === item.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:border-primary/50 hover:bg-background-elevated"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="font-semibold">{item.title}</h4>
+                    {item.isOfficial && (
+                      <Badge variant="primary" size="sm">
+                        Resmi
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-foreground-secondary line-clamp-2">
+                    {item.description}
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <Badge variant="outline" size="sm">
+                      {item.genre}
+                    </Badge>
+                    <Badge variant="outline" size="sm">
+                      {item.difficulty}
+                    </Badge>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+
+          {scenarioUpdateError && (
+            <div className="text-sm text-destructive">{scenarioUpdateError}</div>
+          )}
+        </div>
+      </Modal>
+
     </div>
   );
 }

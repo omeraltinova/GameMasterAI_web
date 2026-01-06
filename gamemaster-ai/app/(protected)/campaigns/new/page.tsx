@@ -1,15 +1,27 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Badge } from "@/components/ui";
-import { mockScenarios } from "@/lib/mock-data";
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Badge, Modal } from "@/components/ui";
 import { post } from "@/lib/api/client";
-import { ArrowLeft, Swords, Users, User, Map, Check, Loader2 } from "lucide-react";
+import { ArrowLeft, Swords, Users, User, Map, Check, Loader2, Search } from "lucide-react";
+
+interface Scenario {
+  id: string;
+  title: string;
+  description: string;
+  genre: string;
+  difficulty: string;
+  isOfficial: boolean;
+  isAIGenerated: boolean;
+}
 
 export default function NewCampaignPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const scenarioIdParam = searchParams.get("scenarioId");
+
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -20,7 +32,88 @@ export default function NewCampaignPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedScenario = mockScenarios.find((s) => s.id === formData.scenarioId);
+  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [isLoadingScenarios, setIsLoadingScenarios] = useState(true);
+  const [scenarioError, setScenarioError] = useState<string | null>(null);
+  const [isScenarioModalOpen, setIsScenarioModalOpen] = useState(false);
+  const [scenarioSearch, setScenarioSearch] = useState("");
+
+  // State to hold fetched scenario if not in list
+  const [fetchedScenario, setFetchedScenario] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchScenarios = async () => {
+      setIsLoadingScenarios(true);
+      setScenarioError(null);
+      try {
+        const res = await fetch("/api/scenarios?limit=50");
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : data.data || [];
+        setScenarios(items);
+      } catch (err) {
+        console.error("Scenarios fetch failed:", err);
+        setScenarioError("Senaryolar yüklenemedi");
+      } finally {
+        setIsLoadingScenarios(false);
+      }
+    };
+
+    fetchScenarios();
+  }, []);
+
+  useEffect(() => {
+    if (scenarioIdParam) {
+      setFormData(prev => ({ ...prev, scenarioId: scenarioIdParam }));
+    }
+  }, [scenarioIdParam]);
+
+  useEffect(() => {
+    if (!scenarioIdParam) return;
+
+    const inList = scenarios.find((s) => s.id === scenarioIdParam);
+    if (inList) {
+      setFetchedScenario(null);
+      if (!formData.name) {
+        setFormData((prev) => ({
+          ...prev,
+          name: `${inList.title} Macerası`,
+          description: prev.description || `Based on scenario: ${inList.title}`,
+        }));
+      }
+      return;
+    }
+
+    fetch(`/api/scenarios/${scenarioIdParam}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data) {
+          setFetchedScenario(data);
+          if (!formData.name) {
+            setFormData((prev) => ({
+              ...prev,
+              name: `${data.title} Macerası`,
+              description: prev.description || `Based on scenario: ${data.title}`,
+            }));
+          }
+        }
+      })
+      .catch((err) => console.error(err));
+  }, [scenarioIdParam, scenarios, formData.name, formData.description]);
+
+  const selectedScenario =
+    scenarios.find((s) => s.id === formData.scenarioId) || fetchedScenario;
+
+  const filteredScenarios = useMemo(() => {
+    if (!scenarioSearch) return scenarios;
+    const query = scenarioSearch.toLowerCase();
+    return scenarios.filter(
+      (scenario) =>
+        scenario.title.toLowerCase().includes(query) ||
+        scenario.description.toLowerCase().includes(query) ||
+        scenario.genre.toLowerCase().includes(query)
+    );
+  }, [scenarios, scenarioSearch]);
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -172,7 +265,7 @@ export default function NewCampaignPage() {
           </CardContent>
         </Card>
 
-        {/* Scenario Selection */}
+                {/* Scenario Selection */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -203,51 +296,72 @@ export default function NewCampaignPage() {
               </button>
 
               {/* Scenarios */}
-              {mockScenarios.slice(0, 3).map((scenario) => (
-                <button
-                  key={scenario.id}
-                  type="button"
-                  onClick={() =>
-                    setFormData({ ...formData, scenarioId: scenario.id })
-                  }
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    formData.scenarioId === scenario.id
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:border-primary/50 hover:bg-background-elevated"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-1">
-                    <h4 className="font-semibold">{scenario.title}</h4>
-                    {scenario.isOfficial && (
-                      <Badge variant="primary" size="sm">
-                        Resmi
+              {isLoadingScenarios ? (
+                <div className="flex items-center justify-center p-4 rounded-lg border border-dashed border-border text-sm text-foreground-muted">
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Senaryolar yükleniyor...
+                </div>
+              ) : scenarios.length === 0 ? (
+                <div className="p-4 rounded-lg border border-dashed border-border text-sm text-foreground-muted">
+                  Henüz senaryo yok. Özgür macera ile devam edebilirsin.
+                </div>
+              ) : (
+                scenarios.slice(0, 3).map((scenario) => (
+                  <button
+                    key={scenario.id}
+                    type="button"
+                    onClick={() =>
+                      setFormData({ ...formData, scenarioId: scenario.id })
+                    }
+                    className={`p-4 rounded-lg border text-left transition-all ${
+                      formData.scenarioId === scenario.id
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:border-primary/50 hover:bg-background-elevated"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <h4 className="font-semibold">{scenario.title}</h4>
+                      {scenario.isOfficial && (
+                        <Badge variant="primary" size="sm">
+                          Resmi
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-foreground-secondary line-clamp-2">
+                      {scenario.description}
+                    </p>
+                    <div className="flex gap-2 mt-2">
+                      <Badge variant="outline" size="sm">
+                        {scenario.genre}
                       </Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-foreground-secondary line-clamp-2">
-                    {scenario.description}
-                  </p>
-                  <div className="flex gap-2 mt-2">
-                    <Badge variant="outline" size="sm">
-                      {scenario.genre}
-                    </Badge>
-                    <Badge variant="outline" size="sm">
-                      {scenario.difficulty}
-                    </Badge>
-                  </div>
-                </button>
-              ))}
+                      <Badge variant="outline" size="sm">
+                        {scenario.difficulty}
+                      </Badge>
+                    </div>
+                  </button>
+                ))
+              )}
             </div>
 
-            <Link href="/scenarios" className="block">
-              <Button variant="ghost" size="sm" className="w-full">
-                Tüm Senaryoları Gör
-              </Button>
-            </Link>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full"
+              onClick={() => setIsScenarioModalOpen(true)}
+              disabled={isLoadingScenarios}
+            >
+              Tüm Senaryoları Gör
+            </Button>
+
+            {scenarioError && (
+              <div className="text-sm text-destructive">{scenarioError}</div>
+            )}
           </CardContent>
         </Card>
 
         {/* Summary */}
+
         {formData.name && (
           <Card variant="outline" className="bg-primary/5">
             <CardContent className="p-4">
@@ -300,8 +414,93 @@ export default function NewCampaignPage() {
           </Button>
         </div>
       </form>
+
+      <Modal
+        open={isScenarioModalOpen}
+        onOpenChange={setIsScenarioModalOpen}
+        title="Tüm Senaryolar"
+        description="Kampanyan için bir senaryo seç veya senaryoyu kaldır."
+        size="full"
+      >
+        <div className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground-muted" />
+            <input
+              type="text"
+              placeholder="Senaryo ara..."
+              value={scenarioSearch}
+              onChange={(e) => setScenarioSearch(e.target.value)}
+              className="w-full h-10 pl-10 pr-4 rounded-lg bg-input border border-border text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-sm text-foreground-secondary">
+            <span>{filteredScenarios.length} senaryo</span>
+            {formData.scenarioId && (
+              <button
+                type="button"
+                className="text-primary hover:underline"
+                onClick={() => {
+                  setFormData({ ...formData, scenarioId: "" });
+                  setIsScenarioModalOpen(false);
+                }}
+              >
+                Senaryoyu kaldır
+              </button>
+            )}
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+            {filteredScenarios.length === 0 ? (
+              <div className="sm:col-span-2 p-6 rounded-lg border border-dashed border-border text-center text-sm text-foreground-muted">
+                Eşleşen senaryo bulunamadı.
+              </div>
+            ) : (
+              filteredScenarios.map((scenario) => (
+                <button
+                  key={scenario.id}
+                  type="button"
+                  onClick={() => {
+                    setFormData({ ...formData, scenarioId: scenario.id });
+                    setIsScenarioModalOpen(false);
+                  }}
+                  className={`p-4 rounded-lg border text-left transition-all ${
+                    formData.scenarioId === scenario.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:border-primary/50 hover:bg-background-elevated"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <h4 className="font-semibold">{scenario.title}</h4>
+                    {scenario.isOfficial && (
+                      <Badge variant="primary" size="sm">
+                        Resmi
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-sm text-foreground-secondary line-clamp-2">
+                    {scenario.description}
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <Badge variant="outline" size="sm">
+                      {scenario.genre}
+                    </Badge>
+                    <Badge variant="outline" size="sm">
+                      {scenario.difficulty}
+                    </Badge>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+
+          {scenarioError && (
+            <div className="text-sm text-destructive">{scenarioError}</div>
+          )}
+        </div>
+      </Modal>
+
     </div>
   );
 }
-
 

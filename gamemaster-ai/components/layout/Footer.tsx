@@ -4,7 +4,6 @@ import { Sword, Github, Twitter, GraduationCap } from "lucide-react";
 const footerLinks = {
   product: [
     { href: "/", label: "Ana Sayfa" },
-    { href: "/about", label: "Hakkında" },
     { href: "/demo", label: "Demo" },
   ],
   resources: [

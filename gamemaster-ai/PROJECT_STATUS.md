@@ -11,18 +11,57 @@
 | Temel Altyapı | ✅ Tamam | - | **100%** |
 | Auth & User | ✅ Temel | Admin yönetimi | **60%** |
 | Karakter Sistemi | ✅ Temel CRUD | Wizard, levelup, stats | **40%** |
-| Kampanya | ✅ Tam | - | **95%** |
+| Kampanya | Tam | - | **97%** |
 | AI GM | ✅ Tam | - | **95%** |
 | Zar Sistemi | ✅ Tam | - | **95%** |
 | Combat | ❌ Yok | Tüm sistem | **0%** |
 | Envanter | ✅ Tam | - | **95%** |
 | NPC Yönetimi | ✅ İyi | Combat stats | **80%** |
-| Senaryo Sistemi | ⚠️ Kısmi | UI, CRUD | **30%** |
+| Senaryo Sistemi | K?smi | Moderasyon, admin ak??lar | **70%** |
 | Admin Panel | ❌ Yok | Tüm panel | **0%** |
 | Harita | ✅ Generation | Gallery, viewer | **50%** |
 
 ---
 
+
+## Guncelleme: Senaryo Revizyonu (6 Ocak 2026)
+
+### Tamamlanan
+- Senaryo verileri temizlendi, 1 resmi senaryo eklendi (worldSettings dolu)
+- Kampanya olusturma ekraninda senaryo listesi API'den geliyor
+- "Tum senaryolari gor" butonu modal secici olarak calisiyor
+- Lobi taslak durumunda senaryo degistirme/kaldirma eklendi
+- Resmi senaryoda dunya kurulumu atlanacak sekilde ayarlandi
+- Senaryo duzenleme sayfasi ve worldSettings kaydi aktif edildi
+- Kampanya baslatma, karakter secilmeden engellendi (UI + API)
+
+### Eksik
+- Admin senaryo moderasyonu (resmi yap/kaldir akisi)
+- Senaryo listesinde gelismis filtreleme/pagination
+- Kampanya icin ayri "start" endpointi (status akisi iyilestirme)
+
+### Atlanan
+- Admin panel UI/raporlama iyilestirmeleri
+- Combat/harita sistemleri ile ilgili isler
+
+---
+## Guncelleme: Dashboard, Karakter Detay ve Liste Iyilestirmeleri (6 Ocak 2026)
+
+### Tamamlanan
+- Dashboard gercek veriye baglandi (karakter/kampanya listeleri, aktif oturumlar, toplam mesaj sayisi; yukleniyor durumlari eklendi)
+- Karakter detay sayfasi mock veriden cikartildi ve gercek veriyle guncellendi (envanter/kusanilan ayrimi, agirlik ozeti, kampanya etiketi)
+- Kampanya detay sayfasindaki Turkce karakter hatalari duzeltildi (Kampanyayi Baslat, senaryo degistir/kaldir metinleri)
+- Kampanya ve senaryo kartlarina olusturan bilgisi eklendi (resmi ve kullanici senaryolari creator bilgisiyle geliyor)
+- About sayfasi navigasyondan gizlendi (Header/Footer)
+
+### Eksik
+- About sayfasinin route'u tamamen kapatilma/redirect edilmesi (su an sadece nav'den gizli)
+- Dashboard icin daha kapsamli istatistikler (tum oturum mesaj toplamlari, zaman bazli ozetler)
+
+### Atlanan
+- /api/characters/:id icin ayri detay endpointi eklenmedi (mevcut karakter listesi uzerinden filtreleniyor)
+
+---
 ## 1. Temel Altyapı ✅ (100%)
 
 ### Tamamlanan
@@ -129,7 +168,7 @@ app/(admin)/layout.tsx
 
 ---
 
-## 4. Kampanya Sistemi ✅ (95%)
+## 4. Kampanya Sistemi (97%)
 
 ### Tamamlanan
 - [x] Kampanya listesi sayfası
@@ -147,6 +186,10 @@ app/(admin)/layout.tsx
 - [x] Kampanya ayarları sayfası (tam UI)
 - [x] Kampanya durumu değiştirme (pause/resume/complete)
 - [x] Oyuncu atma (kick player)
+- [x] Kampanya olusturmada senaryo secimi (API + modal)
+- [x] Lobi taslak durumda senaryo degistirme/kaldirma
+- [x] Kampanya baslatma icin karakter secimi zorunlulugu
+
 
 ### API Endpoints
 
@@ -334,36 +377,37 @@ app/(admin)/layout.tsx
 
 ---
 
-## 10. Senaryo Sistemi ⚠️ (30%)
+## 10. Senaryo Sistemi (70%)
 
 ### Tamamlanan
-- [x] AI senaryo oluşturma API'si (`/api/gm/generate-scenario`)
-- [x] Temel senaryo modeli (Prisma)
-- [x] Senaryo seçimi (kampanya oluşturmada)
+- [x] Senaryo listesi sayfasi (`/scenarios/page.tsx`)
+- [x] Senaryo olusturma sayfasi (`/scenarios/new/page.tsx`)
+- [x] Senaryo detay sayfasi (`/scenarios/[id]/page.tsx`)
+- [x] Senaryo duzenleme sayfasi (`/scenarios/[id]/edit/page.tsx`)
+- [x] ScenarioForm ile worldSettings kaydi
+- [x] Senaryo secimi (kampanya olusturma, modal secici)
 
 ### Eksik
-- [ ] Senaryo listesi sayfası (`/scenarios/page.tsx`)
-- [ ] Senaryo oluşturma sayfası (`/scenarios/new/page.tsx`)
-- [ ] Senaryo detay sayfası (`/scenarios/[id]/page.tsx`)
-- [ ] Resmi senaryo listesi (hazır senaryolar)
+- [ ] Admin senaryo moderasyonu (resmi yap/kaldir akisi)
+- [ ] Gelismis filtreleme/pagination (senaryo listesi)
+- [ ] Senaryo kopyalama/arsivleme akisi
 
 #### API Endpoints
 
 | Endpoint | Durum |
 |----------|-------|
-| `GET /api/scenarios` | ❌ |
-| `GET /api/scenarios/official` | ❌ |
-| `GET /api/scenarios/mine` | ❌ |
-| `POST /api/scenarios` | ⚠️ generate ile |
-| `GET /api/scenarios/:id` | ❌ |
-| `PUT /api/scenarios/:id` | ❌ |
-| `DELETE /api/scenarios/:id` | ❌ |
+| `GET /api/scenarios` | OK |
+| `GET /api/scenarios/official` | OK |
+| `GET /api/scenarios/mine` | OK |
+| `POST /api/scenarios` | OK (worldSettings dahil) |
+| `GET /api/scenarios/:id` | OK |
+| `PUT /api/scenarios/:id` | OK |
+| `DELETE /api/scenarios/:id` | OK |
 
-#### Componentler (Hiçbiri Yok)
-- [ ] `ScenarioCard.tsx`
-- [ ] `ScenarioCreator.tsx`
-- [ ] `ScenarioDetail.tsx`
-- [ ] `AIScenarioGenerator.tsx`
+#### Componentler
+- [x] `ScenarioCard.tsx`
+- [x] `ScenarioForm.tsx`
+- [x] Senaryo detay/edit sayfalari
 
 ---
 

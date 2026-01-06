@@ -100,8 +100,22 @@ Yanıtını JSON formatında ver:
   "description": "Hikaye özeti",
   "genre": "Fantasy",
   "difficulty": "Medium",
-  "startingPrompt": "Başlangıç anlatımı",
-  "tags": ["etiket1", "etiket2"]
+  "startingPrompt": "Oyun başlangıcı için detaylı sahne betimlemesi ve GM talimatları",
+  "tags": ["etiket1", "etiket2"],
+  "worldSettings": {
+    "worldName": "Dünya Adı",
+    "worldType": "fantasy",
+    "tone": "epic",
+    "setting": "Dünya arka planı ve tarihi",
+    "era": "Mevcut çağ",
+    "startingLocation": {
+      "name": "Başlangıç Yeri",
+      "description": "Detaylı açıklama",
+      "atmosphere": "Atmosfer"
+    },
+    "mainConflict": "Ana çatışma",
+    "openingNarration": "Açılış anlatısı"
+  }
 }`;
 
 /**

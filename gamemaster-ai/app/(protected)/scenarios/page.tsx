@@ -1,33 +1,93 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button, Card, CardContent, Badge } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
-import { mockScenarios } from "@/lib/mock-data";
-import { Plus, Map, Search, Sparkles, BookOpen, Filter } from "lucide-react";
+import { ScenarioCard } from "@/components/scenario/ScenarioCard";
+import { Plus, Search, Sparkles, BookOpen, Map, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-const difficultyColors = {
-  Easy: "success",
-  Medium: "warning",
-  Hard: "danger",
-} as const;
+interface Scenario {
+  id: string;
+  title: string;
+  description: string;
+  genre: string;
+  difficulty: string;
+  isOfficial: boolean;
+  isAIGenerated: boolean;
+  tags: any;
+  creator?: {
+    username?: string | null;
+  };
+}
 
 export default function ScenariosPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [genreFilter, setGenreFilter] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("official");
+  
+  const [officialScenarios, setOfficialScenarios] = useState<Scenario[]>([]);
+  const [myScenarios, setMyScenarios] = useState<Scenario[]>([]);
+  const [allScenarios, setAllScenarios] = useState<Scenario[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const genres = [...new Set(mockScenarios.map((s) => s.genre))];
+  // Fetch data based on active tab
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        let url = "/api/scenarios";
+        if (activeTab === "official") {
+          url = "/api/scenarios/official";
+        } else if (activeTab === "mine") {
+          url = "/api/scenarios/mine";
+        }
+        
+        // Append query params
+        const params = new URLSearchParams();
+        if (searchQuery) params.append("query", searchQuery);
+        if (genreFilter) params.append("genre", genreFilter);
+        
+        if (activeTab === "community") {
+           // For community, we fetch all and filter client side or use a specific endpoint param.
+           // Current API structure: /api/scenarios returns all. We can filter !isOfficial
+           const res = await fetch(`/api/scenarios?${params.toString()}`);
+           const data = await res.json();
+           if (data.data) {
+             setAllScenarios(data.data.filter((s: Scenario) => !s.isOfficial));
+           }
+        } else {
+           const res = await fetch(`${url}?${params.toString()}`);
+           const data = await res.json();
+           // Handle both array response and paginated response { data: [] }
+           const scenarios = Array.isArray(data) ? data : data.data || [];
+           
+           if (activeTab === "official") setOfficialScenarios(scenarios);
+           if (activeTab === "mine") setMyScenarios(scenarios);
+        }
 
-  const filterScenarios = (scenarios: typeof mockScenarios) =>
-    scenarios.filter(
-      (s) =>
-        (s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          s.description.toLowerCase().includes(searchQuery.toLowerCase())) &&
-        (!genreFilter || s.genre === genreFilter)
-    );
+      } catch (error) {
+        console.error("Failed to fetch scenarios:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const officialScenarios = mockScenarios.filter((s) => s.isOfficial);
-  const communityScenarios = mockScenarios.filter((s) => !s.isOfficial);
+    // Debounce search
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [activeTab, searchQuery, genreFilter]);
+
+
+  const displayedScenarios = 
+    activeTab === "official" ? officialScenarios :
+    activeTab === "mine" ? myScenarios :
+    allScenarios;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -36,13 +96,15 @@ export default function ScenariosPage() {
         <div>
           <h1 className="text-3xl font-bold">Senaryolar</h1>
           <p className="text-foreground-secondary">
-            {mockScenarios.length} senaryo
+            Yeni maceralar keşfet veya kendi hikayeni yarat
           </p>
         </div>
-        <Button className="gap-2">
-          <Plus className="h-4 w-4" />
-          Yeni Senaryo
-        </Button>
+        <Link href="/scenarios/new">
+          <Button className="gap-2">
+            <Plus className="h-4 w-4" />
+            Yeni Senaryo
+          </Button>
+        </Link>
       </div>
 
       {/* Search and Filters */}
@@ -66,7 +128,7 @@ export default function ScenariosPage() {
           >
             Tümü
           </Button>
-          {genres.map((genre) => (
+          {["Fantasy", "Sci-Fi", "Horror", "Mystery", "Cyberpunk"].map((genre) => (
             <Button
               key={genre}
               variant={genreFilter === genre ? "primary" : "outline"}
@@ -80,120 +142,59 @@ export default function ScenariosPage() {
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="official">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="official">
             <BookOpen className="h-4 w-4 mr-2" />
             Resmi
-            <Badge variant="primary" size="sm" className="ml-2">
-              {officialScenarios.length}
-            </Badge>
           </TabsTrigger>
           <TabsTrigger value="community">
             <Sparkles className="h-4 w-4 mr-2" />
             Topluluk
-            <Badge variant="secondary" size="sm" className="ml-2">
-              {communityScenarios.length}
-            </Badge>
+          </TabsTrigger>
+           <TabsTrigger value="mine">
+            <Map className="h-4 w-4 mr-2" />
+            Senaryolarım
           </TabsTrigger>
         </TabsList>
 
-        {/* Official Scenarios */}
-        <TabsContent value="official">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filterScenarios(officialScenarios).map((scenario) => (
-              <ScenarioCard key={scenario.id} scenario={scenario} />
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* Community Scenarios */}
-        <TabsContent value="community">
-          {filterScenarios(communityScenarios).length > 0 ? (
+        <div className="mt-6">
+          {loading ? (
+             <div className="flex justify-center py-12">
+               <Loader2 className="h-8 w-8 animate-spin text-primary" />
+             </div>
+          ) : displayedScenarios.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filterScenarios(communityScenarios).map((scenario) => (
-                <ScenarioCard key={scenario.id} scenario={scenario} />
+              {displayedScenarios.map((scenario) => (
+                <div key={scenario.id} onClick={() => router.push(`/scenarios/${scenario.id}`)}>
+                   <ScenarioCard scenario={scenario} />
+                </div>
               ))}
             </div>
           ) : (
-            <Card>
+             <Card>
               <CardContent className="py-16 text-center">
                 <Sparkles className="h-16 w-16 text-foreground-muted mx-auto mb-4" />
                 <h3 className="text-xl font-semibold mb-2">
-                  Topluluk senaryosu bulunamadı
+                  Senaryo bulunamadı
                 </h3>
                 <p className="text-foreground-secondary mb-6 max-w-md mx-auto">
-                  İlk topluluk senaryosunu oluşturan sen ol!
+                  {activeTab === "mine" 
+                    ? "Henüz bir senaryo oluşturmadın." 
+                    : "Aradığın kriterlere uygun senaryo bulunamadı."}
                 </p>
-                <Button className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Senaryo Oluştur
-                </Button>
+                <Link href="/scenarios/new">
+                  <Button className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Senaryo Oluştur
+                  </Button>
+                </Link>
               </CardContent>
             </Card>
           )}
-        </TabsContent>
+        </div>
       </Tabs>
     </div>
-  );
-}
-
-function ScenarioCard({ scenario }: { scenario: (typeof mockScenarios)[0] }) {
-  return (
-    <Card hover className="h-full group">
-      {/* Header */}
-      <div className="relative h-32 bg-gradient-to-br from-primary/20 via-secondary/10 to-primary/20 rounded-t-xl flex items-center justify-center">
-        <Map className="h-12 w-12 text-primary/50 group-hover:scale-110 transition-transform" />
-        <div className="absolute top-3 right-3 flex gap-2">
-          {scenario.isOfficial && (
-            <Badge variant="primary" size="sm">
-              Resmi
-            </Badge>
-          )}
-          {scenario.isAIGenerated && (
-            <Badge variant="secondary" size="sm">
-              AI
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      <CardContent className="pt-4">
-        {/* Title */}
-        <h3 className="text-lg font-bold mb-2 group-hover:text-primary transition-colors">
-          {scenario.title}
-        </h3>
-
-        {/* Description */}
-        <p className="text-sm text-foreground-secondary line-clamp-3 mb-4">
-          {scenario.description}
-        </p>
-
-        {/* Meta */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          <Badge variant="outline">{scenario.genre}</Badge>
-          <Badge
-            variant={difficultyColors[scenario.difficulty as keyof typeof difficultyColors]}
-          >
-            {scenario.difficulty}
-          </Badge>
-        </div>
-
-        {/* Tags */}
-        {scenario.tags && scenario.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1">
-            {scenario.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="text-xs px-2 py-0.5 rounded-full bg-background-elevated text-foreground-muted"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
   );
 }
 

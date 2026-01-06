@@ -134,15 +134,41 @@ export async function PUT(
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
+    const updateData: Record<string, unknown> = {};
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.description !== undefined) updateData.description = body.description;
+    if (body.maxPlayers !== undefined) updateData.maxPlayers = body.maxPlayers;
+    if (body.isMultiplayer !== undefined) updateData.isMultiplayer = body.isMultiplayer;
+
+    if (body.scenarioId !== undefined) {
+      if (campaign.status !== "DRAFT") {
+        return NextResponse.json(
+          { success: false, error: "Senaryo sadece taslak kampanyada degistirilebilir" },
+          { status: 400 }
+        );
+      }
+
+      const nextScenarioId = body.scenarioId || null;
+      if (nextScenarioId) {
+        const scenarioExists = await prisma.scenario.findUnique({
+          where: { id: nextScenarioId },
+          select: { id: true },
+        });
+        if (!scenarioExists) {
+          return NextResponse.json(
+            { success: false, error: "Senaryo bulunamadi" },
+            { status: 404 }
+          );
+        }
+      }
+
+      updateData.scenarioId = nextScenarioId;
+    }
+
     // Update campaign
     const updatedCampaign = await prisma.campaign.update({
       where: { id },
-      data: {
-        name: body.name,
-        description: body.description,
-        maxPlayers: body.maxPlayers,
-        isMultiplayer: body.isMultiplayer,
-      },
+      data: updateData,
     });
 
     return NextResponse.json({

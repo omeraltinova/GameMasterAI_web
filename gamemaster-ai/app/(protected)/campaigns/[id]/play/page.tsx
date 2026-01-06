@@ -105,7 +105,10 @@ export default function PlayPage() {
 
           // Eğer worldSettings yoksa ve çok az mesaj varsa setup göster
           const hasWorldSettings = currentState.worldSettings && Object.keys(currentState.worldSettings).length > 0;
-          setIsNewSession(!hasWorldSettings && messageCount <= 1);
+          const scenarioHasWorldSettings = Boolean(campaignData?.scenario?.worldSettings);
+          const scenarioIsPreset = Boolean(campaignData?.scenario?.isOfficial);
+          const shouldSkipSetup = scenarioIsPreset || scenarioHasWorldSettings || hasWorldSettings;
+          setIsNewSession(!shouldSkipSetup && messageCount <= 1);
 
           // Set campaign data
           setCampaign({
@@ -147,7 +150,7 @@ export default function PlayPage() {
           }
 
           // Determine game phase
-          if (!hasWorldSettings && messageCount <= 1) {
+          if (!shouldSkipSetup && messageCount <= 1) {
             setGamePhase("setup");
           } else {
             setGamePhase("playing");
@@ -313,7 +316,7 @@ export default function PlayPage() {
   }
 
   // Karakter seçimi zorunlu - karakter yoksa uyarı göster
-  if (!character && !isCreator) {
+  if (!character) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4">
         <div className="text-center max-w-md">

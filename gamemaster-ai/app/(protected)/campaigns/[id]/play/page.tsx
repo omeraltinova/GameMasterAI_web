@@ -676,7 +676,7 @@ export default function PlayPage() {
       await fetchMessages();
 
       // Yeni GM yanıtı üret (narrate fonksiyonu kendi loading state'ini yönetir)
-      const result = await narrate(previousPlayerMessage.content);
+      const result = await narrate(previousPlayerMessage.content, { skipPlayerMessageSave: true });
 
       if (result && result.narration) {
         const gmMessage: Message = {

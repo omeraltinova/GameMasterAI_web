@@ -149,18 +149,22 @@ Yanıtını aşağıdaki JSON formatında ver:
     }> = [];
 
     try {
-      // JSON'u bulmaya çalış
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      let jsonContent = aiResponse;
+
+      // Markdown code block içindeki JSON'ı çıkar (```json ... ```)
+      const codeBlockMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonContent = codeBlockMatch[1].trim();
+      }
+
+      // JSON objesini bul 
+      const jsonMatch = jsonContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         let jsonStr = jsonMatch[0];
 
-        // JSON'u temizle - yaygın sorunları düzelt
-        // Trailing comma'ları kaldır
+        // Temel temizlik - sadece syntax bozan bariz hataları düzelt
+        // Trailing comma'ları kaldır (JSON standardında yasak)
         jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
-        // Escape edilmemiş newline'ları düzelt
-        jsonStr = jsonStr.replace(/\n/g, '\\n');
-        // Escape edilmemiş tab'ları düzelt
-        jsonStr = jsonStr.replace(/\t/g, '\\t');
 
         try {
           const parsed = JSON.parse(jsonStr);
@@ -172,7 +176,9 @@ Yanıtını aşağıdaki JSON formatında ver:
             }));
           }
         } catch (innerError) {
-          // İlk parse başarısız olduysa, suggestions array'ini doğrudan bulmaya çalış
+          // İlk parse başarısız olduysa, suggestions array'ini regex ile bulmaya çalış
+          console.warn('First JSON parse failed, trying regex extraction', innerError);
+
           const suggestionsMatch = aiResponse.match(/"suggestions"\s*:\s*\[([\s\S]*?)\]/);
           if (suggestionsMatch) {
             // Her suggestion objesini ayrı ayrı parse etmeye çalış
@@ -180,13 +186,19 @@ Yanıtını aşağıdaki JSON formatında ver:
             if (suggestionObjects) {
               suggestionObjects.forEach((objStr, index) => {
                 try {
-                  const cleanedStr = objStr.replace(/,\s*}/g, '}');
+                  // Obje içindeki basit syntax hatalarını düzelt
+                  let cleanedStr = objStr.replace(/,\s*}/g, '}');
+                  // Key'leri quote içine al (eğer eksikse)
+                  cleanedStr = cleanedStr.replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":');
+
                   const obj = JSON.parse(cleanedStr);
-                  suggestions.push({
-                    id: obj.id || `suggestion_${Date.now()}_${index}`,
-                    shortLabel: obj.shortLabel || 'Aksiyon',
-                    detailedAction: obj.detailedAction || obj.shortLabel || 'Aksiyon yap',
-                  });
+                  if (obj.shortLabel || obj.detailedAction) {
+                    suggestions.push({
+                      id: obj.id || `suggestion_${Date.now()}_${index}`,
+                      shortLabel: obj.shortLabel || 'Aksiyon',
+                      detailedAction: obj.detailedAction || obj.shortLabel || 'Aksiyon yap',
+                    });
+                  }
                 } catch {
                   // Tek obje parse edilemedi, atla
                 }
@@ -195,9 +207,11 @@ Yanıtını aşağıdaki JSON formatında ver:
           }
 
           if (suggestions.length === 0) {
-            throw innerError;
+            throw innerError; // Hala bulamadıysak hata fırlat
           }
         }
+      } else {
+        throw new Error('No JSON object found in response');
       }
     } catch (parseError) {
       console.error('Suggestions parse error:', parseError);

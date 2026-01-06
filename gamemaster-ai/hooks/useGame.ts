@@ -4,11 +4,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { get, post, put, buildQuery, APIError } from '@/lib/api/client';
-import type { 
-  Message, 
-  GameSession, 
-  GameState, 
-  Character, 
+import type {
+  Message,
+  GameSession,
+  GameState,
+  Character,
   Campaign,
   DiceType,
   GMPrompt
@@ -73,10 +73,10 @@ export function useGame(sessionId: string) {
     try {
       const offset = (page - 1) * limit;
       const query = buildQuery({ offset, limit });
-      const data = await get<{ 
-        success: boolean; 
-        messages: Message[]; 
-        pagination: { total: number } 
+      const data = await get<{
+        success: boolean;
+        messages: Message[];
+        pagination: { total: number }
       }>(
         `/sessions/${sessionId}/messages${query}`
       );
@@ -104,15 +104,15 @@ export function useGame(sessionId: string) {
         messages: Message[];
         gameState: GameState;
       }>(`/sessions/${sessionId}/updates${query}`);
-      
+
       if (data.messages.length > 0) {
         setMessages((prev) => [...prev, ...data.messages]);
       }
-      
+
       if (data.gameState) {
         setGameState(data.gameState);
       }
-      
+
       return data;
     } catch (err) {
       setError(err instanceof APIError ? err.message : 'Güncellemeler yüklenemedi');
@@ -221,11 +221,11 @@ export function useGM(sessionId: string) {
   /**
    * Hikaye anlatımı (narration)
    */
-  const narrate = useCallback(async (playerAction: string) => {
+  const narrate = useCallback(async (playerAction: string, options?: { skipPlayerMessageSave?: boolean }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<{ 
+      const data = await post<{
         success: boolean;
         narration: string;
         gmPrompt?: GMPrompt;
@@ -242,6 +242,7 @@ export function useGM(sessionId: string) {
         {
           sessionId,
           playerAction,
+          skipPlayerMessageSave: options?.skipPlayerMessageSave,
         }
       );
       return data;
@@ -375,13 +376,13 @@ export function useSuggestions(sessionId: string) {
    */
   const fetchSuggestions = useCallback(async (lastGMMessage: string) => {
     if (!sessionId) return null;
-    
+
     setIsLoading(true);
     setError(null);
     setSuggestions([]);
-    
+
     try {
-      const data = await post<{ 
+      const data = await post<{
         success: boolean;
         suggestions: Suggestion[];
       }>(
@@ -391,7 +392,7 @@ export function useSuggestions(sessionId: string) {
           lastGMMessage,
         }
       );
-      
+
       if (data.success && data.suggestions) {
         setSuggestions(data.suggestions);
       }
@@ -442,13 +443,13 @@ export function useLocationImage(sessionId: string) {
       console.log('[useLocationImage] No sessionId, skipping');
       return null;
     }
-    
+
     console.log(`[useLocationImage] Generating image for: ${locationName}`);
     console.log(`[useLocationImage] Type: ${locationType}, Description length: ${description.length}`);
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const payload: Record<string, unknown> = {
         sessionId,
@@ -463,7 +464,7 @@ export function useLocationImage(sessionId: string) {
         payload.excludeFromContext = options.excludeFromContext;
       }
 
-      const data = await post<{ 
+      const data = await post<{
         success: boolean;
         imageUrl?: string;
         error?: string;
@@ -472,9 +473,9 @@ export function useLocationImage(sessionId: string) {
         '/gm/generate-location-image',
         payload
       );
-      
+
       console.log(`[useLocationImage] Response:`, { success: data.success, hasUrl: !!data.imageUrl, error: data.error });
-      
+
       if (data.success && data.imageUrl) {
         setLocationImage(data.imageUrl);
         setCurrentLocation(locationName);

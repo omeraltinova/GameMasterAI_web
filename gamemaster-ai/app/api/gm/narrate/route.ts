@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { sessionId, playerAction } = body;
+    const { sessionId, playerAction, skipPlayerMessageSave } = body;
 
     // Validation
     if (!sessionId) {
@@ -107,18 +107,28 @@ export async function POST(req: NextRequest) {
     const toolResults = aiResult.toolResults;
 
     // AI yanıtını parse et
-    let narration: string = aiResponse;
+    let narration: string = '';
     let gmPrompt: GMPrompt | null = null;
     let locationChange: LocationChange | null = null;
 
     try {
-      // JSON yanıtını parse etmeye çalış
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      // AI yanıtından JSON çıkar
+      let jsonContent = aiResponse;
+
+      // Markdown code block içindeki JSON'ı çıkar (```json ... ```)
+      const codeBlockMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonContent = codeBlockMatch[1].trim();
+      }
+
+      // JSON objesini bul - en dıştaki { ile } arasını al  
+      const jsonMatch = jsonContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
 
-        if (parsed.narration) {
-          narration = parsed.narration;
+        // Narration çıkar ve temizle
+        if (parsed.narration && typeof parsed.narration === 'string') {
+          narration = parsed.narration.trim();
         }
 
         // LocationChange parse et
@@ -153,9 +163,51 @@ export async function POST(req: NextRequest) {
         }
       }
     } catch (parseError) {
-      // JSON parse hatası, düz metin olarak kullan
-      console.log('AI response is not JSON, using as plain text');
-      narration = aiResponse;
+      // JSON parse hatası
+      console.log('AI response JSON parse error, using as plain text');
+
+      // Parse başarısız olsa bile regex ile narration alanını kurtarmaya çalış
+      const narrationMatch = aiResponse.match(/"narration"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      if (narrationMatch) {
+        try {
+          // JSON string escape karakterlerini çöz
+          narration = JSON.parse(`"${narrationMatch[1]}"`);
+        } catch {
+          narration = narrationMatch[1];
+        }
+      }
+    }
+
+    // Eğer narration hala boş ise, ham yanıtı işle
+    if (!narration || narration.trim() === '') {
+      // 1. JSON parse edemedik ama belki metin JSON formatında değildir?
+      // Eğer JSON benzeri yapı yoksa (süslü parantez), doğrudan metni kullan
+      if (!aiResponse.includes('{')) {
+        narration = aiResponse.trim();
+      } else {
+        // 2. JSON var ama parse edemedik. Code block içindeyse, code block dışındakileri al
+        // Genelde AI: "İşte hikaye: {json}" veya "{json} Umarım beğenirsin" der.
+
+        const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+        const textWithoutCodeBlocks = aiResponse.replace(codeBlockRegex, '').trim();
+
+        if (textWithoutCodeBlocks.length > 20) {
+          // Yeterince uzun metin varsa bunu kullan (JSON dışı açıklama)
+          narration = textWithoutCodeBlocks;
+        } else {
+          // Son çare: Regex ile temizlemeye çalış ama çok agresif olma
+          narration = aiResponse
+            .replace(/```json[\s\S]*?```/g, '')
+            .replace(/```[\s\S]*?```/g, '')
+            .replace(/\{[\s\S]*\}/g, '')
+            .trim();
+        }
+      }
+
+      // Hala boşsa fallback
+      if (!narration || narration.length < 5) {
+        narration = 'Hikaye devam ediyor... (AI yanıtı işlenemedi)';
+      }
     }
 
     // Tool results'tan ek bilgiler
@@ -182,16 +234,18 @@ export async function POST(req: NextRequest) {
       currentPlayer?.user?.username ||
       'Oyuncu';
 
-    // Oyuncu mesajını kaydet
-    await prisma.message.create({
-      data: {
-        sessionId,
-        senderId: userId,
-        senderType: 'PLAYER',
-        senderName: playerName,
-        content: playerAction,
-      },
-    });
+    // Oyuncu mesajını kaydet (eğer regenerate değilse)
+    if (!skipPlayerMessageSave) {
+      await prisma.message.create({
+        data: {
+          sessionId,
+          senderId: userId,
+          senderType: 'PLAYER',
+          senderName: playerName,
+          content: playerAction,
+        },
+      });
+    }
 
     // GM yanıtını kaydet (metadata'da gmPrompt ve locationChange)
     const gmMessage = await prisma.message.create({

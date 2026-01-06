@@ -1,4 +1,6 @@
 export { DiceRoller } from "./DiceRoller";
+export { DiceAnimation, DiceAnimationInline } from "./DiceAnimation";
+export { DiceHistory } from "./DiceHistory";
 export { ChatWindow } from "./ChatWindow";
 export { MessageInput } from "./MessageInput";
 export { CharacterMini } from "./CharacterMini";

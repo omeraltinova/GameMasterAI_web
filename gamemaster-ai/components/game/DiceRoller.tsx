@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { Button, Badge } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { Dice1, Dice2, Dice3, Dice4, Dice5, Dice6 } from "lucide-react";
+import { Dice1, Dice2, Dice3, Dice4, Dice5, Dice6, Sparkles, AlertTriangle } from "lucide-react";
 import type { DiceType } from "@/types";
 
+type RollMode = 'normal' | 'advantage' | 'disadvantage';
+
 interface DiceRollerProps {
-  onRoll?: (diceType: DiceType, count: number, modifier: number, result: number[]) => void;
+  onRoll?: (diceType: DiceType, count: number, modifier: number, result: number[], rollMode?: RollMode) => void;
 }
 
 const diceOptions: { type: DiceType; label: string; max: number }[] = [
@@ -24,12 +26,14 @@ export function DiceRoller({ onRoll }: DiceRollerProps) {
   const [selectedDice, setSelectedDice] = useState<DiceType>("d20");
   const [count, setCount] = useState(1);
   const [modifier, setModifier] = useState(0);
+  const [rollMode, setRollMode] = useState<RollMode>('normal');
   const [isRolling, setIsRolling] = useState(false);
   const [lastResult, setLastResult] = useState<{
     dice: DiceType;
     results: number[];
     modifier: number;
     total: number;
+    rollMode: RollMode;
   } | null>(null);
 
   const rollDice = () => {
@@ -39,33 +43,51 @@ export function DiceRoller({ onRoll }: DiceRollerProps) {
     setTimeout(() => {
       const diceMax = diceOptions.find((d) => d.type === selectedDice)?.max || 20;
       const results: number[] = [];
+      let total = 0;
 
-      for (let i = 0; i < count; i++) {
-        results.push(Math.floor(Math.random() * diceMax) + 1);
+      // Advantage/Disadvantage için d20 ve tek zar kontrolü
+      if (selectedDice === 'd20' && count === 1 && rollMode !== 'normal') {
+        // 2 kez at
+        const roll1 = Math.floor(Math.random() * 20) + 1;
+        const roll2 = Math.floor(Math.random() * 20) + 1;
+        results.push(roll1, roll2);
+
+        const chosenRoll = rollMode === 'advantage' ? Math.max(roll1, roll2) : Math.min(roll1, roll2);
+        total = chosenRoll + modifier;
+      } else {
+        // Normal atış
+        for (let i = 0; i < count; i++) {
+          results.push(Math.floor(Math.random() * diceMax) + 1);
+        }
+        total = results.reduce((a, b) => a + b, 0) + modifier;
       }
-
-      const total = results.reduce((a, b) => a + b, 0) + modifier;
 
       setLastResult({
         dice: selectedDice,
         results,
         modifier,
         total,
+        rollMode: selectedDice === 'd20' && count === 1 ? rollMode : 'normal',
       });
 
-      onRoll?.(selectedDice, count, modifier, results);
+      onRoll?.(selectedDice, count, modifier, results, rollMode);
       setIsRolling(false);
     }, 500);
   };
 
-  const isCritical =
-    selectedDice === "d20" &&
-    count === 1 &&
-    lastResult?.results[0] === 20;
-  const isCriticalFail =
-    selectedDice === "d20" &&
-    count === 1 &&
-    lastResult?.results[0] === 1;
+  // Get the effective roll for advantage/disadvantage
+  const getEffectiveRoll = () => {
+    if (!lastResult || lastResult.rollMode === 'normal' || lastResult.results.length < 2) {
+      return lastResult?.results[0];
+    }
+    return lastResult.rollMode === 'advantage'
+      ? Math.max(lastResult.results[0], lastResult.results[1])
+      : Math.min(lastResult.results[0], lastResult.results[1]);
+  };
+
+  const effectiveRoll = getEffectiveRoll();
+  const isCritical = selectedDice === "d20" && effectiveRoll === 20;
+  const isCriticalFail = selectedDice === "d20" && effectiveRoll === 1;
 
   return (
     <div className="space-y-4">
@@ -130,6 +152,50 @@ export function DiceRoller({ onRoll }: DiceRollerProps) {
         </div>
       </div>
 
+      {/* Advantage/Disadvantage - only for d20 with count=1 */}
+      {selectedDice === 'd20' && count === 1 && (
+        <div>
+          <label className="text-xs text-foreground-muted mb-1 block">Atış Modu</label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setRollMode('normal')}
+              className={cn(
+                "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                rollMode === 'normal'
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background-elevated hover:bg-border text-foreground-secondary"
+              )}
+            >
+              Normal
+            </button>
+            <button
+              onClick={() => setRollMode('advantage')}
+              className={cn(
+                "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1",
+                rollMode === 'advantage'
+                  ? "bg-success text-success-foreground"
+                  : "bg-background-elevated hover:bg-border text-foreground-secondary"
+              )}
+            >
+              <Sparkles className="h-4 w-4" />
+              Avantaj
+            </button>
+            <button
+              onClick={() => setRollMode('disadvantage')}
+              className={cn(
+                "flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-1",
+                rollMode === 'disadvantage'
+                  ? "bg-warning text-warning-foreground"
+                  : "bg-background-elevated hover:bg-border text-foreground-secondary"
+              )}
+            >
+              <AlertTriangle className="h-4 w-4" />
+              Dezavantaj
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Roll Button */}
       <Button
         onClick={rollDice}
@@ -154,26 +220,61 @@ export function DiceRoller({ onRoll }: DiceRollerProps) {
             isCritical
               ? "bg-success/20 border border-success"
               : isCriticalFail
-              ? "bg-danger/20 border border-danger"
-              : "bg-background-elevated"
+                ? "bg-danger/20 border border-danger"
+                : "bg-background-elevated"
           )}
         >
           <div className="flex items-center justify-center gap-2 mb-2">
-            {lastResult.results.map((r, i) => (
-              <span
-                key={i}
-                className={cn(
-                  "inline-flex items-center justify-center w-10 h-10 rounded-lg font-mono font-bold text-lg",
-                  r === 20 && lastResult.dice === "d20"
-                    ? "bg-success text-success-foreground"
-                    : r === 1 && lastResult.dice === "d20"
-                    ? "bg-danger text-danger-foreground"
-                    : "bg-primary/20 text-primary"
-                )}
-              >
-                {r}
-              </span>
-            ))}
+            {lastResult.rollMode !== 'normal' && lastResult.results.length === 2 ? (
+              // Advantage/Disadvantage display
+              <>
+                {lastResult.results.map((r, i) => {
+                  const isChosen = lastResult.rollMode === 'advantage'
+                    ? r === Math.max(lastResult.results[0], lastResult.results[1])
+                    : r === Math.min(lastResult.results[0], lastResult.results[1]);
+                  // Handle both rolls being the same
+                  const shouldHighlight = isChosen && (i === 0 || lastResult.results[0] !== lastResult.results[1]);
+
+                  return (
+                    <span
+                      key={i}
+                      className={cn(
+                        "inline-flex items-center justify-center w-10 h-10 rounded-lg font-mono font-bold text-lg transition-all",
+                        shouldHighlight
+                          ? r === 20
+                            ? "bg-success text-success-foreground ring-2 ring-success"
+                            : r === 1
+                              ? "bg-danger text-danger-foreground ring-2 ring-danger"
+                              : "bg-primary text-primary-foreground ring-2 ring-primary"
+                          : "bg-background-elevated text-foreground-muted opacity-50 line-through"
+                      )}
+                    >
+                      {r}
+                    </span>
+                  );
+                })}
+                <span className="text-xs text-foreground-muted">
+                  {lastResult.rollMode === 'advantage' ? '✨' : '⚠️'}
+                </span>
+              </>
+            ) : (
+              // Normal roll display
+              lastResult.results.map((r, i) => (
+                <span
+                  key={i}
+                  className={cn(
+                    "inline-flex items-center justify-center w-10 h-10 rounded-lg font-mono font-bold text-lg",
+                    r === 20 && lastResult.dice === "d20"
+                      ? "bg-success text-success-foreground"
+                      : r === 1 && lastResult.dice === "d20"
+                        ? "bg-danger text-danger-foreground"
+                        : "bg-primary/20 text-primary"
+                  )}
+                >
+                  {r}
+                </span>
+              ))
+            )}
             {lastResult.modifier !== 0 && (
               <>
                 <span className="text-foreground-muted">

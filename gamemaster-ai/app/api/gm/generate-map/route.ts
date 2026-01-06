@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     userPrompt += `**Location:** ${locationName}\n`;
     userPrompt += `**Type:** ${locationType}\n`;
     userPrompt += `**Atmosphere:** ${atmosphere || 'mysterious'}\n`;
-    
+
     if (details && Array.isArray(details)) {
       userPrompt += `**Important Features:**\n`;
       details.forEach(detail => {
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
       userPrompt,
       {
         temperature: 0.8,
-        maxTokens: 2000,
+        maxTokens: 10000,
       }
     );
 

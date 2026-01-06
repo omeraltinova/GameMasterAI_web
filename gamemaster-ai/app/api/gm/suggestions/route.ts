@@ -84,15 +84,15 @@ export async function POST(req: NextRequest) {
     // Minimal context oluştur - sadece son GM mesajı ve lokasyon
     let location = 'Bilinmeyen';
     let worldContext = '';
-    
+
     if (gameSession.currentState) {
       try {
-        const state = typeof gameSession.currentState === 'string' 
-          ? JSON.parse(gameSession.currentState) 
+        const state = typeof gameSession.currentState === 'string'
+          ? JSON.parse(gameSession.currentState)
           : gameSession.currentState;
-        
+
         location = state.location || state.worldSettings?.startingLocation?.name || 'Bilinmeyen';
-        
+
         if (state.worldSettings) {
           worldContext = `Dünya: ${state.worldSettings.worldName || ''}, Ton: ${state.worldSettings.tone || ''}`;
         }
@@ -137,7 +137,7 @@ Yanıtını aşağıdaki JSON formatında ver:
       userPrompt,
       {
         temperature: 0.9, // Daha yaratıcı öneriler için
-        maxTokens: 2000,  // Öneri yanıtları için yeterli
+        maxTokens: 10000,  // Öneri yanıtları için yeterli
       }
     );
 
@@ -153,7 +153,7 @@ Yanıtını aşağıdaki JSON formatında ver:
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         let jsonStr = jsonMatch[0];
-        
+
         // JSON'u temizle - yaygın sorunları düzelt
         // Trailing comma'ları kaldır
         jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1');
@@ -161,7 +161,7 @@ Yanıtını aşağıdaki JSON formatında ver:
         jsonStr = jsonStr.replace(/\n/g, '\\n');
         // Escape edilmemiş tab'ları düzelt
         jsonStr = jsonStr.replace(/\t/g, '\\t');
-        
+
         try {
           const parsed = JSON.parse(jsonStr);
           if (parsed.suggestions && Array.isArray(parsed.suggestions)) {
@@ -193,7 +193,7 @@ Yanıtını aşağıdaki JSON formatında ver:
               });
             }
           }
-          
+
           if (suggestions.length === 0) {
             throw innerError;
           }

@@ -17,6 +17,22 @@ export const SYSTEM_PROMPT = `Sen D&D 5e kurallarına hakim, uzman bir Dungeon M
 4. Gerekirse oyunculardan zar atmalarını iste
 5. Oyuncu seçimlerine göre hikayeyi dinamik olarak yönlendir
 
+**AI Tool Kullanımı (ÖNEMLİ!):**
+Sana verilen tool'ları aktif olarak kullan:
+
+1. **create_npc**: Hikayede yeni bir NPC tanıttığında bu tool'u çağır.
+   - Örnek: Oyuncu tavernaya girdiğinde taverna sahibini tanıt ve create_npc çağır
+   - Sadece yeni, isimli karakterler için kullan (generic guards, peasants için çağırma)
+
+2. **update_npc**: Bir NPC'nin durumu değiştiğinde (düşmandan dosta, vb.)
+   - Önemli diyalogları kaydetmek için addDialogue kullan
+
+3. **give_item**: NPC oyuncuya item verdiğinde, oyuncu bir şey bulduğunda
+   - Loot, ödüller, satın almalar için kullan
+
+4. **request_dice_roll**: Skill check, saving throw gerektiren durumlar için
+   - Perception, Stealth, Persuasion gibi kontroller için
+
 **Anlatım Tarzı:**
 - Türkçe dilinde yanıt ver
 - Betimlemelerde 5 duyuyu kullan (görme, işitme, dokunma, koku, tat)
@@ -30,6 +46,7 @@ Zar atımı gerektiğinde şunu kullan:
 
 **NPC Etkileşimi:**
 - Her NPC'nin kendine özgü kişiliği var
+- YENİ NPC tanıttığında create_npc tool'unu MUTLAKA çağır
 - Diyaloglarında NPC'nin karakterini yansıt
 - Oyuncuların seçimlerine göre NPC'ler tepki versin
 
@@ -40,7 +57,7 @@ Zar atımı gerektiğinde şunu kullan:
 - Kritik başarı/başarısızlık durumlarını belirt
 
 **Kurallar:**
-- D&D 5e SRD (System Reference Document) kurallarına uyuş
+- D&D 5e SRD (System Reference Document) kurallarına uy
 - Belirsiz durumlarda oyuncu lehine yorumla
 - Oyun akışını yavaşlatma, eğlenceli tut
 
@@ -162,15 +179,15 @@ export function buildContextPrompt(context: GameContext): string {
   // Lokasyon
   if (context.location) {
     prompt += `**Mevcut Lokasyon:** ${context.location}`;
-    
+
     if (context.timeOfDay) {
       prompt += ` (${context.timeOfDay})`;
     }
-    
+
     if (context.weather) {
       prompt += ` - Hava: ${context.weather}`;
     }
-    
+
     prompt += '\n\n';
   }
 
@@ -218,9 +235,9 @@ export function buildContextPrompt(context: GameContext): string {
     prompt += '**Son Olaylar:**\n';
     const lastMessages = context.recentMessages.slice(-10); // Son 10 mesaj
     lastMessages.forEach(msg => {
-      const sender = msg.senderType === 'PLAYER' ? 'Oyuncu' : 
-                    msg.senderType === 'GM' ? 'GM' : 
-                    msg.senderType === 'SYSTEM' ? 'Sistem' : msg.senderType;
+      const sender = msg.senderType === 'PLAYER' ? 'Oyuncu' :
+        msg.senderType === 'GM' ? 'GM' :
+          msg.senderType === 'SYSTEM' ? 'Sistem' : msg.senderType;
       prompt += `[${sender}]: ${msg.content}\n`;
     });
     prompt += '\n';

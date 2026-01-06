@@ -326,3 +326,110 @@ export async function getAIResponseWithContext(
 
   return response.choices[0].message.content;
 }
+
+import { ToolDefinition, ToolCall, gmTools } from './tools';
+import { executeToolCalls, ToolExecutionResult } from './toolExecutor';
+
+export interface OpenRouterResponseWithTools {
+  id: string;
+  choices: Array<{
+    message: {
+      role: string;
+      content: string | null;
+      tool_calls?: ToolCall[];
+    };
+    finish_reason: string;
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+/**
+ * AI Tool Calling ile çağrı yapar
+ * NPC oluşturma, item verme gibi işlemleri AI otomatik yapabilir
+ */
+export async function callOpenRouterWithTools(
+  messages: OpenRouterMessage[],
+  options?: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    tools?: ToolDefinition[];
+    sessionId?: string;
+    characterId?: string;
+  }
+): Promise<{
+  content: string;
+  toolCalls?: ToolCall[];
+  toolResults?: ToolExecutionResult[];
+}> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+
+  if (!apiKey) {
+    throw new Error('OPENROUTER_API_KEY environment variable is not set');
+  }
+
+  const model = options?.model || process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet';
+  const temperature = options?.temperature || 0.7;
+  const maxTokens = options?.maxTokens || 10000;
+  const tools = options?.tools || gmTools;
+
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+        'X-Title': 'GameMaster AI',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens,
+        tools,
+        tool_choice: 'auto', // Let AI decide when to use tools
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error?.message || response.statusText);
+    }
+
+    const data: OpenRouterResponseWithTools = await response.json();
+    const choice = data.choices[0];
+
+    if (!choice) {
+      throw new Error('No response from AI');
+    }
+
+    const content = choice.message.content || '';
+    const toolCalls = choice.message.tool_calls;
+
+    // If there are tool calls, execute them
+    if (toolCalls && toolCalls.length > 0 && options?.sessionId) {
+      console.log(`[AI] Executing ${toolCalls.length} tool calls...`);
+      const toolResults = await executeToolCalls(
+        toolCalls,
+        options.sessionId,
+        options.characterId
+      );
+
+      return {
+        content,
+        toolCalls,
+        toolResults,
+      };
+    }
+
+    return { content };
+  } catch (error: any) {
+    console.error('callOpenRouterWithTools error:', error);
+    throw error;
+  }
+}

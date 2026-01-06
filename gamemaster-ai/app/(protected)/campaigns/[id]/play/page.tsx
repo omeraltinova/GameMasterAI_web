@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, ConfirmDialog } from "@/components/ui";
-import { ChatWindow, MessageInput, DiceRoller, CharacterMini, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage, DiceModal } from "@/components/game";
+import { ChatWindow, MessageInput, DiceRoller, CharacterMini, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage, DiceModal, NPCModal } from "@/components/game";
 import { InventoryModal } from "@/components/character";
 import { useGame, useGM, useDice, useSuggestions, useLocationImage } from "@/hooks/useGame";
 import { get, post, put } from "@/lib/api/client";
@@ -70,6 +70,7 @@ export default function PlayPage() {
   const [isResetting, setIsResetting] = useState(false);
   const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [showDiceModal, setShowDiceModal] = useState(false);
+  const [showNPCModal, setShowNPCModal] = useState(false);
 
   // Get campaign ID from URL params
   const campaignId = params.id as string;
@@ -873,7 +874,7 @@ export default function PlayPage() {
             />
 
             {/* Quick Actions */}
-            <div className="flex gap-2 mt-3">
+            <div className="flex gap-2 mt-3 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
@@ -895,14 +896,22 @@ export default function PlayPage() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setShowNPCModal(true)}
+                className="gap-1"
+              >
+                <Users className="h-4 w-4" />
+                Karakterler
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => toggleSidePanel("character")}
                 className={cn(
                   "gap-1",
                   sidePanelView === "character" && "bg-primary/10 border-primary"
                 )}
               >
-                <Users className="h-4 w-4" />
-                Karakter
+                🧙 Karakter
               </Button>
             </div>
           </div>
@@ -1078,6 +1087,19 @@ export default function PlayPage() {
           isOpen={showInventoryModal}
           onClose={() => setShowInventoryModal(false)}
           characterId={character.id}
+        />
+      )}
+
+      {/* NPC Modal */}
+      {sessionId && (
+        <NPCModal
+          isOpen={showNPCModal}
+          onClose={() => setShowNPCModal(false)}
+          sessionId={sessionId}
+          onTalkToNPC={(npc) => {
+            // Send message to talk to NPC
+            handleSendMessage(`${npc.name} ile konuşmak istiyorum`);
+          }}
         />
       )}
     </div>

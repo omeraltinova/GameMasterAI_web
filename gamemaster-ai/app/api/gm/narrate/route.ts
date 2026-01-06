@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import { getAIResponseWithContext } from '@/lib/ai/openrouter';
+import { callOpenRouterWithTools, OpenRouterMessage } from '@/lib/ai/openrouter';
 import { SYSTEM_PROMPT, getNarrationPrompt } from '@/lib/ai/prompts';
 import { buildSessionContext } from '@/lib/ai/context';
 import { getUserId } from '@/lib/auth/server';
@@ -80,18 +80,31 @@ export async function POST(req: NextRequest) {
     // Context oluştur
     const context = await buildSessionContext(sessionId);
 
-    // AI'dan yanıt al
+    // Oyuncunun karakter ID'sini bul
+    const currentPlayer = gameSession.campaign.players.find(
+      (p: any) => p.userId === userId
+    );
+    const characterId = currentPlayer?.character?.id;
+
+    // AI mesajlarını hazırla
     const contextPrompt = contextToPrompt(context);
     const userPrompt = getNarrationPrompt(playerAction);
 
-    const aiResponse = await getAIResponseWithContext(
-      SYSTEM_PROMPT,
-      contextPrompt,
-      userPrompt,
-      {
-        temperature: 0.8,
-      }
-    );
+    const messages: OpenRouterMessage[] = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      { role: 'user', content: contextPrompt },
+      { role: 'user', content: userPrompt },
+    ];
+
+    // AI Tool Calling ile yanıt al
+    const aiResult = await callOpenRouterWithTools(messages, {
+      temperature: 0.8,
+      sessionId,
+      characterId,
+    });
+
+    const aiResponse = aiResult.content;
+    const toolResults = aiResult.toolResults;
 
     // AI yanıtını parse et
     let narration: string = aiResponse;
@@ -103,11 +116,11 @@ export async function POST(req: NextRequest) {
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        
+
         if (parsed.narration) {
           narration = parsed.narration;
         }
-        
+
         // LocationChange parse et
         if (parsed.locationChange && parsed.locationChange.changed) {
           locationChange = {
@@ -117,7 +130,7 @@ export async function POST(req: NextRequest) {
             description: parsed.locationChange.description,
           };
         }
-        
+
         if (parsed.gmPrompt && parsed.gmPrompt.actions && parsed.gmPrompt.actions.length > 0) {
           gmPrompt = {
             actions: parsed.gmPrompt.actions.map((action: any, index: number) => ({
@@ -145,13 +158,29 @@ export async function POST(req: NextRequest) {
       narration = aiResponse;
     }
 
+    // Tool results'tan ek bilgiler
+    let newNPCs: any[] = [];
+    let givenItems: any[] = [];
+    let diceRollRequest: any = null;
+
+    if (toolResults && toolResults.length > 0) {
+      toolResults.forEach(result => {
+        if (result.success) {
+          if (result.toolName === 'create_npc' && result.result?.isNew) {
+            newNPCs.push(result.result);
+          } else if (result.toolName === 'give_item') {
+            givenItems.push(result.result);
+          } else if (result.toolName === 'request_dice_roll') {
+            diceRollRequest = result.result;
+          }
+        }
+      });
+    }
+
     // Oyuncunun karakter adını bul
-    const currentPlayer = gameSession.campaign.players.find(
-      (p: any) => p.userId === userId
-    );
-    const playerName = currentPlayer?.character?.name || 
-                       currentPlayer?.user?.username || 
-                       'Oyuncu';
+    const playerName = currentPlayer?.character?.name ||
+      currentPlayer?.user?.username ||
+      'Oyuncu';
 
     // Oyuncu mesajını kaydet
     await prisma.message.create({
@@ -177,8 +206,8 @@ export async function POST(req: NextRequest) {
 
     // Session state'i güncelle (lokasyon değişikliği varsa)
     if (locationChange && locationChange.changed && locationChange.newLocation) {
-      const currentState = gameSession.currentState ? 
-        (typeof gameSession.currentState === 'string' ? JSON.parse(gameSession.currentState) : gameSession.currentState) : 
+      const currentState = gameSession.currentState ?
+        (typeof gameSession.currentState === 'string' ? JSON.parse(gameSession.currentState) : gameSession.currentState) :
         {};
 
       await prisma.gameSession.update({
@@ -209,6 +238,12 @@ export async function POST(req: NextRequest) {
       locationChange,
       messageId: gmMessage.id,
       timestamp: gmMessage.timestamp,
+      // Tool results
+      toolResults: {
+        newNPCs,
+        givenItems,
+        diceRollRequest,
+      },
     });
   } catch (error) {
     console.error('Narration error:', error);
@@ -261,9 +296,9 @@ function contextToPrompt(context: any): string {
     prompt += '**Son Olaylar:**\n';
     const lastMessages = context.recentMessages.slice(-10);
     lastMessages.forEach((msg: any) => {
-      const sender = msg.senderType === 'PLAYER' ? 'Oyuncu' : 
-                    msg.senderType === 'GM' ? 'GM' : 
-                    msg.senderType === 'SYSTEM' ? 'Sistem' : msg.senderType;
+      const sender = msg.senderType === 'PLAYER' ? 'Oyuncu' :
+        msg.senderType === 'GM' ? 'GM' :
+          msg.senderType === 'SYSTEM' ? 'Sistem' : msg.senderType;
       prompt += `[${sender}]: ${msg.content}\n`;
     });
     prompt += '\n';

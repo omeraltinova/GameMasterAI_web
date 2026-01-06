@@ -16,7 +16,7 @@
 | Zar Sistemi | ✅ Tam | - | **95%** |
 | Combat | ❌ Yok | Tüm sistem | **0%** |
 | Envanter | ✅ Tam | - | **95%** |
-| NPC Yönetimi | ❌ Yok | CRUD, UI | **0%** |
+| NPC Yönetimi | ✅ İyi | Combat stats | **80%** |
 | Senaryo Sistemi | ⚠️ Kısmi | UI, CRUD | **30%** |
 | Admin Panel | ❌ Yok | Tüm panel | **0%** |
 | Harita | ✅ Generation | Gallery, viewer | **50%** |
@@ -301,27 +301,36 @@ app/(admin)/layout.tsx
 
 ---
 
-## 9. NPC Yönetimi ❌ (0%)
+## 9. NPC Yönetimi ✅ (80%)
 
-### Tüm Sistem Eksik
+### Tamamlanan
+- [x] NPC listesi API (`GET /api/sessions/:id/npcs`)
+- [x] NPC oluşturma API (`POST /api/sessions/:id/npcs`)
+- [x] NPC güncelleme API (`PUT /api/sessions/:id/npcs/:npcId`)
+- [x] NPC silme API (`DELETE /api/sessions/:id/npcs/:npcId`)
+- [x] AI Tool definitions (`lib/ai/tools.ts`)
+  - create_npc
+  - update_npc
+  - give_item
+  - request_dice_roll
+- [x] Tool Executor (`lib/ai/toolExecutor.ts`)
+- [x] callOpenRouterWithTools fonksiyonu
+- [x] NPCModal komponenti
+- [x] Dost/Düşman gruplandırma
+- [x] NPC ile konuşma entegrasyonu
 
-#### API Endpoints (Hiçbiri Yok)
-- [ ] `GET /api/sessions/:id/npcs` - Session NPC'leri
-- [ ] `POST /api/sessions/:id/npcs` - NPC oluştur
-- [ ] `PUT /api/npcs/:id` - NPC güncelle
-- [ ] `DELETE /api/npcs/:id` - NPC sil
+### API Endpoints
 
-#### Componentler (Hiçbiri Yok)
-- [ ] `NPCCard.tsx` - NPC kartı
-- [ ] `NPCDialogue.tsx` - NPC diyalog arayüzü
-- [ ] `NPCList.tsx` - NPC listesi
+| Endpoint | Durum |
+|----------|-------|
+| `GET /api/sessions/:id/npcs` | ✅ |
+| `POST /api/sessions/:id/npcs` | ✅ |
+| `PUT /api/sessions/:id/npcs/:npcId` | ✅ |
+| `DELETE /api/sessions/:id/npcs/:npcId` | ✅ |
 
-#### Özellikler (Hiçbiri Yok)
-- [ ] NPC oluşturma (isim, ırk, rol)
-- [ ] NPC kişilik tanımlama
-- [ ] NPC stat bloğu
-- [ ] Düşman/dost durumu
-- [ ] Diyalog geçmişi kaydetme
+### Sonra Yapılacak
+- [ ] Combat stats (HP, AC, attack bonus)
+- [ ] NPC görsel oluşturma
 
 ---
 

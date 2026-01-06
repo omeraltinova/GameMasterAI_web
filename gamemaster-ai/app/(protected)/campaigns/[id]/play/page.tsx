@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, ConfirmDialog } from "@/components/ui";
-import { ChatWindow, MessageInput, DiceRoller, CharacterMini, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage } from "@/components/game";
+import { ChatWindow, MessageInput, DiceRoller, CharacterMini, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage, DiceModal } from "@/components/game";
 import { InventoryModal } from "@/components/character";
 import { useGame, useGM, useDice, useSuggestions, useLocationImage } from "@/hooks/useGame";
 import { get, post, put } from "@/lib/api/client";
@@ -69,6 +69,7 @@ export default function PlayPage() {
   const [restartFromMessageId, setRestartFromMessageId] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
   const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [showDiceModal, setShowDiceModal] = useState(false);
 
   // Get campaign ID from URL params
   const campaignId = params.id as string;
@@ -876,11 +877,8 @@ export default function PlayPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => toggleSidePanel("dice")}
-                className={cn(
-                  "gap-1",
-                  sidePanelView === "dice" && "bg-primary/10 border-primary"
-                )}
+                onClick={() => setShowDiceModal(true)}
+                className="gap-1"
               >
                 <Dice6 className="h-4 w-4" />
                 Zar At
@@ -918,7 +916,6 @@ export default function PlayPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold">
                   {sidePanelView === "character" && "Karakter"}
-                  {sidePanelView === "dice" && "Zar At"}
                 </h3>
                 <Button
                   variant="ghost"
@@ -938,14 +935,6 @@ export default function PlayPage() {
                 <div className="text-center text-muted-foreground py-8">
                   <p>Karakter bilgisi yükleniyor...</p>
                 </div>
-              )}
-
-              {sidePanelView === "dice" && (
-                <Card>
-                  <CardContent className="p-4">
-                    <DiceRoller onRoll={handleDiceRoll} />
-                  </CardContent>
-                </Card>
               )}
             </div>
           </aside>
@@ -1074,6 +1063,13 @@ export default function PlayPage() {
         cancelText="İptal"
         variant="warning"
         isLoading={isResetting}
+      />
+
+      {/* Dice Modal */}
+      <DiceModal
+        isOpen={showDiceModal}
+        onClose={() => setShowDiceModal(false)}
+        onRoll={handleDiceRoll}
       />
 
       {/* Inventory Modal */}

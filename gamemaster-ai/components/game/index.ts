@@ -1,4 +1,5 @@
 export { DiceRoller } from "./DiceRoller";
+export { DiceModal } from "./DiceModal";
 export { DiceAnimation, DiceAnimationInline } from "./DiceAnimation";
 export { DiceHistory } from "./DiceHistory";
 export { ChatWindow } from "./ChatWindow";

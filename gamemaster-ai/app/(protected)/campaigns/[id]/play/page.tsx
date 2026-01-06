@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, ConfirmDialog } from "@/components/ui";
 import { ChatWindow, MessageInput, DiceRoller, CharacterMini, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage } from "@/components/game";
+import { InventoryModal } from "@/components/character";
 import { useGame, useGM, useDice, useSuggestions, useLocationImage } from "@/hooks/useGame";
 import { get, post, put } from "@/lib/api/client";
 import type { Message, DiceType, Character, Campaign, GMAction, GMPrompt, LocationChange } from "@/types";
@@ -61,32 +62,33 @@ export default function PlayPage() {
   const [gamePhase, setGamePhase] = useState<GamePhase>("loading");
   const [isNewSession, setIsNewSession] = useState(false);
   const [pendingMandatoryAction, setPendingMandatoryAction] = useState<GMPrompt | null>(null);
-  
+
   // Restart dialog states
   const [showFullResetDialog, setShowFullResetDialog] = useState(false);
   const [showRestartFromMessageDialog, setShowRestartFromMessageDialog] = useState(false);
   const [restartFromMessageId, setRestartFromMessageId] = useState<string | null>(null);
   const [isResetting, setIsResetting] = useState(false);
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
 
   // Get campaign ID from URL params
   const campaignId = params.id as string;
-  
+
   // Fetch active session automatically using centralized endpoint
   useEffect(() => {
     const fetchActiveSession = async () => {
       try {
         setIsLoading(true);
-        const response = await get(`/campaigns/${campaignId}/active-session`) as { 
-          success: boolean; 
-          session: any; 
-          campaign: any; 
+        const response = await get(`/campaigns/${campaignId}/active-session`) as {
+          success: boolean;
+          session: any;
+          campaign: any;
           error?: string;
           isNewSession?: boolean;
         };
-        
+
         if (response && response.success) {
           const { session, campaign: campaignData } = response;
-          
+
           // Set the actual session ID from the response
           if (session?.id) {
             setActiveSessionId(session.id);
@@ -95,14 +97,14 @@ export default function PlayPage() {
           // Check if this is a new session
           // Session yeni oluşturulmuşsa ve mesaj yoksa veya sadece 1 mesaj varsa setup göster
           const messageCount = session?.messages?.length || 0;
-          const currentState = session?.currentState ? 
-            (typeof session.currentState === 'string' ? JSON.parse(session.currentState) : session.currentState) 
+          const currentState = session?.currentState ?
+            (typeof session.currentState === 'string' ? JSON.parse(session.currentState) : session.currentState)
             : {};
-          
+
           // Eğer worldSettings yoksa ve çok az mesaj varsa setup göster
           const hasWorldSettings = currentState.worldSettings && Object.keys(currentState.worldSettings).length > 0;
           setIsNewSession(!hasWorldSettings && messageCount <= 1);
-          
+
           // Set campaign data
           setCampaign({
             id: campaignData.id,
@@ -125,7 +127,7 @@ export default function PlayPage() {
             const currentPlayer = campaignData.players.find(
               (p: any) => p.userId === currentUserId || p.user?.id === currentUserId
             );
-            
+
             if (currentPlayer) {
               // Set player name (from user or character)
               if (currentPlayer.character) {
@@ -235,7 +237,7 @@ export default function PlayPage() {
 
       // Oyuna geç
       setGamePhase("playing");
-      
+
       // Açılış mesajı için öneriler getir
       fetchSuggestions(settings.openingNarration);
     } catch (err) {
@@ -350,10 +352,10 @@ export default function PlayPage() {
     if (pendingMandatoryAction?.isMandatory) {
       return;
     }
-    
+
     // Önerileri temizle
     clearSuggestions();
-    
+
     // Önce oyuncu mesajını UI'a ekle (optimistic update)
     const playerMessage: Message = {
       id: `temp-${Date.now()}`,
@@ -367,7 +369,7 @@ export default function PlayPage() {
 
     // AI GM çağrısı yap
     const result = await narrate(content);
-    
+
     if (result && result.narration) {
       // GM yanıtını önce mesajlara ekle
       const gmMessage: Message = {
@@ -380,7 +382,7 @@ export default function PlayPage() {
         gmPrompt: result.gmPrompt,
       };
       addMessage(gmMessage);
-      
+
       // Lokasyon değişikliği varsa görsel üret ve mesajı güncelle
       if (result.locationChange?.changed && result.locationChange.newLocation && result.locationChange.description) {
         const imageResult = await generateLocationImage(
@@ -388,19 +390,19 @@ export default function PlayPage() {
           result.locationChange.locationType || 'other',
           result.locationChange.description
         );
-        
+
         if (imageResult?.success && imageResult.imageUrl) {
           // Mesajı veritabanında güncelle
           await put(`/messages/${gmMessage.id}`, {
             locationImageUrl: imageResult.imageUrl,
             locationName: result.locationChange.newLocation,
           });
-          
+
           // Mesajları yeniden yükle
           await fetchMessages();
         }
       }
-      
+
       // Eğer zorunlu aksiyon varsa, state'i güncelle
       if (result.gmPrompt?.isMandatory) {
         setPendingMandatoryAction(result.gmPrompt);
@@ -416,7 +418,7 @@ export default function PlayPage() {
   const handleActionSelect = async (action: GMAction, messageId: string) => {
     // Önerileri temizle
     clearSuggestions();
-    
+
     // Seçilen aksiyonu oyuncu mesajı olarak ekle
     const playerMessage: Message = {
       id: `action-${Date.now()}`,
@@ -427,13 +429,13 @@ export default function PlayPage() {
       timestamp: new Date().toISOString(),
     };
     addMessage(playerMessage);
-    
+
     // Zorunlu aksiyon state'ini temizle
     setPendingMandatoryAction(null);
 
     // AI'ya seçimi gönder
     const result = await narrate(`${action.label}: ${action.value || action.description || ''}`);
-    
+
     if (result && result.narration) {
       const gmMessage: Message = {
         id: result.messageId || `gm-${Date.now()}`,
@@ -445,7 +447,7 @@ export default function PlayPage() {
         gmPrompt: result.gmPrompt,
       };
       addMessage(gmMessage);
-      
+
       // Lokasyon değişikliği varsa görsel üret ve mesajı güncelle
       if (result.locationChange?.changed && result.locationChange.newLocation && result.locationChange.description) {
         const imageResult = await generateLocationImage(
@@ -453,7 +455,7 @@ export default function PlayPage() {
           result.locationChange.locationType || 'other',
           result.locationChange.description
         );
-        
+
         if (imageResult?.success && imageResult.imageUrl) {
           await put(`/messages/${gmMessage.id}`, {
             locationImageUrl: imageResult.imageUrl,
@@ -462,7 +464,7 @@ export default function PlayPage() {
           await fetchMessages();
         }
       }
-      
+
       if (result.gmPrompt?.isMandatory) {
         setPendingMandatoryAction(result.gmPrompt);
       } else {
@@ -479,10 +481,10 @@ export default function PlayPage() {
     // Gorsel basarili uretildiyse, sohbete GM mesaji olarak ekle
     const skillText = action.skill ? ` ${action.skill}` : '';
     const dcText = action.dc ? ` (DC ${action.dc})` : '';
-    const successText = rollResult.success !== undefined 
-      ? (rollResult.success ? ' ✅ Başarılı!' : ' ❌ Başarısız') 
+    const successText = rollResult.success !== undefined
+      ? (rollResult.success ? ' ✅ Başarılı!' : ' ❌ Başarısız')
       : '';
-    
+
     const diceMessage: Message = {
       id: `dice-action-${Date.now()}`,
       sessionId: sessionId || '',
@@ -492,14 +494,14 @@ export default function PlayPage() {
       timestamp: new Date().toISOString(),
     };
     addMessage(diceMessage);
-    
+
     // Zorunlu aksiyon state'ini temizle
     setPendingMandatoryAction(null);
 
     // AI'ya zar sonucunu bildir
     const actionText = `${action.skill || 'Zar'} kontrolü attım. Sonuç: ${rollResult.total}${rollResult.success !== undefined ? (rollResult.success ? ' (Başarılı)' : ' (Başarısız)') : ''}`;
     const result = await narrate(actionText);
-    
+
     if (result && result.narration) {
       const gmMessage: Message = {
         id: result.messageId || `gm-${Date.now()}`,
@@ -511,7 +513,7 @@ export default function PlayPage() {
         gmPrompt: result.gmPrompt,
       };
       addMessage(gmMessage);
-      
+
       // Lokasyon değişikliği varsa görsel üret ve mesajı güncelle
       if (result.locationChange?.changed && result.locationChange.newLocation && result.locationChange.description) {
         const imageResult = await generateLocationImage(
@@ -519,7 +521,7 @@ export default function PlayPage() {
           result.locationChange.locationType || 'other',
           result.locationChange.description
         );
-        
+
         if (imageResult?.success && imageResult.imageUrl) {
           await put(`/messages/${gmMessage.id}`, {
             locationImageUrl: imageResult.imageUrl,
@@ -528,7 +530,7 @@ export default function PlayPage() {
           await fetchMessages();
         }
       }
-      
+
       if (result.gmPrompt?.isMandatory) {
         setPendingMandatoryAction(result.gmPrompt);
       }
@@ -543,7 +545,7 @@ export default function PlayPage() {
   ) => {
     // DiceRoller'dan gelen sonuçları kullan (tekrar atma!)
     const total = results.reduce((a, b) => a + b, 0) + modifier;
-    
+
     const diceMessage: Message = {
       id: `dice-${Date.now()}`,
       sessionId: sessionId || '',
@@ -558,24 +560,24 @@ export default function PlayPage() {
   // Sahne görseli üretme handler'ı
   const handleGenerateSceneImage = async () => {
     if (!sessionId) return;
-    
+
     // Son GM mesajından sahne bilgisini al
     const lastGMMessages = messages
       .filter(m => m.senderType === 'GM')
       .slice(-2);
-    
+
     if (lastGMMessages.length === 0) return;
-    
+
     // Son mesajlardan sahne açıklaması oluştur
     const sceneContext = lastGMMessages.map(m => m.content).join(' ');
-    
+
     // Mevcut lokasyon bilgisini al
     const locationName = currentLocation || 'Bilinmeyen Mekan';
-    
+
     // Sahne açıklamasını İngilizce'ye çevirmeden direkt kullan
     // API bunu handle edecek
     const sceneDescription = `Current scene: ${sceneContext.substring(0, 500)}`;
-    
+
     // Görseli üret
     const imageResult = await generateLocationImage(
       locationName,
@@ -587,7 +589,7 @@ export default function PlayPage() {
         excludeFromContext: true,
       }
     );
-    
+
     // Gorsel basarili uretildiyse, sohbete GM mesaji olarak ekle
     if (imageResult?.success && imageResult.imageUrl) {
       if (imageResult.message) {
@@ -605,14 +607,14 @@ export default function PlayPage() {
   // Belirli mesajdan itibaren yeniden başlatma handler'ı
   const handleRestartFromMessage = async () => {
     if (!sessionId || !restartFromMessageId) return;
-    
+
     setIsResetting(true);
     try {
       const response = await post(`/sessions/${sessionId}/reset`, {
         type: 'from_message',
         messageId: restartFromMessageId,
       }) as { success: boolean; newMessage?: Message; deletedCount?: number };
-      
+
       if (response.success) {
         // Mesajları yeniden yükle
         fetchMessages();
@@ -637,7 +639,7 @@ export default function PlayPage() {
   // GM mesajını yeniden üret
   const handleRegenerateMessage = async (messageId: string) => {
     if (!sessionId) return;
-    
+
     try {
       // Mesajı bul
       const targetMessage = messages.find(m => m.id === messageId);
@@ -649,7 +651,7 @@ export default function PlayPage() {
       // Önceki oyuncu mesajını bul
       const targetIndex = messages.findIndex(m => m.id === messageId);
       let previousPlayerMessage: Message | undefined;
-      
+
       for (let i = targetIndex - 1; i >= 0; i--) {
         if (messages[i].senderType === 'PLAYER' || messages[i].senderType === 'DICE') {
           previousPlayerMessage = messages[i];
@@ -673,7 +675,7 @@ export default function PlayPage() {
 
       // Yeni GM yanıtı üret (narrate fonksiyonu kendi loading state'ini yönetir)
       const result = await narrate(previousPlayerMessage.content);
-      
+
       if (result && result.narration) {
         const gmMessage: Message = {
           id: result.messageId || `gm-${Date.now()}`,
@@ -685,7 +687,7 @@ export default function PlayPage() {
           gmPrompt: result.gmPrompt,
         };
         addMessage(gmMessage);
-        
+
         // Lokasyon değişikliği varsa görsel üret ve mesajı güncelle
         if (result.locationChange?.changed && result.locationChange.newLocation && result.locationChange.description) {
           const imageResult = await generateLocationImage(
@@ -693,7 +695,7 @@ export default function PlayPage() {
             result.locationChange.locationType || 'other',
             result.locationChange.description
           );
-          
+
           if (imageResult?.success && imageResult.imageUrl) {
             await put(`/messages/${gmMessage.id}`, {
               locationImageUrl: imageResult.imageUrl,
@@ -702,7 +704,7 @@ export default function PlayPage() {
             await fetchMessages();
           }
         }
-        
+
         if (result.gmPrompt?.isMandatory) {
           setPendingMandatoryAction(result.gmPrompt);
         } else {
@@ -739,18 +741,18 @@ export default function PlayPage() {
           <Badge
             variant={
               campaign?.status === 'ACTIVE' ? 'success' :
-              campaign?.status === 'PAUSED' ? 'warning' : 'default'
+                campaign?.status === 'PAUSED' ? 'warning' : 'default'
             }
           >
             {campaign?.status === 'ACTIVE' ? 'Aktif' :
-             campaign?.status === 'PAUSED' ? 'Duraklatıldı' :
-             campaign?.status === 'DRAFT' ? 'Taslak' : campaign?.status}
+              campaign?.status === 'PAUSED' ? 'Duraklatıldı' :
+                campaign?.status === 'DRAFT' ? 'Taslak' : campaign?.status}
           </Badge>
-          
+
           {/* Reset Button - Sadece creator görebilir */}
           {isCreator && (
-            <Button 
-              variant="ghost" 
+            <Button
+              variant="ghost"
               size="sm"
               onClick={() => setShowFullResetDialog(true)}
               title="Oyunu Sıfırla"
@@ -759,7 +761,7 @@ export default function PlayPage() {
               <RefreshCw className="h-4 w-4" />
             </Button>
           )}
-          
+
           <Link href={`/campaigns/${campaign?.id}/settings`}>
             <Button variant="ghost" size="sm">
               <Settings className="h-4 w-4" />
@@ -773,9 +775,9 @@ export default function PlayPage() {
         {/* Chat Area */}
         <div className="flex-1 flex flex-col">
           {/* Location Image - Mekan değiştiğinde göster */}
-          
+
           <div className="relative flex-1 flex flex-col min-h-0">
-            <ChatWindow 
+            <ChatWindow
               messages={messages}
               onActionSelect={handleActionSelect}
               onDiceRoll={handleActionDiceRoll}
@@ -856,15 +858,15 @@ export default function PlayPage() {
                 <span>{pendingMandatoryAction.promptText || 'Yukarıdaki seçeneklerden birini seç'}</span>
               </div>
             )}
-            
+
             <MessageInput
               onSend={handleSendMessage}
               onGenerateImage={handleGenerateSceneImage}
               isGeneratingImage={isImageLoading}
               disabled={isGMLoading || isGameLoading || !!pendingMandatoryAction?.isMandatory}
               placeholder={
-                pendingMandatoryAction?.isMandatory 
-                  ? "Önce yukarıdaki aksiyonu tamamla..." 
+                pendingMandatoryAction?.isMandatory
+                  ? "Önce yukarıdaki aksiyonu tamamla..."
                   : "Aksiyonunu yaz... (örn: 'Kapıyı açmaya çalışıyorum')"
               }
             />
@@ -886,11 +888,8 @@ export default function PlayPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => toggleSidePanel("inventory")}
-                className={cn(
-                  "gap-1",
-                  sidePanelView === "inventory" && "bg-primary/10 border-primary"
-                )}
+                onClick={() => setShowInventoryModal(true)}
+                className="gap-1"
               >
                 <Backpack className="h-4 w-4" />
                 Envanter
@@ -920,7 +919,6 @@ export default function PlayPage() {
                 <h3 className="font-semibold">
                   {sidePanelView === "character" && "Karakter"}
                   {sidePanelView === "dice" && "Zar At"}
-                  {sidePanelView === "inventory" && "Envanter"}
                 </h3>
                 <Button
                   variant="ghost"
@@ -935,7 +933,7 @@ export default function PlayPage() {
               {sidePanelView === "character" && character && (
                 <CharacterMini character={character} />
               )}
-              
+
               {!character && sidePanelView === "character" && (
                 <div className="text-center text-muted-foreground py-8">
                   <p>Karakter bilgisi yükleniyor...</p>
@@ -946,52 +944,6 @@ export default function PlayPage() {
                 <Card>
                   <CardContent className="p-4">
                     <DiceRoller onRoll={handleDiceRoll} />
-                  </CardContent>
-                </Card>
-              )}
-
-              {sidePanelView === "inventory" && character && (
-                <Card>
-                  <CardHeader className="p-4 pb-2">
-                    <CardTitle className="text-sm">Hızlı Erişim</CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-2">
-                    <div className="space-y-2">
-                      {character.inventory && character.inventory.length > 0 ? (
-                        character.inventory.map((item, i) => (
-                          <div
-                            key={i}
-                            className="flex items-center justify-between p-2 rounded-lg bg-background-elevated"
-                          >
-                            <div>
-                              <p className="text-sm font-medium">{item.name}</p>
-                              <p className="text-xs text-foreground-muted">
-                                {item.type}
-                              </p>
-                            </div>
-                            {item.equipped && (
-                              <Badge variant="success" size="sm">
-                                Kuşanılmış
-                              </Badge>
-                            )}
-                            {item.quantity && (
-                              <Badge variant="outline" size="sm">
-                                x{item.quantity}
-                              </Badge>
-                            )}
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-muted-foreground text-center py-4">
-                          Envanter boş
-                        </p>
-                      )}
-                    </div>
-                    <Link href={`/characters/${character.id}/inventory`}>
-                      <Button variant="ghost" size="sm" className="w-full mt-3">
-                        Tam Envanteri Gör
-                      </Button>
-                    </Link>
                   </CardContent>
                 </Card>
               )}
@@ -1013,7 +965,7 @@ export default function PlayPage() {
                 Nasıl sıfırlamak istiyorsun?
               </p>
             </div>
-            
+
             <div className="space-y-3">
               {/* Option 1: Full reset with world redesign */}
               <button
@@ -1051,7 +1003,7 @@ export default function PlayPage() {
                   </div>
                 </div>
               </button>
-              
+
               {/* Option 2: Keep world, reset messages */}
               <button
                 onClick={async () => {
@@ -1087,7 +1039,7 @@ export default function PlayPage() {
                 </div>
               </button>
             </div>
-            
+
             <button
               onClick={() => setShowFullResetDialog(false)}
               disabled={isResetting}
@@ -1095,7 +1047,7 @@ export default function PlayPage() {
             >
               İptal
             </button>
-            
+
             {isResetting && (
               <div className="absolute inset-0 bg-card/80 rounded-xl flex items-center justify-center">
                 <div className="flex items-center gap-2 text-primary">
@@ -1123,6 +1075,15 @@ export default function PlayPage() {
         variant="warning"
         isLoading={isResetting}
       />
+
+      {/* Inventory Modal */}
+      {character && (
+        <InventoryModal
+          isOpen={showInventoryModal}
+          onClose={() => setShowInventoryModal(false)}
+          characterId={character.id}
+        />
+      )}
     </div>
   );
 }

@@ -15,7 +15,7 @@
 | AI GM | ✅ Tam | - | **95%** |
 | Zar Sistemi | ✅ Tam | - | **95%** |
 | Combat | ❌ Yok | Tüm sistem | **0%** |
-| Envanter | ❌ Yok | Tüm sistem | **0%** |
+| Envanter | ✅ Tam | - | **95%** |
 | NPC Yönetimi | ❌ Yok | CRUD, UI | **0%** |
 | Senaryo Sistemi | ⚠️ Kısmi | UI, CRUD | **30%** |
 | Admin Panel | ❌ Yok | Tüm panel | **0%** |
@@ -273,30 +273,31 @@ app/(admin)/layout.tsx
 
 ---
 
-## 8. Envanter Sistemi ❌ (0%)
+## 8. Envanter Sistemi ✅ (95%)
 
-### Tüm Sistem Eksik
+### Tamamlanan
+- [x] Envanter listesi API (`GET /api/characters/:id/inventory`)
+- [x] Item ekleme API (`POST /api/characters/:id/inventory`)
+- [x] Item güncelleme API (`PUT /api/characters/:id/inventory/:itemId`)
+- [x] Item silme API (`DELETE /api/characters/:id/inventory/:itemId`)
+- [x] Kuşanma API (`PUT /api/characters/:id/inventory/:itemId/equip`)
+- [x] InventoryGrid komponenti
+- [x] ItemCard komponenti
+- [x] AddItemModal komponenti
+- [x] Item kategorileri (Weapon, Armor, Potion, vb.)
+- [x] Kuşanma/çıkarma
+- [x] Ağırlık hesaplama
+- [x] Item properties (damage, AC bonus)
 
-#### API Endpoints (Hiçbiri Yok)
-- [ ] `GET /api/characters/:id/inventory` - Envanter listesi
-- [ ] `POST /api/characters/:id/inventory` - Item ekle
-- [ ] `PUT /api/characters/:charId/inventory/:itemId` - Item güncelle
-- [ ] `DELETE /api/characters/:charId/inventory/:itemId` - Item sil
-- [ ] `PUT /api/characters/:charId/inventory/:itemId/equip` - Kuşan/Çıkar
+### API Endpoints
 
-#### Componentler (Hiçbiri Yok)
-- [ ] `InventoryGrid.tsx` - Envanter grid görünümü
-- [ ] `ItemCard.tsx` - Item kartı
-- [ ] `ItemDetail.tsx` - Item detay modal
-- [ ] `EquipmentSlots.tsx` - Kuşanma slotları
-- [ ] `AddItemModal.tsx` - Item ekleme modal
-
-#### Özellikler (Hiçbiri Yok)
-- [ ] Item kategorileri (Weapon, Armor, Potion, vb.)
-- [ ] Equipment slots (Head, Body, Hands, vb.)
-- [ ] Kuşanma/çıkarma
-- [ ] Ağırlık hesaplama
-- [ ] Item properties (damage, AC bonus, vb.)
+| Endpoint | Durum |
+|----------|-------|
+| `GET /api/characters/:id/inventory` | ✅ |
+| `POST /api/characters/:id/inventory` | ✅ |
+| `PUT /api/characters/:id/inventory/:itemId` | ✅ |
+| `DELETE /api/characters/:id/inventory/:itemId` | ✅ |
+| `PUT /api/characters/:id/inventory/:itemId/equip` | ✅ |
 
 ---
 

@@ -162,3 +162,4 @@ export function rollDiceForAction(action: GMAction): {
   return { results, total, modifier, success };
 }
 
+

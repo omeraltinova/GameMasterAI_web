@@ -230,7 +230,7 @@ export default function CampaignLobbyPage() {
       <div className="flex flex-col items-center justify-center py-16">
         <h1 className="text-2xl font-bold mb-4">Kampanya bulunamadı</h1>
         <Link href="/campaigns">
-          <Button variant="outline">Kampanyalara Dön</Button>
+          <Button variant="outline">Oturumlara Dön</Button>
         </Link>
       </div>
     );
@@ -302,7 +302,7 @@ export default function CampaignLobbyPage() {
       <Link href="/campaigns">
         <Button variant="ghost" size="sm" className="gap-2">
           <ArrowLeft className="h-4 w-4" />
-          Kampanyalara Dön
+          Oturumlara Dön
         </Button>
       </Link>
 

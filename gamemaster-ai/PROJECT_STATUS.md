@@ -62,6 +62,21 @@
 - /api/characters/:id icin ayri detay endpointi eklenmedi (mevcut karakter listesi uzerinden filtreleniyor)
 
 ---
+
+## Guncelleme: Kurallar, Karakter Duzenleme ve Oturum Adlandirma (6 Ocak 2026)
+
+### Tamamlanan
+- Kurallar sayfasi D&D 5e SRD esasina gore guncellendi (metinler/terimler)
+- Karakter duzenleme sayfasi eklendi (`/characters/[id]/edit`) ve karakter guncelleme endpointi eklendi
+- Kampanyalar UI metinleri Oturumlar olarak guncellendi (linkler degismedi)
+
+### Eksik
+- Karakter duzenleme ekraninda arka plan icin serbest hikaye alani
+
+### Atlanan
+- Ana sayfa bolum degisiklikleri (bu tur istek icin ertelendi)
+
+---
 ## 1. Temel Altyapı ✅ (100%)
 
 ### Tamamlanan

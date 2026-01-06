@@ -19,7 +19,7 @@ import { useState } from "react";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/characters", label: "Karakterler", icon: Users },
-  { href: "/campaigns", label: "Kampanyalar", icon: Swords },
+  { href: "/campaigns", label: "Oturumlar", icon: Swords },
   { href: "/scenarios", label: "Senaryolar", icon: Map },
   { href: "/profile", label: "Profil", icon: User },
 ];

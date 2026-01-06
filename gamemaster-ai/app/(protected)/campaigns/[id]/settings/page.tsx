@@ -235,7 +235,7 @@ export default function CampaignSettingsPage() {
       <div className="flex flex-col items-center justify-center py-16">
         <h1 className="text-2xl font-bold mb-4">Kampanya bulunamadı</h1>
         <Link href="/campaigns">
-          <Button variant="outline">Kampanyalara Dön</Button>
+          <Button variant="outline">Oturumlara Dön</Button>
         </Link>
       </div>
     );

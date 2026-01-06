@@ -283,7 +283,7 @@ export default function PlayPage() {
         <h1 className="text-2xl font-bold mb-4">Hata</h1>
         <p className="text-muted-foreground mb-4">{error}</p>
         <Link href="/campaigns">
-          <Button variant="outline">Kampanyalara Dön</Button>
+          <Button variant="outline">Oturumlara Dön</Button>
         </Link>
       </div>
     );
@@ -294,7 +294,7 @@ export default function PlayPage() {
       <div className="flex flex-col items-center justify-center py-16">
         <h1 className="text-2xl font-bold mb-4">Kampanya bulunamadı</h1>
         <Link href="/campaigns">
-          <Button variant="outline">Kampanyalara Dön</Button>
+          <Button variant="outline">Oturumlara Dön</Button>
         </Link>
       </div>
     );
@@ -309,7 +309,7 @@ export default function PlayPage() {
         <h1 className="text-2xl font-bold mb-4">Kampanya Tamamlandı</h1>
         <p className="text-muted-foreground mb-4">Bu kampanya zaten tamamlanmış.</p>
         <Link href="/campaigns">
-          <Button variant="outline">Kampanyalara Dön</Button>
+          <Button variant="outline">Oturumlara Dön</Button>
         </Link>
       </div>
     );

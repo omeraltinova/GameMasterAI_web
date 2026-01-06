@@ -54,7 +54,7 @@ export default function CampaignsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Kampanyalar</h1>
+          <h1 className="text-3xl font-bold">Oturumlar</h1>
           <p className="text-foreground-secondary">
             {campaigns.length} kampanya
           </p>
@@ -91,7 +91,7 @@ export default function CampaignsPage() {
       <Tabs defaultValue="my">
         <TabsList>
           <TabsTrigger value="my">
-            Kampanyalarım
+            Oturumlarım
             <Badge variant="primary" size="sm" className="ml-2">
               {myCampaigns.length}
             </Badge>

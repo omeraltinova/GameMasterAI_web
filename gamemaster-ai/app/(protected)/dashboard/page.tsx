@@ -132,7 +132,7 @@ export default function DashboardPage() {
       href: "/characters",
     },
     {
-      title: "Kampanyalar",
+      title: "Oturumlar",
       value: campaigns.length,
       icon: Swords,
       color: "secondary",
@@ -284,14 +284,14 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Swords className="h-5 w-5 text-secondary" />
-              Aktif Kampanyalar
+              Aktif Oturumlar
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {isLoading ? (
               <div className="p-6 text-center text-sm text-foreground-muted">
                 <Loader2 className="h-5 w-5 animate-spin mx-auto mb-3" />
-                Kampanyalar yükleniyor...
+                Oturumlar yükleniyor...
               </div>
             ) : activeCampaigns.length > 0 ? (
               activeCampaigns.map((campaign) => (

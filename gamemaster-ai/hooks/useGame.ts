@@ -493,11 +493,13 @@ export function useLocationImage(sessionId: string) {
   }, [sessionId]);
 
   /**
-   * Görseli temizle
+   * Görseli temizle (yükleme sırasında da kapanabilmesi için isLoading'i sıfırla)
    */
   const clearImage = useCallback(() => {
     setLocationImage(null);
     setCurrentLocation(null);
+    setIsLoading(false);
+    setError(null);
   }, []);
 
   return {

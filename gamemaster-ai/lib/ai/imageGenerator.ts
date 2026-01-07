@@ -27,7 +27,7 @@ export async function generateLocationImage(
   options?: ImageGenerationOptions
 ): Promise<ImageGenerationResult> {
   const apiKey = process.env.OPENROUTER_API_KEY;
-  
+
   if (!apiKey) {
     return {
       success: false,
@@ -37,11 +37,11 @@ export async function generateLocationImage(
 
   // Model seçimi - Image generation destekleyen modeller
   // OpenRouter'da modalities ile çalışan modeller: flux-pro, stable-diffusion vb.
-  const model = options?.model || 'openai/gpt-5-image-mini';
+  const model = options?.model || 'google/gemini-2.5-flash-image';
   const size = options?.size || '1792x1024'; // Landscape for location images
   const quality = options?.quality || 'standard';
   const style = options?.style || 'vivid';
-  
+
   const requestId = generateRequestId();
   const startTime = Date.now();
 
@@ -80,7 +80,7 @@ export async function generateLocationImage(
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: { message: response.statusText } }));
       console.error(`[ImageGen] Error response:`, JSON.stringify(errorData));
-      
+
       // Log error
       logAIResponse({
         timestamp: new Date().toISOString(),
@@ -105,17 +105,17 @@ export async function generateLocationImage(
     }
 
     const data = await response.json();
-    
+
     // OpenRouter image models return images in the message.images field
     const message = data.choices?.[0]?.message;
     console.log(`[ImageGen] Message has images:`, !!message?.images, `Image count:`, message?.images?.length || 0);
-    
+
     if (message?.images && Array.isArray(message.images) && message.images.length > 0) {
       const imageUrl = message.images[0]?.image_url?.url;
-      
+
       if (imageUrl) {
         console.log(`[ImageGen] Image URL found:`, imageUrl.substring(0, 100));
-        
+
         // Log success
         logAIResponse({
           timestamp: new Date().toISOString(),
@@ -127,15 +127,15 @@ export async function generateLocationImage(
           response: {
             content: `Image generated: ${imageUrl.substring(0, 50)}...`,
             finishReason: data.choices?.[0]?.finish_reason || 'stop',
-            usage: { 
-              promptTokens: data.usage?.prompt_tokens || 0, 
-              completionTokens: data.usage?.completion_tokens || 0, 
-              totalTokens: data.usage?.total_tokens || 0 
+            usage: {
+              promptTokens: data.usage?.prompt_tokens || 0,
+              completionTokens: data.usage?.completion_tokens || 0,
+              totalTokens: data.usage?.total_tokens || 0
             },
           },
           duration,
         });
-        
+
         return {
           success: true,
           imageUrl: imageUrl,
@@ -160,7 +160,7 @@ export async function generateLocationImage(
 
     console.error(`[ImageGen] No image URL found in response. Message:`, message);
     console.error(`[ImageGen] Has images field:`, !!message?.images);
-    
+
     return {
       success: false,
       error: 'No image URL returned from model. The model may not support image generation or modalities are not configured correctly.'
@@ -169,7 +169,7 @@ export async function generateLocationImage(
   } catch (error) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
+
     logAIResponse({
       timestamp: new Date().toISOString(),
       requestId,

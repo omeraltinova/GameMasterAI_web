@@ -413,8 +413,14 @@ export default function PlayPage() {
         setPendingMandatoryAction(result.gmPrompt);
       } else {
         setPendingMandatoryAction(null);
-        // Zorunlu aksiyon yoksa önerileri getir
-        fetchSuggestions(result.narration);
+        // GM aksiyon önerileri vermemişse AI suggestions getir
+        const hasGMActions = result.gmPrompt?.actions && result.gmPrompt.actions.length > 0;
+        if (!hasGMActions) {
+          fetchSuggestions(result.narration);
+        } else {
+          // GM aksiyon vermiş, suggestions'ı temizle
+          clearSuggestions();
+        }
       }
     }
   };
@@ -473,8 +479,13 @@ export default function PlayPage() {
       if (result.gmPrompt?.isMandatory) {
         setPendingMandatoryAction(result.gmPrompt);
       } else {
-        // Zorunlu aksiyon yoksa önerileri getir
-        fetchSuggestions(result.narration);
+        // GM aksiyon önerileri vermemişse AI suggestions getir
+        const hasGMActions = result.gmPrompt?.actions && result.gmPrompt.actions.length > 0;
+        if (!hasGMActions) {
+          fetchSuggestions(result.narration);
+        } else {
+          clearSuggestions();
+        }
       }
     }
   };
@@ -538,6 +549,14 @@ export default function PlayPage() {
 
       if (result.gmPrompt?.isMandatory) {
         setPendingMandatoryAction(result.gmPrompt);
+      } else {
+        // GM aksiyon önerileri vermemişse AI suggestions getir
+        const hasGMActions = result.gmPrompt?.actions && result.gmPrompt.actions.length > 0;
+        if (!hasGMActions) {
+          fetchSuggestions(result.narration);
+        } else {
+          clearSuggestions();
+        }
       }
     }
   };
@@ -714,7 +733,13 @@ export default function PlayPage() {
           setPendingMandatoryAction(result.gmPrompt);
         } else {
           setPendingMandatoryAction(null);
-          fetchSuggestions(result.narration);
+          // GM aksiyon önerileri vermemişse AI suggestions getir
+          const hasGMActions = result.gmPrompt?.actions && result.gmPrompt.actions.length > 0;
+          if (!hasGMActions) {
+            fetchSuggestions(result.narration);
+          } else {
+            clearSuggestions();
+          }
         }
       }
     } catch (err) {
@@ -831,8 +856,8 @@ export default function PlayPage() {
               </div>
             )}
 
-            {/* AI Action Suggestions - Sadece GM prompt yoksa göster */}
-            {!pendingMandatoryAction?.isMandatory && !messages.some(m => m.senderType === 'GM' && m.gmPrompt && m.gmPrompt.actions && m.gmPrompt.actions.length > 0) && (
+            {/* AI Action Suggestions - Sadece suggestions varsa ve GM zorunlu aksiyon vermemişse göster */}
+            {!pendingMandatoryAction?.isMandatory && suggestions.length > 0 && (
               <ActionSuggestions
                 suggestions={suggestions}
                 isLoading={isSuggestionsLoading}

@@ -45,7 +45,7 @@ function Avatar({
     <div
       className={cn(
         "relative flex shrink-0 items-center justify-center rounded-full overflow-hidden",
-        "bg-background-elevated border border-border",
+        "bg-gradient-to-br from-indigo-900/80 via-violet-900/60 to-indigo-950/80 border border-border",
         sizes[size],
         className
       )}

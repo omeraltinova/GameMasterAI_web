@@ -37,7 +37,7 @@ export async function generateLocationImage(
 
   // Model seçimi - Image generation destekleyen modeller
   // OpenRouter'da modalities ile çalışan modeller: flux-pro, stable-diffusion vb.
-  const model = options?.model || 'openai/gpt-5-image';
+  const model = options?.model || 'openai/gpt-5-image-mini';
   const size = options?.size || '1792x1024'; // Landscape for location images
   const quality = options?.quality || 'standard';
   const style = options?.style || 'vivid';

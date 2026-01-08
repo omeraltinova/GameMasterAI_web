@@ -19,8 +19,9 @@ const footerLinks = {
 export function Footer() {
   return (
     <footer className="border-t border-border bg-background-secondary">
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+      <div className="container mx-auto px-4 py-12 ">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 justify-items-center">
+          <div className="max-w-xs w-1/2">
           {/* Brand */}
           <div className="space-y-4">
             <Link href="/" className="flex items-center gap-2">
@@ -36,22 +37,19 @@ export function Footer() {
             </p>
             <div className="flex gap-3">
               <a
-                href="#"
+                href="https://github.com/omeraltinova/GameMasterAI_web"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="p-2 rounded-lg bg-background-elevated hover:bg-border transition-colors"
                 aria-label="GitHub"
               >
                 <Github className="h-4 w-4 text-foreground-secondary" />
               </a>
-              <a
-                href="#"
-                className="p-2 rounded-lg bg-background-elevated hover:bg-border transition-colors"
-                aria-label="Twitter"
-              >
-                <Twitter className="h-4 w-4 text-foreground-secondary" />
-              </a>
+            
             </div>
           </div>
-
+          </div>
+          <div className="max-w-xs w-1/7">
           {/* Product Links */}
           <div>
             <h4 className="font-semibold text-foreground mb-4">Ürün</h4>
@@ -68,7 +66,8 @@ export function Footer() {
               ))}
             </ul>
           </div>
-
+          </div>
+          <div className="max-w-xs w-2/4">
           {/* Resources Links */}
           <div>
             <h4 className="font-semibold text-foreground mb-4">Kaynaklar</h4>
@@ -85,22 +84,6 @@ export function Footer() {
               ))}
             </ul>
           </div>
-
-          {/* Legal Links */}
-          <div>
-            <h4 className="font-semibold text-foreground mb-4">Yasal</h4>
-            <ul className="space-y-2">
-              {footerLinks.legal.map((link) => (
-                <li key={link.label}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-foreground-secondary hover:text-foreground transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
           </div>
         </div>
 

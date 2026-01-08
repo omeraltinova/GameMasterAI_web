@@ -1,220 +1,185 @@
 "use client";
 
-import { useState } from "react";
-import { Button, Card, CardContent, Badge } from "@/components/ui";
-import { mockScenarios } from "@/lib/mock-data";
-import { formatDate } from "@/lib/utils";
-import { Map, Search, Check, X, MoreVertical, Star, Trash2, Edit, Eye } from "lucide-react";
+import { useState, useEffect } from "react";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/Dropdown";
+  Card,
+  CardContent,
+  Button,
+  Badge,
+  Input,
+  Spinner,
+  useToast,
+  ConfirmDialog,
+} from "@/components/ui";
+import { Search, Trash2, Map, ExternalLink } from "lucide-react";
+import Link from "next/link";
 
-const difficultyColors = {
-  Easy: "success",
-  Medium: "warning",
-  Hard: "danger",
-} as const;
+interface Scenario {
+  id: string;
+  title: string;
+  description: string;
+  genre: string;
+  difficulty: string;
+  isOfficial: boolean;
+  createdAt: string;
+  creator: {
+    username: string;
+    email: string;
+  } | null;
+  _count: {
+    campaigns: number;
+  };
+}
 
-export default function AdminScenariosPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [filter, setFilter] = useState<"all" | "official" | "community">("all");
+export default function ScenariosPage() {
+  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const { addToast } = useToast();
 
-  const filteredScenarios = mockScenarios.filter(
-    (scenario) =>
-      (scenario.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        scenario.description.toLowerCase().includes(searchQuery.toLowerCase())) &&
-      (filter === "all" ||
-        (filter === "official" && scenario.isOfficial) ||
-        (filter === "community" && !scenario.isOfficial))
+  useEffect(() => {
+    fetchScenarios();
+  }, []);
+
+  const fetchScenarios = async () => {
+    try {
+      const res = await fetch("/api/admin/scenarios");
+      if (res.ok) {
+        setScenarios(await res.json());
+      }
+    } catch (error) {
+      console.error("Senaryolar yüklenemedi", error);
+      addToast({ type: "error", title: "Hata", description: "Veriler yüklenemedi" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteId) return;
+    try {
+      const res = await fetch(`/api/admin/scenarios?id=${deleteId}`, { method: "DELETE" });
+      if (res.ok) {
+        setScenarios(scenarios.filter((s) => s.id !== deleteId));
+        addToast({ type: "success", title: "Başarılı", description: "Senaryo silindi." });
+      } else {
+        throw new Error("Silme başarısız");
+      }
+    } catch (error) {
+      addToast({ type: "error", title: "Hata", description: "Senaryo silinemedi." });
+    } finally {
+      setDeleteId(null);
+    }
+  };
+
+  const filteredScenarios = scenarios.filter((s) =>
+    s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    s.creator?.username.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  if (loading) return <div className="flex justify-center p-10"><Spinner size="lg" /></div>;
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Header & Search */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Senaryo Yönetimi</h1>
-          <p className="text-foreground-secondary">
-            {mockScenarios.length} senaryo
-          </p>
+          <h1 className="text-3xl font-bold">Senaryolar</h1>
+          <p className="text-foreground-secondary">Tüm oyun senaryolarını yönet</p>
         </div>
-        <Button className="gap-2">
-          <Map className="h-4 w-4" />
-          Resmi Senaryo Ekle
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground-muted" />
-          <input
-            type="text"
-            placeholder="Senaryo ara..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 rounded-lg bg-input border border-border text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-ring"
+        <div className="w-full sm:w-auto">
+          <Input
+            placeholder="Senaryo veya yazar ara..."
+            leftIcon={<Search className="h-4 w-4" />}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full sm:w-72"
           />
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant={filter === "all" ? "primary" : "outline"}
-            size="sm"
-            onClick={() => setFilter("all")}
-          >
-            Tümü
-          </Button>
-          <Button
-            variant={filter === "official" ? "primary" : "outline"}
-            size="sm"
-            onClick={() => setFilter("official")}
-          >
-            Resmi
-          </Button>
-          <Button
-            variant={filter === "community" ? "primary" : "outline"}
-            size="sm"
-            onClick={() => setFilter("community")}
-          >
-            Topluluk
-          </Button>
-        </div>
       </div>
 
-      {/* Scenarios Table */}
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-background-secondary">
-                  <th className="text-left py-4 px-6 text-sm font-medium text-foreground-secondary">
-                    Senaryo
-                  </th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-foreground-secondary">
-                    Tür
-                  </th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-foreground-secondary">
-                    Zorluk
-                  </th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-foreground-secondary">
-                    Durum
-                  </th>
-                  <th className="text-left py-4 px-6 text-sm font-medium text-foreground-secondary">
-                    Oluşturulma
-                  </th>
-                  <th className="text-right py-4 px-6 text-sm font-medium text-foreground-secondary">
-                    İşlemler
-                  </th>
+              <thead className="bg-background-elevated border-b border-border">
+                <tr>
+                  <th className="text-left py-3 px-4 text-sm font-medium">Senaryo Adı</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium">Yazar</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium">Tür / Zorluk</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium">Kullanım</th>
+                  <th className="text-right py-3 px-4 text-sm font-medium">İşlemler</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredScenarios.map((scenario) => (
-                  <tr
-                    key={scenario.id}
-                    className="border-b border-border hover:bg-background-elevated transition-colors"
-                  >
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <Map className="h-4 w-4 text-primary" />
-                        </div>
+                  <tr key={scenario.id} className="border-b border-border hover:bg-background-elevated/50">
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <Map className="h-4 w-4 text-secondary" />
                         <div>
                           <p className="font-medium">{scenario.title}</p>
-                          <p className="text-sm text-foreground-muted line-clamp-1 max-w-xs">
-                            {scenario.description}
-                          </p>
+                          {scenario.isOfficial && (
+                            <Badge variant="primary" className="mt-1 text-[10px] py-0 h-4">Resmi</Badge>
+                          )}
                         </div>
                       </div>
                     </td>
-                    <td className="py-4 px-6">
-                      <Badge variant="outline">{scenario.genre}</Badge>
+                    <td className="py-3 px-4 text-sm text-foreground-secondary">
+                      {scenario.creator ? scenario.creator.username : <span className="text-foreground-muted italic">Anonim</span>}
                     </td>
-                    <td className="py-4 px-6">
-                      <Badge variant={difficultyColors[scenario.difficulty as keyof typeof difficultyColors]}>
-                        {scenario.difficulty}
-                      </Badge>
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex gap-2">
-                        {scenario.isOfficial ? (
-                          <Badge variant="primary">
-                            <Star className="h-3 w-3 mr-1" />
-                            Resmi
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">Topluluk</Badge>
-                        )}
-                        {scenario.isAIGenerated && (
-                          <Badge variant="outline">AI</Badge>
-                        )}
+                    <td className="py-3 px-4">
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="outline" className="w-fit">{scenario.genre}</Badge>
+                        <span className="text-xs text-foreground-muted">{scenario.difficulty}</span>
                       </div>
                     </td>
-                    <td className="py-4 px-6 text-foreground-secondary">
-                      {formatDate(scenario.createdAt)}
+                    <td className="py-3 px-4 text-sm text-foreground-secondary">
+                      {scenario._count.campaigns} Kampanya
                     </td>
-                    <td className="py-4 px-6">
-                      <div className="flex justify-end">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="sm">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>İşlemler</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Görüntüle
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Düzenle
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              {scenario.isOfficial ? (
-                                <>
-                                  <X className="h-4 w-4 mr-2" />
-                                  Resmi Olmaktan Çıkar
-                                </>
-                              ) : (
-                                <>
-                                  <Check className="h-4 w-4 mr-2" />
-                                  Resmi Yap
-                                </>
-                              )}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-danger">
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Sil
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        <Link href={`/scenarios/${scenario.id}`} target="_blank">
+                          <Button variant="ghost" size="sm" title="Görüntüle">
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-danger hover:text-danger hover:bg-danger/10"
+                          onClick={() => setDeleteId(scenario.id)}
+                          title="Sil"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </td>
                   </tr>
                 ))}
+                {filteredScenarios.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-foreground-muted">
+                      Senaryo bulunamadı.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
-
-          {filteredScenarios.length === 0 && (
-            <div className="py-12 text-center">
-              <Map className="h-12 w-12 text-foreground-muted mx-auto mb-4" />
-              <p className="text-foreground-secondary">Senaryo bulunamadı</p>
-            </div>
-          )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        isOpen={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        title="Senaryoyu Sil"
+        description="Bu senaryo kalıcı olarak silinecek. Emin misiniz?"
+        variant="danger"
+        confirmText="Sil"
+      />
     </div>
   );
 }
-
-

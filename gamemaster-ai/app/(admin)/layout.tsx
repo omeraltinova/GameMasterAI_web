@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { useAuth } from "@/contexts/AuthContext";
 import { Spinner } from "@/components/ui";
+import { useSession } from "next-auth/react";
 
 export default function AdminLayout({
   children,
@@ -13,19 +13,20 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { data: session, status } = useSession();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (!isAuthenticated) {
-        router.push("/login");
-      } else if (user?.role !== "ADMIN") {
-        router.push("/dashboard");
-      }
-    }
-  }, [isAuthenticated, isLoading, user, router]);
+    if (status === "loading") return;
 
-  if (isLoading) {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    } else if (session?.user?.role !== "ADMIN") {
+      // Admin değilse normal dashboard'a yönlendir
+      router.push("/dashboard");
+    }
+  }, [status, session, router]);
+
+  if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Spinner size="lg" />
@@ -33,7 +34,8 @@ export default function AdminLayout({
     );
   }
 
-  if (!isAuthenticated || user?.role !== "ADMIN") {
+  // Sadece admin ise içeriği göster
+  if (!session || session.user.role !== "ADMIN") {
     return null;
   }
 
@@ -47,5 +49,3 @@ export default function AdminLayout({
     </div>
   );
 }
-
-

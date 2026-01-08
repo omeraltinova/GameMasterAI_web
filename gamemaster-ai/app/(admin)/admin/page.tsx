@@ -1,8 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle, Badge } from "@/components/ui";
-import { mockUsers, mockCharacters, mockCampaigns, mockScenarios } from "@/lib/mock-data";
+import { Card, CardContent, CardHeader, CardTitle, Badge, Spinner } from "@/components/ui";
 import {
   Users,
   Swords,
@@ -14,45 +14,79 @@ import {
   Play,
 } from "lucide-react";
 
-const stats = [
-  {
-    title: "Toplam Kullanıcı",
-    value: mockUsers.length,
-    icon: Users,
-    color: "primary",
-    change: "+12%",
-  },
-  {
-    title: "Toplam Karakter",
-    value: mockCharacters.length,
-    icon: UserPlus,
-    color: "secondary",
-    change: "+8%",
-  },
-  {
-    title: "Aktif Kampanya",
-    value: mockCampaigns.filter((c) => c.status === "ACTIVE").length,
-    icon: Swords,
-    color: "success",
-    change: "+24%",
-  },
-  {
-    title: "Senaryo",
-    value: mockScenarios.length,
-    icon: Map,
-    color: "info",
-    change: "+5%",
-  },
-];
-
-const recentActivity = [
-  { action: "Yeni kullanıcı kaydı", user: "DungeonMaster42", time: "2 dakika önce" },
-  { action: "Kampanya oluşturuldu", user: "Adventurer", time: "15 dakika önce" },
-  { action: "Karakter seviye atladı", user: "DragonSlayer", time: "1 saat önce" },
-  { action: "Senaryo tamamlandı", user: "MysticMage", time: "3 saat önce" },
-];
+interface DashboardData {
+  stats: {
+    users: number;
+    characters: number;
+    activeCampaigns: number;
+    scenarios: number;
+  };
+  recentUsers: Array<{
+    id: string;
+    username: string;
+    email: string;
+    role: string;
+    createdAt: string;
+  }>;
+}
 
 export default function AdminDashboardPage() {
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const res = await fetch("/api/admin/dashboard");
+        if (res.ok) {
+          const jsonData = await res.json();
+          setData(jsonData);
+        }
+      } catch (error) {
+        console.error("Dashboard verisi yüklenemedi", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-full">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  const stats = [
+    {
+      title: "Toplam Kullanıcı",
+      value: data?.stats.users || 0,
+      icon: Users,
+      color: "primary",
+    },
+    {
+      title: "Toplam Karakter",
+      value: data?.stats.characters || 0,
+      icon: UserPlus,
+      color: "secondary",
+    },
+    {
+      title: "Aktif Oturum",
+      value: data?.stats.activeCampaigns || 0,
+      icon: Swords,
+      color: "success",
+    },
+    {
+      title: "Senaryo",
+      value: data?.stats.scenarios || 0,
+      icon: Map,
+      color: "info",
+    },
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -76,7 +110,6 @@ export default function AdminDashboardPage() {
                       {stat.title}
                     </p>
                     <p className="text-3xl font-bold">{stat.value}</p>
-                    <p className="text-xs text-success mt-1">{stat.change} bu ay</p>
                   </div>
                   <div className={`p-3 rounded-xl bg-${stat.color}/10`}>
                     <Icon className={`h-6 w-6 text-${stat.color}`} />
@@ -99,6 +132,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="grid sm:grid-cols-2 gap-4">
+              {/* Kullanıcı Yönetimi */}
               <Link href="/admin/users">
                 <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
                   <Users className="h-6 w-6 text-primary mb-2 group-hover:scale-110 transition-transform" />
@@ -108,6 +142,8 @@ export default function AdminDashboardPage() {
                   </p>
                 </div>
               </Link>
+
+              {/* Senaryo Yönetimi */}
               <Link href="/admin/scenarios">
                 <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
                   <Map className="h-6 w-6 text-secondary mb-2 group-hover:scale-110 transition-transform" />
@@ -117,18 +153,24 @@ export default function AdminDashboardPage() {
                   </p>
                 </div>
               </Link>
-              <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
-                <Activity className="h-6 w-6 text-success mb-2 group-hover:scale-110 transition-transform" />
-                <h4 className="font-medium">Sistem İstatistikleri</h4>
-                <p className="text-sm text-foreground-secondary">
-                  Detaylı analiz ve raporlar
-                </p>
-              </div>
-              <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
+
+              {/* Oturum Yönetimi */}
+              <Link href="/admin/campaigns">
+                <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
+                  <Swords className="h-6 w-6 text-success mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-medium">Oturum Yönetimi</h4>
+                  <p className="text-sm text-foreground-secondary">
+                    Oturumları denetle ve yönet
+                  </p>
+                </div>
+              </Link>
+
+              {/* Aktif Oturumlar (Henüz sayfası yok, placeholder kalabilir) */}
+              <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group opacity-70">
                 <Play className="h-6 w-6 text-warning mb-2 group-hover:scale-110 transition-transform" />
                 <h4 className="font-medium">Aktif Oturumlar</h4>
                 <p className="text-sm text-foreground-secondary">
-                  Canlı oyun oturumlarını izle
+                  Canlı oyun oturumlarını izle (Çok yakında)
                 </p>
               </div>
             </div>
@@ -140,94 +182,34 @@ export default function AdminDashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5 text-secondary" />
-              Son Aktiviteler
+              Son Kayıt Olanlar
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recentActivity.map((activity, i) => (
+              {data?.recentUsers.map((user, i) => (
                 <div
-                  key={i}
+                  key={user.id}
                   className="flex items-start gap-3 pb-4 border-b border-border last:border-0 last:pb-0"
                 >
                   <div className="w-2 h-2 rounded-full bg-primary mt-2" />
                   <div className="flex-1">
-                    <p className="text-sm">{activity.action}</p>
+                    <p className="text-sm font-medium">{user.username}</p>
                     <p className="text-xs text-foreground-muted">
-                      {activity.user} • {activity.time}
+                      {new Date(user.createdAt).toLocaleDateString("tr-TR")}
                     </p>
                   </div>
                 </div>
               ))}
+              {!data?.recentUsers.length && (
+                <p className="text-sm text-foreground-muted">
+                  Henüz kayıtlı kullanıcı yok.
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Users Overview */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Son Kullanıcılar</CardTitle>
-          <Link href="/admin/users">
-            <Badge variant="outline" className="cursor-pointer hover:bg-background-elevated">
-              Tümünü Gör
-              <ArrowRight className="h-3 w-3 ml-1" />
-            </Badge>
-          </Link>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 text-sm font-medium text-foreground-secondary">
-                    Kullanıcı
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-foreground-secondary">
-                    E-posta
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-foreground-secondary">
-                    Rol
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm font-medium text-foreground-secondary">
-                    Kayıt Tarihi
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {mockUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-border hover:bg-background-elevated">
-                    <td className="py-3 px-4">
-                      <span className="font-medium">{user.username}</span>
-                    </td>
-                    <td className="py-3 px-4 text-foreground-secondary">
-                      {user.email}
-                    </td>
-                    <td className="py-3 px-4">
-                      <Badge
-                        variant={
-                          user.role === "ADMIN"
-                            ? "danger"
-                            : user.role === "MEMBER"
-                            ? "primary"
-                            : "default"
-                        }
-                      >
-                        {user.role}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4 text-foreground-secondary">
-                      {new Date(user.createdAt).toLocaleDateString("tr-TR")}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }
-
-

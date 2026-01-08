@@ -1,51 +1,127 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Avatar, Badge } from "@/components/ui";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Avatar,
+  Badge,
+  useToast, // Toast yerine useToast import ettik
+  ConfirmDialog,
+} from "@/components/ui";
 import { useSession, signOut } from "next-auth/react";
-import { User, Mail, Calendar, Shield, Save, Lock, Bell, Palette } from "lucide-react";
+import {
+  User,
+  Mail,
+  Calendar,
+  Shield,
+  Save,
+  Lock,
+  Palette,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function ProfilePage() {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
+  const router = useRouter();
+  const { addToast } = useToast(); // Hook'u başlattık
   const user = session?.user;
 
-  // initialize from session if available
-  const [formData, setFormData] = useState(() => ({
-    name: session?.user?.name ?? "",
-    email: session?.user?.email ?? "",
-  }));
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+  });
 
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  // update only when session provides new values and defer the setState
+  // Manuel toast state'ine gerek kalmadı, useToast halledecek
+
+  // Session yüklendiğinde formu doldur
   useEffect(() => {
-    if (!session?.user) return;
-    const next = {
-      name: session.user.name ?? "",
-      email: session.user.email ?? "",
-    };
-    if (formData.name === next.name && formData.email === next.email) return;
-    const id = setTimeout(() => setFormData(next), 0);
-    return () => clearTimeout(id);
-  }, [session, formData.name, formData.email]);
+    if (session?.user) {
+      setFormData({
+        name: session.user.name || "",
+        email: session.user.email || "",
+      });
+    }
+  }, [session]);
+
+  const showToast = (message: string, type: "success" | "error") => {
+    addToast({
+      type: type,
+      title: type === "success" ? "İşlem Başarılı" : "Hata",
+      description: message,
+    });
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    // API simülasyonu
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    console.log("Saving profile:", formData);
-    setIsSaving(false);
+
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: formData.name }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Güncelleme başarısız");
+      }
+
+      // Session'ı güncelle (arayüzdeki ismin hemen değişmesi için)
+      await update({
+        ...session,
+        user: { ...session?.user, name: formData.name },
+      });
+
+      showToast("Profil başarıyla güncellendi", "success");
+    } catch (error: any) {
+      showToast(error.message, "error");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
+  const handleDeleteAccount = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "DELETE",
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Hesap silinemedi");
+      }
+
+      // Çıkış yap ve anasayfaya yönlendir
+      await signOut({ callbackUrl: "/" });
+    } catch (error: any) {
+      showToast(error.message, "error");
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
+  if (!user) return null;
+
   return (
-    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-10">
+      {/* Toast componenti buradan kaldırıldı çünkü ToastProvider global olarak yönetecek */}
+
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold">Profil</h1>
-        <p className="text-foreground-secondary">
-          Hesap ayarlarını yönet
-        </p>
+        <p className="text-foreground-secondary">Hesap ayarlarını yönet</p>
       </div>
 
       {/* Profile Card */}
@@ -53,25 +129,25 @@ export default function ProfilePage() {
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-center gap-6">
             <Avatar
-              src={user?.image || undefined}
-              fallback={user?.name || "U"}
+              src={user.image || undefined}
+              fallback={user.name || "U"}
               size="xl"
               className="w-24 h-24"
             />
             <div className="flex-1 text-center sm:text-left">
-              <h2 className="text-2xl font-bold">{user?.name}</h2>
-              <p className="text-foreground-secondary">{user?.email}</p>
+              <h2 className="text-2xl font-bold">{user.name}</h2>
+              <p className="text-foreground-secondary">{user.email}</p>
               <div className="flex flex-wrap gap-2 mt-2 justify-center sm:justify-start">
-                <Badge variant="primary">
-                  MEMBER
+                <Badge variant={user.role === "ADMIN" ? "danger" : "primary"}>
+                  {user.role === "ADMIN" ? "YÖNETİCİ" : "ÜYE"}
                 </Badge>
                 <Badge variant="outline">
                   <Calendar className="h-3 w-3 mr-1" />
-                  Aktif Üye
+                  Aktif Hesap
                 </Badge>
               </div>
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" disabled>
               Fotoğraf Değiştir
             </Button>
           </div>
@@ -90,20 +166,21 @@ export default function ProfilePage() {
           <form onSubmit={handleSave} className="space-y-4">
             <Input
               label="Kullanıcı Adı"
-              // Input değeri formData.name ile eşleşmeli
-              value={formData.name} 
+              value={formData.name}
               onChange={(e) =>
                 setFormData({ ...formData, name: e.target.value })
               }
               leftIcon={<User className="h-4 w-4" />}
+              placeholder="Kullanıcı adınız"
             />
             <Input
               label="E-posta"
               type="email"
               value={formData.email}
-              readOnly 
+              readOnly
               className="opacity-70 cursor-not-allowed"
               leftIcon={<Mail className="h-4 w-4" />}
+              hint="E-posta adresi değiştirilemez."
             />
             <Button type="submit" isLoading={isSaving} className="gap-2">
               <Save className="h-4 w-4" />
@@ -113,7 +190,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Security - Geri kalan kısımlar aynı */}
+      {/* Security */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -126,10 +203,10 @@ export default function ProfilePage() {
             <div>
               <h4 className="font-medium">Şifre</h4>
               <p className="text-sm text-foreground-muted">
-                Daha güvenli bir şifre belirleyin
+                Şifrenizi güvenli tutun
               </p>
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" disabled title="Yakında">
               Değiştir
             </Button>
           </div>
@@ -157,56 +234,17 @@ export default function ProfilePage() {
           <div className="flex items-center justify-between p-4 rounded-lg bg-background-elevated">
             <div>
               <h4 className="font-medium">Tema</h4>
-              <p className="text-sm text-foreground-muted">
-                Arayüz görünümü
-              </p>
+              <p className="text-sm text-foreground-muted">Arayüz görünümü</p>
             </div>
             <Badge variant="primary">Karanlık</Badge>
           </div>
           <div className="flex items-center justify-between p-4 rounded-lg bg-background-elevated">
             <div>
               <h4 className="font-medium">Dil</h4>
-              <p className="text-sm text-foreground-muted">
-                Tercih edilen dil
-              </p>
+              <p className="text-sm text-foreground-muted">Tercih edilen dil</p>
             </div>
             <Badge variant="outline">Türkçe</Badge>
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Notifications */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bell className="h-5 w-5 text-primary" />
-            Bildirimler
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {[
-            { label: "E-posta Bildirimleri", desc: "Kampanya güncellemeleri", enabled: true },
-            { label: "Oyun Bildirimleri", desc: "Sıran geldiğinde bildir", enabled: true },
-            { label: "Pazarlama", desc: "Yenilikler ve özel teklifler", enabled: false },
-          ].map((item, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between p-4 rounded-lg bg-background-elevated"
-            >
-              <div>
-                <h4 className="font-medium">{item.label}</h4>
-                <p className="text-sm text-foreground-muted">{item.desc}</p>
-              </div>
-              <label className="relative inline-flex cursor-pointer">
-                <input
-                  type="checkbox"
-                  defaultChecked={item.enabled}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-background-elevated rounded-full peer peer-checked:bg-primary transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-foreground after:rounded-full after:h-5 after:w-5 after:transition-transform peer-checked:after:translate-x-5" />
-              </label>
-            </div>
-          ))}
         </CardContent>
       </Card>
 
@@ -226,7 +264,11 @@ export default function ProfilePage() {
                 Bu cihazdan çıkış yap
               </p>
             </div>
-            <Button variant="danger" size="sm" onClick={() => signOut({ callbackUrl: "/" })}>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => signOut({ callbackUrl: "/" })}
+            >
               Çıkış Yap
             </Button>
           </div>
@@ -237,12 +279,29 @@ export default function ProfilePage() {
                 Hesabını ve tüm verilerini kalıcı olarak sil
               </p>
             </div>
-            <Button variant="danger" size="sm">
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
               Hesabı Sil
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteAccount}
+        title="Hesabınızı silmek istediğinize emin misiniz?"
+        description="Bu işlem geri alınamaz. Tüm karakterleriniz, kampanyalarınız ve verileriniz kalıcı olarak silinecektir."
+        confirmText="Evet, Hesabı Sil"
+        cancelText="İptal"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

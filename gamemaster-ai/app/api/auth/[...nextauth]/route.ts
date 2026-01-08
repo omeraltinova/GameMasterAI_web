@@ -39,31 +39,40 @@ const authConfig = {
           id: user.id,
           email: user.email,
           name: user.username,
-          // role bilgisini session callback'te ekleyeceğiz
+          role: user.role,
         };
       },
     }),
   ],
   callbacks: {
-  async session({ session, token }: { session: Session; token: JWT }) {
-    if (session?.user) {
-      // Token'daki bilgileri session'a aktar
-      if (token.sub) {
-        session.user.image = token.picture;
+    async session({ session, token }: { session: Session; token: JWT }) {
+      if (session?.user && token) {
+        session.user.id = token.id;
+        session.user.email = token.email;
+        session.user.name = token.name;
+        session.user.role = token.role;
       }
-      // User bilgilerini session'a ekle
-      session.user.id = token.id;
-      session.user.email = token.email;
-      session.user.name = token.name;
-    }
-    return session;
-  },
-    async jwt({ token, user }: { token: JWT; user: any }) {
+      return session;
+    },
+    // DÜZELTME BURADA: trigger ve session parametreleri eklendi
+    async jwt({ token, user, trigger, session }: { token: JWT; user: any; trigger?: string; session?: any }) {
+      // İlk giriş anı
       if (user) {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
+        token.role = user.role;
       }
+
+      // Kullanıcı update() fonksiyonunu çağırdığında burası çalışır
+      if (trigger === "update" && session?.user) {
+        // Gelen yeni ismi token'a yaz
+        if (session.user.name) {
+          token.name = session.user.name;
+        }
+        // İleride rol veya resim güncellemek istersen onları da buraya ekleyebilirsin
+      }
+
       return token;
     },
   },
@@ -78,7 +87,6 @@ const authConfig = {
 
 const handler = NextAuth(authConfig);
 
-// Export authOptions for use in other files
 export const authOptions = authConfig;
 
 export { handler as GET, handler as POST };

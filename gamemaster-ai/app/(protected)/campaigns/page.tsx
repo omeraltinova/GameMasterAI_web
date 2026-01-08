@@ -56,7 +56,7 @@ export default function CampaignsPage() {
         <div>
           <h1 className="text-3xl font-bold">Oturumlar</h1>
           <p className="text-foreground-secondary">
-            {campaigns.length} kampanya
+            {campaigns.length} oturum
           </p>
         </div>
         <div className="flex gap-3">
@@ -69,7 +69,7 @@ export default function CampaignsPage() {
           <Link href="/campaigns/new">
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
-              Yeni Kampanya
+              Yeni Oturum
             </Button>
           </Link>
         </div>
@@ -80,7 +80,7 @@ export default function CampaignsPage() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground-muted" />
         <input
           type="text"
-          placeholder="Kampanya ara..."
+          placeholder="Oturum ara..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full h-10 pl-10 pr-4 rounded-lg bg-input border border-border text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-ring"
@@ -121,7 +121,7 @@ export default function CampaignsPage() {
               <CardContent className="py-16 text-center">
                 <Swords className="h-16 w-16 text-foreground-muted mx-auto mb-4" />
                 <h3 className="text-xl font-semibold mb-2">
-                  Henüz kampanyan yok
+                  Henüz oturum yok
                 </h3>
                 <p className="text-foreground-secondary mb-6 max-w-md mx-auto">
                   Kendi maceranı oluştur veya bir senaryo seçerek epik bir yolculuğa başla.
@@ -129,7 +129,7 @@ export default function CampaignsPage() {
                 <Link href="/campaigns/new">
                   <Button className="gap-2">
                     <Plus className="h-4 w-4" />
-                    İlk Kampanyani Oluştur
+                    İlk Oturumunu Oluştur
                   </Button>
                 </Link>
               </CardContent>
@@ -157,10 +157,10 @@ export default function CampaignsPage() {
               <CardContent className="py-16 text-center">
                 <Users className="h-16 w-16 text-foreground-muted mx-auto mb-4" />
                 <h3 className="text-xl font-semibold mb-2">
-                  Henüz bir kampanyaya katılmadın
+                  Henüz bir oturuma katılmadın
                 </h3>
                 <p className="text-foreground-secondary mb-6 max-w-md mx-auto">
-                  Arkadaşlarının kampanyalarına davet koduyla katılabilirsin.
+                  Arkadaşlarının oturumlarına davet koduyla katılabilirsin.
                 </p>
                 <Link href="/campaigns/join">
                   <Button variant="outline" className="gap-2">

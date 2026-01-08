@@ -29,7 +29,7 @@ export default function JoinCampaignPage() {
         setError(response?.error || "Geçersiz davet kodu. Lütfen kontrol edip tekrar deneyin.");
       }
     } catch (err: any) {
-      setError(err?.message || "Kampanya aranırken bir hata oluştu.");
+      setError(err?.message || "Oturum aranırken bir hata oluştu.");
     } finally {
       setIsSearching(false);
     }
@@ -56,7 +56,7 @@ export default function JoinCampaignPage() {
         <div className="inline-flex p-4 rounded-full bg-primary/10 mb-4">
           <Users className="h-8 w-8 text-primary" />
         </div>
-        <h1 className="text-3xl font-bold mb-2">Kampanyaya Katıl</h1>
+        <h1 className="text-3xl font-bold mb-2">Oturuma Katıl</h1>
         <p className="text-foreground-secondary">
           Arkadaşının paylaştığı davet kodunu gir
         </p>
@@ -91,7 +91,7 @@ export default function JoinCampaignPage() {
               disabled={!inviteCode || inviteCode.length < 4}
             >
               <Search className="h-4 w-4" />
-              Kampanyayı Bul
+              Oturumu Bul
             </Button>
           </form>
         </CardContent>
@@ -101,7 +101,7 @@ export default function JoinCampaignPage() {
       {foundCampaign && (
         <Card className="border-primary/50 bg-primary/5">
           <CardHeader>
-            <CardTitle className="text-lg">Kampanya Bulundu!</CardTitle>
+            <CardTitle className="text-lg">Oturum Bulundu!</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -134,7 +134,7 @@ export default function JoinCampaignPage() {
               </Button>
             ) : foundCampaign.isFull ? (
               <Button disabled className="w-full">
-                Kampanya Dolu
+                Oturum Dolu
               </Button>
             ) : (
               <Button onClick={handleJoinCampaign} className="w-full gap-2">
@@ -149,7 +149,7 @@ export default function JoinCampaignPage() {
       {/* Info */}
       <div className="p-4 rounded-lg bg-background-elevated text-center">
         <p className="text-sm text-foreground-secondary">
-          Davet kodu, kampanya sahibi tarafından paylaşılır. Kampanya lobisinde
+          Davet kodu, oturum sahibi tarafından paylaşılır. Oturum lobisinde
           davet kodunu bulabilirsin.
         </p>
       </div>

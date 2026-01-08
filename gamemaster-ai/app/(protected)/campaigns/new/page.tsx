@@ -130,13 +130,13 @@ export default function NewCampaignPage() {
       });
 
       if (response.success && response.campaign) {
-        // Yeni oluşturulan kampanyaya yönlendir
+        // Yeni oluşturulan oturuma yönlendir
         router.push(`/campaigns/${response.campaign.id}`);
       } else {
-        setError('Kampanya oluşturulamadı');
+        setError('Oturum oluşturulamadı');
       }
     } catch (err: any) {
-      console.error('Kampanya oluşturma hatası:', err);
+      console.error('Oturum oluşturma hatası:', err);
       setError(err?.message || 'Bir hata oluştu');
     } finally {
       setIsLoading(false);
@@ -155,7 +155,7 @@ export default function NewCampaignPage() {
 
       {/* Header */}
       <div className="text-center">
-        <h1 className="text-3xl font-bold mb-2">Yeni Kampanya</h1>
+        <h1 className="text-3xl font-bold mb-2">Yeni Oturum</h1>
         <p className="text-foreground-secondary">
           Epik bir macera oluştur ve kahramanları topla
         </p>
@@ -172,7 +172,7 @@ export default function NewCampaignPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Input
-              label="Kampanya Adı"
+              label="Oturum Adı"
               placeholder="Epik maceranın adını gir..."
               value={formData.name}
               onChange={(e) =>
@@ -183,7 +183,7 @@ export default function NewCampaignPage() {
 
             <Textarea
               label="Açıklama (Opsiyonel)"
-              placeholder="Kampanyanı kısaca anlat..."
+              placeholder="Oturumunu kısaca anlat..."
               value={formData.description}
               onChange={(e) =>
                 setFormData({ ...formData, description: e.target.value })
@@ -368,7 +368,7 @@ export default function NewCampaignPage() {
               <h4 className="font-medium mb-2">Özet</h4>
               <ul className="space-y-1 text-sm text-foreground-secondary">
                 <li>
-                  <strong>Kampanya:</strong> {formData.name}
+                  <strong>Oturum:</strong> {formData.name}
                 </li>
                 <li>
                   <strong>Mod:</strong>{" "}
@@ -408,7 +408,7 @@ export default function NewCampaignPage() {
             ) : (
               <>
                 <Check className="h-4 w-4" />
-                Kampanyayı Oluştur
+                Oturumu Oluştur
               </>
             )}
           </Button>
@@ -419,7 +419,7 @@ export default function NewCampaignPage() {
         open={isScenarioModalOpen}
         onOpenChange={setIsScenarioModalOpen}
         title="Tüm Senaryolar"
-        description="Kampanyan için bir senaryo seç veya senaryoyu kaldır."
+        description="Oturumun için bir senaryo seç veya senaryoyu kaldır."
         size="full"
       >
         <div className="space-y-4">

@@ -73,10 +73,14 @@ export default function ScenariosPage() {
     }
   };
 
-  const filteredScenarios = scenarios.filter((s) =>
-    s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.creator?.username.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredScenarios = scenarios.filter((s) => {
+    const normalizedSearch = searchTerm.toLowerCase();
+    const creatorName = s.creator?.username || "";
+    return (
+      s.title.toLowerCase().includes(normalizedSearch) ||
+      creatorName.toLowerCase().includes(normalizedSearch)
+    );
+  });
 
   if (loading) return <div className="flex justify-center p-10"><Spinner size="lg" /></div>;
 
@@ -140,7 +144,7 @@ export default function ScenariosPage() {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <Link href={`/scenarios/${scenario.id}`} target="_blank">
+                        <Link href={`/scenarios/${scenario.id}`} target="_blank" rel="noopener noreferrer">
                           <Button variant="ghost" size="sm" title="Görüntüle">
                             <ExternalLink className="h-4 w-4" />
                           </Button>

@@ -43,11 +43,14 @@ export default function CampaignsPage() {
   );
 
   const filterCampaigns = (campaigns: Campaign[]) =>
-    campaigns.filter(
-      (c) =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    campaigns.filter((c) => {
+      const query = searchQuery.toLowerCase();
+      const description = c.description ? c.description.toLowerCase() : "";
+      return (
+        c.name.toLowerCase().includes(query) ||
+        description.includes(query)
+      );
+    });
 
   return (
     <div className="space-y-6 animate-fade-in">

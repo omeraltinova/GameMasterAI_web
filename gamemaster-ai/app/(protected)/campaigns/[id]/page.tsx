@@ -256,10 +256,13 @@ export default function CampaignLobbyPage() {
   const filteredScenarios = availableScenarios.filter((item) => {
     if (!scenarioSearch) return true;
     const query = scenarioSearch.toLowerCase();
+    const title = item.title || "";
+    const description = item.description || "";
+    const genre = item.genre || "";
     return (
-      item.title?.toLowerCase().includes(query) ||
-      item.description?.toLowerCase().includes(query) ||
-      item.genre?.toLowerCase().includes(query)
+      title.toLowerCase().includes(query) ||
+      description.toLowerCase().includes(query) ||
+      genre.toLowerCase().includes(query)
     );
   });
 

@@ -14,7 +14,6 @@ import type { Session } from 'next-auth';
 export async function getUserSession(req?: NextRequest): Promise<Session | null> {
   try {
     const session = await getServerSession(authOptions);
-    console.log('🔍 Session retrieved:', JSON.stringify(session, null, 2));
     return session as Session | null;
   } catch (error) {
     console.error('Session alınamadı:', error);
@@ -29,7 +28,6 @@ export async function getUserId(req?: NextRequest): Promise<string | null> {
   const session = await getUserSession(req);
   // NextAuth 5'te user objesinden ID'yi al
   const userId = session?.user?.id || null;
-  console.log('🔍 User ID from session:', userId);
   return userId;
 }
 

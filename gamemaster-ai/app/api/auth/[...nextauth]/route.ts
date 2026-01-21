@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import bcrypt from "bcryptjs";
 import type { Session } from "next-auth";
 import type { JWT } from "next-auth/jwt";
+import { checkRateLimit, getClientIp } from "@/lib/security/rateLimit";
 
 const authConfig = {
   providers: [
@@ -13,9 +14,16 @@ const authConfig = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("E-posta ve şifre gerekli");
+        }
+
+        const ip = getClientIp(req);
+        const rateLimitKey = `login:${ip}:${credentials.email.toLowerCase()}`;
+        const rateLimit = checkRateLimit(rateLimitKey, { windowMs: 15 * 60 * 1000, max: 10 });
+        if (!rateLimit.allowed) {
+          throw new Error("Çok fazla deneme. Lütfen daha sonra tekrar deneyin.");
         }
 
         const user = await prisma.user.findUnique({

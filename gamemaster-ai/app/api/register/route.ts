@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import bcrypt from "bcryptjs";
+import { checkRateLimit, getClientIp } from "@/lib/security/rateLimit";
 
 export async function POST(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const rateLimitKey = `register:${ip}`;
+    const rateLimit = checkRateLimit(rateLimitKey, { windowMs: 60 * 60 * 1000, max: 10 });
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ message: "Çok fazla deneme. Lütfen daha sonra tekrar deneyin." }, { status: 429 });
+    }
+
     const { username, email, password } = await req.json();
 
     if (!username || !email || !password) {

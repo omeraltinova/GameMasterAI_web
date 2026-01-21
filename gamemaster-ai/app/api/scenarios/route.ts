@@ -11,8 +11,12 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("query");
     const genre = searchParams.get("genre");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const limitParam = parseInt(searchParams.get("limit") || "20");
+    const offsetParam = parseInt(searchParams.get("offset") || "0");
+    const limitBase = Number.isFinite(limitParam) ? limitParam : 20;
+    const offsetBase = Number.isFinite(offsetParam) ? offsetParam : 0;
+    const limit = Math.min(Math.max(limitBase, 1), 50);
+    const offset = Math.max(offsetBase, 0);
 
     const where: any = {};
 

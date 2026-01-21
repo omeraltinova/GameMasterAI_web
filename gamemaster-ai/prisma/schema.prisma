@@ -30,6 +30,8 @@ model User {
   scenarios       Scenario[]
   campaignPlayers CampaignPlayer[]
   messages        Message[]
+  updatedSystemSettings SystemSetting[] @relation("SystemSettingUpdatedBy")
+  adminActionLogs      AdminActionLog[] @relation("AdminActionLogAdmin")
 }
 
 // ==========================================
@@ -270,4 +272,39 @@ model CampaignPlayer {
 
   // Unique constraint
   @@unique([campaignId, userId])
+}
+
+// ==========================================
+// SystemSetting - Sistem Ayarları (Singleton)
+// ==========================================
+
+model SystemSetting {
+  id                  String   @id
+  maintenanceMode     Boolean  @default(false)
+  maintenanceMessage  String?
+  aiPrimaryModel      String?
+  aiFallbackModel     String?
+  aiRequestsPerMinute Int?
+  updatedAt           DateTime @updatedAt
+  updatedById         String?
+
+  // İlişkiler
+  updatedBy User? @relation("SystemSettingUpdatedBy", fields: [updatedById], references: [id])
+}
+
+// ==========================================
+// AdminActionLog - Admin Denetim Kaydı
+// ==========================================
+
+model AdminActionLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  // İlişkiler
+  admin User @relation("AdminActionLogAdmin", fields: [adminId], references: [id], onDelete: Cascade)
 }

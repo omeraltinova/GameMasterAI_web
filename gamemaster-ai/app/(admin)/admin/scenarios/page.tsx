@@ -11,7 +11,7 @@ import {
   useToast,
   ConfirmDialog,
 } from "@/components/ui";
-import { Search, Trash2, Map, ExternalLink } from "lucide-react";
+import { Search, Trash2, Map, ExternalLink, Star } from "lucide-react";
 import Link from "next/link";
 
 interface Scenario {
@@ -36,6 +36,7 @@ export default function ScenariosPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [officialLoadingId, setOfficialLoadingId] = useState<string | null>(null);
   const { addToast } = useToast();
 
   useEffect(() => {
@@ -70,6 +71,37 @@ export default function ScenariosPage() {
       addToast({ type: "error", title: "Hata", description: "Senaryo silinemedi." });
     } finally {
       setDeleteId(null);
+    }
+  };
+
+  const toggleOfficial = async (scenario: Scenario) => {
+    const nextValue = !scenario.isOfficial;
+    setOfficialLoadingId(scenario.id);
+
+    try {
+      const res = await fetch("/api/admin/scenarios", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: scenario.id, isOfficial: nextValue }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Güncelleme başarısız");
+      }
+
+      setScenarios((prev) =>
+        prev.map((s) => (s.id === scenario.id ? { ...s, isOfficial: nextValue } : s))
+      );
+
+      addToast({
+        type: "success",
+        title: "Güncellendi",
+        description: nextValue ? "Senaryo resmi yapıldı." : "Senaryo resmiyetten kaldırıldı.",
+      });
+    } catch (error) {
+      addToast({ type: "error", title: "Hata", description: "Güncelleme yapılamadı." });
+    } finally {
+      setOfficialLoadingId(null);
     }
   };
 
@@ -144,6 +176,20 @@ export default function ScenariosPage() {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          isLoading={officialLoadingId === scenario.id}
+                          className={
+                            scenario.isOfficial
+                              ? "text-warning hover:text-warning"
+                              : "text-foreground-secondary hover:text-foreground"
+                          }
+                          onClick={() => toggleOfficial(scenario)}
+                          title={scenario.isOfficial ? "Resmiyetten kaldır" : "Resmi yap"}
+                          aria-label={scenario.isOfficial ? "Resmiyetten kaldır" : "Resmi yap"}
+                          leftIcon={<Star className="h-4 w-4" />}
+                        />
                         <Link href={`/scenarios/${scenario.id}`} target="_blank" rel="noopener noreferrer">
                           <Button variant="ghost" size="sm" title="Görüntüle">
                             <ExternalLink className="h-4 w-4" />

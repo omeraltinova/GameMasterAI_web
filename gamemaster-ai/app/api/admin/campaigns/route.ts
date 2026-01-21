@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
+import { logAdminAction } from "@/lib/admin/audit";
 
 export async function GET() {
   try {
@@ -32,7 +33,27 @@ export async function DELETE(req: Request) {
 
     if (!id) return NextResponse.json({ error: "ID gerekli" }, { status: 400 });
 
+    const campaign = await prisma.campaign.findUnique({
+      where: { id },
+      select: { id: true, name: true, status: true },
+    });
+
+    if (!campaign) {
+      return NextResponse.json({ error: "Kampanya bulunamadı" }, { status: 404 });
+    }
+
     await prisma.campaign.delete({ where: { id } });
+
+    await logAdminAction({
+      adminId: session.user.id,
+      action: "CAMPAIGN_DELETE",
+      entityType: "Campaign",
+      entityId: id,
+      metadata: {
+        name: campaign.name,
+        status: campaign.status,
+      },
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

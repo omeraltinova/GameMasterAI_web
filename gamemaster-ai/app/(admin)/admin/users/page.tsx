@@ -165,6 +165,7 @@ export default function UsersPage() {
                           size="sm"
                           onClick={() => setRoleChangeId(user.id)}
                           title="Rol Değiştir"
+                          aria-label="Rol Değiştir"
                         >
                           {user.role === "ADMIN" ? <ShieldAlert className="h-4 w-4 text-warning" /> : <Shield className="h-4 w-4" />}
                         </Button>
@@ -173,6 +174,8 @@ export default function UsersPage() {
                           size="sm"
                           className="text-danger hover:text-danger hover:bg-danger/10"
                           onClick={() => setDeleteId(user.id)}
+                          title="Sil"
+                          aria-label="Sil"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

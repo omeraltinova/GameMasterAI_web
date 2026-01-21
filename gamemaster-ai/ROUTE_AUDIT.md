@@ -21,6 +21,11 @@ Generated from the current repo state. Update findings per page/route during rev
 - Findings:
   - No issues found (reviewed)
 
+### `/admin/settings`
+- File: `app/(admin)/admin/settings/page.tsx`
+- Findings:
+  - No issues found (reviewed)
+
 ### `/admin/campaigns`
 - File: `app/(admin)/admin/campaigns/page.tsx`
 - Findings:
@@ -150,9 +155,21 @@ Generated from the current repo state. Update findings per page/route during rev
 - Findings:
   - No issues found (reviewed)
 
+### `/api/admin/settings`
+- File: `app/api/admin/settings/route.ts`
+- Methods: GET, PATCH
+- Findings:
+  - No issues found (reviewed)
+
+### `/api/admin/audit`
+- File: `app/api/admin/audit/route.ts`
+- Methods: GET
+- Findings:
+  - No issues found (reviewed)
+
 ### `/api/admin/scenarios`
 - File: `app/api/admin/scenarios/route.ts`
-- Methods: DELETE, GET
+- Methods: DELETE, GET, PATCH
 - Findings:
   - No issues found (reviewed)
 
@@ -349,6 +366,12 @@ Generated from the current repo state. Update findings per page/route during rev
 - Methods: POST
 - Findings:
   - Fixed: Added basic rate limiting for account creation (IP, 1 hour window).
+
+### `/api/system/status`
+- File: `app/api/system/status/route.ts`
+- Methods: GET
+- Findings:
+  - No issues found (reviewed)
 
 ### `/api/scenarios`
 - File: `app/api/scenarios/route.ts`

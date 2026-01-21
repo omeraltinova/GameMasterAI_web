@@ -11,6 +11,7 @@ import {
   Map,
   User,
   Shield,
+  Settings,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -26,6 +27,7 @@ const navItems = [
 
 const adminItems = [
   { href: "/admin", label: "Admin Panel", icon: Shield },
+  { href: "/admin/settings", label: "Sistem Ayarları", icon: Settings },
 ];
 
 export function Sidebar() {

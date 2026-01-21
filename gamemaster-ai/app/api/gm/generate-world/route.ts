@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAIResponseWithContext } from '@/lib/ai/openrouter';
 import { getUserId } from '@/lib/auth/server';
+import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 
 /**
  * POST /api/gm/generate-world
@@ -14,6 +15,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { message: 'Oturum açmanız gerekiyor' },
         { status: 401 }
+      );
+    }
+
+    const rateLimit = await checkAIRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { message: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { status: 429 }
       );
     }
 
@@ -141,5 +150,4 @@ GÖREV: Bir D&D kampanyası için dünya ayarları oluştur.
     );
   }
 }
-
 

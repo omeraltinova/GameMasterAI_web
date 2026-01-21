@@ -2,6 +2,7 @@
 // GameMaster AI için AI entegrasyonu
 
 import { logAIResponse, generateRequestId } from './logger';
+import { getSystemSettings } from '@/lib/admin/systemSettings';
 
 export interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';
@@ -35,6 +36,42 @@ export interface OpenRouterError {
 // Retry configuration
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000; // 1 second
+const SETTINGS_CACHE_MS = 30_000;
+
+type AIModelConfig = {
+  primaryModel: string;
+  fallbackModel?: string;
+};
+
+let cachedConfig: AIModelConfig | null = null;
+let cachedAt = 0;
+
+async function resolveAIModelConfig(): Promise<AIModelConfig> {
+  const now = Date.now();
+  if (cachedConfig && now - cachedAt < SETTINGS_CACHE_MS) {
+    return cachedConfig;
+  }
+
+  try {
+    const settings = await getSystemSettings();
+    cachedConfig = {
+      primaryModel:
+        settings?.aiPrimaryModel ||
+        process.env.OPENROUTER_MODEL ||
+        'anthropic/claude-3-sonnet',
+      fallbackModel: settings?.aiFallbackModel || process.env.OPENROUTER_FALLBACK_MODEL,
+    };
+  } catch (error) {
+    console.error('Failed to load AI model settings:', error);
+    cachedConfig = {
+      primaryModel: process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet',
+      fallbackModel: process.env.OPENROUTER_FALLBACK_MODEL,
+    };
+  }
+
+  cachedAt = now;
+  return cachedConfig;
+}
 
 /**
  * Sleep helper for retry delays
@@ -72,8 +109,9 @@ export async function callOpenRouter(
     throw new Error('OPENROUTER_API_KEY environment variable is not set');
   }
 
-  const primaryModel = options?.model || process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet';
-  const fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL;
+  const modelConfig = await resolveAIModelConfig();
+  const primaryModel = options?.model || modelConfig.primaryModel;
+  const fallbackModel = modelConfig.fallbackModel;
   const temperature = options?.temperature || 0.7;
   const maxTokens = options?.maxTokens || 10000;
   const requestId = generateRequestId();
@@ -244,7 +282,8 @@ export async function callOpenRouterStream(
     throw new Error('OPENROUTER_API_KEY environment variable is not set');
   }
 
-  const model = options?.model || process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet';
+  const modelConfig = await resolveAIModelConfig();
+  const model = options?.model || modelConfig.primaryModel;
   const temperature = options?.temperature || 0.7;
   const maxTokens = options?.maxTokens || 10000;
 
@@ -372,7 +411,8 @@ export async function callOpenRouterWithTools(
     throw new Error('OPENROUTER_API_KEY environment variable is not set');
   }
 
-  const model = options?.model || process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet';
+  const modelConfig = await resolveAIModelConfig();
+  const model = options?.model || modelConfig.primaryModel;
   const temperature = options?.temperature || 0.7;
   const maxTokens = options?.maxTokens || 10000;
   const tools = options?.tools || gmTools;

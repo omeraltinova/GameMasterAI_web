@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db/prisma';
 import { getAIResponse } from '@/lib/ai/openrouter';
 import { SCENARIO_GENERATION_PROMPT } from '@/lib/ai/prompts';
 import { getUserId } from '@/lib/auth/server';
+import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 
 /**
  * POST /api/gm/generate-scenario
@@ -16,6 +16,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { message: 'Oturum açmanız gerekiyor' },
         { status: 401 }
+      );
+    }
+
+    const rateLimit = await checkAIRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { message: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { status: 429 }
       );
     }
 
@@ -81,32 +89,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Senaryoyu veritabanına kaydet
-    const scenario = await prisma.scenario.create({
-      data: {
-        title: scenarioData.title || 'Adsız Senaryo',
-        description: scenarioData.description || '',
-        genre: genre,
-        difficulty: difficulty,
-        startingPrompt: scenarioData.startingPrompt || '',
-        isAIGenerated: true,
-        creatorId: userId,
-        tags: JSON.stringify(scenarioData.tags || []),
-        // @ts-ignore - Prisma client out of sync
-        worldSettings: scenarioData.worldSettings ? JSON.stringify(scenarioData.worldSettings) : null,
-      },
-    });
-
+    const tags = Array.isArray(scenarioData.tags) ? scenarioData.tags : [];
     return NextResponse.json({
       success: true,
       scenario: {
-        id: scenario.id,
-        title: scenario.title,
-        description: scenario.description,
-        genre: scenario.genre,
-        difficulty: scenario.difficulty,
-        startingPrompt: scenario.startingPrompt,
-        tags: scenarioData.tags || [],
+        title: scenarioData.title || 'Adsız Senaryo',
+        description: scenarioData.description || '',
+        genre: scenarioData.genre || genre,
+        difficulty: scenarioData.difficulty || difficulty,
+        startingPrompt: scenarioData.startingPrompt || '',
+        tags,
         worldSettings: scenarioData.worldSettings || null,
         isAIGenerated: true,
       },

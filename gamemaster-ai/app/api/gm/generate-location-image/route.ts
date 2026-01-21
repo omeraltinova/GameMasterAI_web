@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
 import { generateLocationImage, getLocationStyleHints } from '@/lib/ai/imageGenerator';
+import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 
 const MAX_DESCRIPTION_LENGTH = 1200;
 const MAX_MESSAGE_LENGTH = 240;
@@ -122,6 +123,14 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return unauthorizedResponse();
+    }
+
+    const rateLimit = await checkAIRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { message: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { status: 429 }
+      );
     }
 
     // Session kontrolü

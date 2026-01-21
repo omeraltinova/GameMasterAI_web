@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db/prisma';
 import { getAIResponse } from '@/lib/ai/openrouter';
 import { MAP_GENERATION_PROMPT } from '@/lib/ai/prompts';
 import { getUserId } from '@/lib/auth/server';
+import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 
 /**
  * POST /api/gm/generate-map
@@ -17,6 +18,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { message: 'Oturum açmanız gerekiyor' },
         { status: 401 }
+      );
+    }
+
+    const rateLimit = await checkAIRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { message: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { status: 429 }
       );
     }
 

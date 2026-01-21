@@ -12,6 +12,9 @@ Generated from the current repo state.
 ### `/admin`
 - File: `app/(admin)/admin/page.tsx`
 
+### `/admin/settings`
+- File: `app/(admin)/admin/settings/page.tsx`
+
 ### `/admin/campaigns`
 - File: `app/(admin)/admin/campaigns/page.tsx`
 
@@ -90,9 +93,17 @@ Generated from the current repo state.
 - File: `app/api/admin/dashboard/route.ts`
 - Methods: GET
 
+### `/api/admin/settings`
+- File: `app/api/admin/settings/route.ts`
+- Methods: GET, PATCH
+
+### `/api/admin/audit`
+- File: `app/api/admin/audit/route.ts`
+- Methods: GET
+
 ### `/api/admin/scenarios`
 - File: `app/api/admin/scenarios/route.ts`
-- Methods: DELETE, GET
+- Methods: DELETE, GET, PATCH
 
 ### `/api/admin/users`
 - File: `app/api/admin/users/route.ts`
@@ -221,6 +232,10 @@ Generated from the current repo state.
 ### `/api/register`
 - File: `app/api/register/route.ts`
 - Methods: POST
+
+### `/api/system/status`
+- File: `app/api/system/status/route.ts`
+- Methods: GET
 
 ### `/api/scenarios`
 - File: `app/api/scenarios/route.ts`

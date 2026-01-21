@@ -6,6 +6,7 @@ import { Header } from "@/components/layout/Header";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Spinner } from "@/components/ui";
 import { useSession } from "next-auth/react";
+import { MaintenanceGate } from "@/components/system/MaintenanceGate";
 
 export default function AdminLayout({
   children,
@@ -40,12 +41,14 @@ export default function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Header />
-      <div className="flex-1 flex">
-        <Sidebar />
-        <main className="flex-1 p-6 overflow-auto">{children}</main>
+    <MaintenanceGate>
+      <div className="min-h-screen flex flex-col">
+        <Header />
+        <div className="flex-1 flex">
+          <Sidebar />
+          <main className="flex-1 p-6 overflow-auto">{children}</main>
+        </div>
       </div>
-    </div>
+    </MaintenanceGate>
   );
 }

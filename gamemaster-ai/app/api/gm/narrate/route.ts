@@ -4,6 +4,7 @@ import { callOpenRouterWithTools, OpenRouterMessage } from '@/lib/ai/openrouter'
 import { SYSTEM_PROMPT, getNarrationPrompt } from '@/lib/ai/prompts';
 import { buildSessionContext } from '@/lib/ai/context';
 import { getUserId } from '@/lib/auth/server';
+import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 import type { GMPrompt, GMAction, LocationChange } from '@/types';
 
 /**
@@ -18,6 +19,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { message: 'Oturum açmanız gerekiyor' },
         { status: 401 }
+      );
+    }
+
+    const rateLimit = await checkAIRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { message: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { status: 429 }
       );
     }
 

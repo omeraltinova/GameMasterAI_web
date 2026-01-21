@@ -114,7 +114,14 @@ export default function CampaignsPage() {
                       {campaign._count.players} Oyuncu, {campaign._count.sessions} Oturum
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <Button variant="ghost" size="sm" onClick={() => setDeleteId(campaign.id)} className="text-danger">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDeleteId(campaign.id)}
+                        className="text-danger"
+                        title="Sil"
+                        aria-label="Sil"
+                      >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </td>

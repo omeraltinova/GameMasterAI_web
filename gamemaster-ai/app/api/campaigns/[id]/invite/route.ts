@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { randomBytes } from 'crypto';
 
 // POST /api/campaigns/:id/invite - Yeni davet kodu oluştur
 export async function POST(
@@ -39,7 +40,7 @@ export async function POST(
     }
 
     // Yeni benzersiz davet kodu oluştur
-    const newInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const newInviteCode = randomBytes(4).toString('hex').toUpperCase();
 
     // Kampanyayı güncelle
     const updatedCampaign = await prisma.campaign.update({

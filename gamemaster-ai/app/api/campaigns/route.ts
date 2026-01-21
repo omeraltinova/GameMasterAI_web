@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse } from '@/lib/auth/server';
+import { randomBytes } from 'crypto';
 
 /**
  * GET /api/campaigns
@@ -117,8 +118,7 @@ export async function POST(req: NextRequest) {
       return unauthorizedResponse();
     }
 
-    // Benzersiz davet kodu oluştur
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const inviteCode = randomBytes(4).toString('hex').toUpperCase();
 
     // Yeni kampanya oluştur
     // Not: CampaignPlayer kaydı karakter seçildikten sonra oluşturulacak

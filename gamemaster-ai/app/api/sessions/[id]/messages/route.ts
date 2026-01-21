@@ -132,13 +132,6 @@ export async function POST(
       );
     }
 
-    if (!senderType || typeof senderType !== 'string') {
-      return NextResponse.json(
-        { message: 'Gönderen tipi gerekiyor' },
-        { status: 400 }
-      );
-    }
-
     // Auth kontrolü (NextAuth session)
     const userId = await getUserId();
     if (!userId) {
@@ -181,6 +174,11 @@ export async function POST(
       return forbiddenResponse('Bu session\'a mesaj gönderme yetkiniz yok');
     }
 
+    const resolvedSenderType =
+      isCreator && senderType === 'GM'
+        ? 'GM'
+        : 'PLAYER';
+
     // Oyuncunun karakter veya kullanıcı adını al
     const senderName = currentPlayer?.character?.name || 
                        currentPlayer?.user?.username || 
@@ -191,7 +189,7 @@ export async function POST(
       data: {
         sessionId,
         senderId: userId,
-        senderType: senderType || 'PLAYER',
+        senderType: resolvedSenderType,
         senderName,
         content,
         timestamp: new Date(),

@@ -49,11 +49,12 @@ export async function GET(
     }
 
     // Kullanıcının yetkisi var mı?
-    const hasAccess = session.campaign.players.some(
+    const isCreator = session.campaign.creatorId === userId;
+    const isPlayer = session.campaign.players.some(
       (player: any) => player.userId === userId
     );
 
-    if (!hasAccess) {
+    if (!isCreator && !isPlayer) {
       return forbiddenResponse('Bu session\'a erişim yetkiniz yok');
     }
 

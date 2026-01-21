@@ -47,9 +47,9 @@ async function updateMessage(
 
     // Yetki kontrolü
     const isCreator = message.session.campaign.creatorId === userId;
-    const isPlayer = message.session.campaign.players.some(p => p.userId === userId);
+    const isSender = message.senderId === userId;
 
-    if (!isCreator && !isPlayer) {
+    if (!isCreator && !isSender) {
       return NextResponse.json(
         { message: 'Bu mesajı güncelleme yetkiniz yok' },
         { status: 403 }

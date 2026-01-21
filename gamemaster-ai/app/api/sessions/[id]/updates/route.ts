@@ -41,11 +41,12 @@ export async function GET(
     }
 
     // Kullanıcının yetkisi var mı?
-    const hasAccess = session.campaign.players.some(
+    const isCreator = session.campaign.creatorId === userId;
+    const isPlayer = session.campaign.players.some(
       (player: any) => player.userId === userId
     );
 
-    if (!hasAccess) {
+    if (!isCreator && !isPlayer) {
       return forbiddenResponse('Bu session\'a erişim yetkiniz yok');
     }
 
@@ -76,6 +77,28 @@ export async function GET(
       take: 20,
     });
 
+    const sanitizedUpdates = updates.map((msg) => {
+      let gmPrompt: unknown = undefined;
+      if (msg.metadata) {
+        try {
+          const parsed = JSON.parse(msg.metadata);
+          if (parsed && typeof parsed === 'object') {
+            gmPrompt = (parsed as { gmPrompt?: unknown }).gmPrompt;
+          }
+        } catch {
+          gmPrompt = undefined;
+        }
+      }
+
+      return {
+        ...msg,
+        metadata: gmPrompt ? { gmPrompt } : undefined,
+        gmPrompt,
+        locationImageUrl: msg.locationImageUrl,
+        locationName: msg.locationName,
+      };
+    });
+
     // Session güncelleme zamanını kontrol et
     const lastUpdate = session.updatedAt;
 
@@ -85,8 +108,8 @@ export async function GET(
     return NextResponse.json({
       success: true,
       updates: {
-        hasNewMessages: updates.length > 0,
-        messages: updates,
+        hasNewMessages: sanitizedUpdates.length > 0,
+        messages: sanitizedUpdates,
         gameStateChanged,
         lastUpdate: lastUpdate,
         timestamp: new Date().toISOString(),

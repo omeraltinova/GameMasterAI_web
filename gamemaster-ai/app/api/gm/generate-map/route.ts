@@ -48,12 +48,29 @@ export async function POST(req: NextRequest) {
     // Session'ı kontrol et
     const gameSession = await prisma.gameSession.findUnique({
       where: { id: sessionId },
+      include: {
+        campaign: {
+          include: {
+            players: true,
+          },
+        },
+      },
     });
 
     if (!gameSession) {
       return NextResponse.json(
         { message: 'Session bulunamadı' },
         { status: 404 }
+      );
+    }
+
+    const hasAccess = gameSession.campaign.creatorId === userId ||
+      gameSession.campaign.players.some((p: any) => p.userId === userId);
+
+    if (!hasAccess) {
+      return NextResponse.json(
+        { message: 'Bu session\'a erişim yetkiniz yok' },
+        { status: 403 }
       );
     }
 

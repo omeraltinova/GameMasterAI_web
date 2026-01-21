@@ -68,6 +68,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const hasAccess = gameSession.campaign.creatorId === userId ||
+      gameSession.campaign.players.some((p: any) => p.userId === userId);
+
+    if (!hasAccess) {
+      return NextResponse.json(
+        { message: 'Bu session\'a erişim yetkiniz yok' },
+        { status: 403 }
+      );
+    }
+
     if (!npc) {
       return NextResponse.json(
         { message: 'NPC bulunamadı' },

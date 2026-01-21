@@ -65,6 +65,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (characterId) {
+      const character = await prisma.character.findFirst({
+        where: { id: characterId, userId },
+        select: { id: true, campaignId: true },
+      });
+
+      if (!character) {
+        return NextResponse.json(
+          { message: 'Bu karaktere erişim yetkiniz yok' },
+          { status: 403 }
+        );
+      }
+
+      if (character.campaignId !== session.campaignId) {
+        return NextResponse.json(
+          { message: 'Bu karakter bu oturuma ait değil' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Zar at
     const diceCount = count || 1;
     const diceModifier = modifier || 0;

@@ -145,12 +145,17 @@ export interface Scenario {
 // ==========================================
 
 export interface GameState {
+  sessionId?: string;
+  campaignId?: string;
   location: string;
   timeOfDay: string;
   weather?: string;
+  inCombat?: boolean;
   activeNPCs: string[];
   activeQuests: string[];
   notes?: string;
+  turnOrder?: string[] | null;
+  activePlayer?: string | null;
 }
 
 export interface GameSession {
@@ -375,5 +380,4 @@ export interface RegisterInput {
   password: string;
   confirmPassword: string;
 }
-
 

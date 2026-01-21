@@ -55,8 +55,10 @@ export function useGame(sessionId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await get<GameState>(`/sessions/${sessionId}/state`);
-      setGameState(data);
+      const data = await get<{ success: boolean; state: GameState }>(`/sessions/${sessionId}/state`);
+      if (data?.state) {
+        setGameState(data.state);
+      }
     } catch (err) {
       setError(err instanceof APIError ? err.message : 'Oyun durumu yüklenemedi');
     } finally {
@@ -101,16 +103,23 @@ export function useGame(sessionId: string) {
     try {
       const query = buildQuery({ since });
       const data = await get<{
-        messages: Message[];
-        gameState: GameState;
+        success: boolean;
+        updates: {
+          messages: Message[];
+          gameStateChanged: boolean;
+        };
       }>(`/sessions/${sessionId}/updates${query}`);
 
-      if (data.messages.length > 0) {
-        setMessages((prev) => [...prev, ...data.messages]);
+      const updates = data?.updates;
+      if (updates?.messages && updates.messages.length > 0) {
+        setMessages((prev) => [...prev, ...updates.messages]);
       }
 
-      if (data.gameState) {
-        setGameState(data.gameState);
+      if (updates?.gameStateChanged) {
+        const stateData = await get<{ success: boolean; state: GameState }>(`/sessions/${sessionId}/state`);
+        if (stateData?.state) {
+          setGameState(stateData.state);
+        }
       }
 
       return data;
@@ -129,12 +138,15 @@ export function useGame(sessionId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<Message>(`/sessions/${sessionId}/messages`, {
+      const data = await post<{ success: boolean; message: Message }>(`/sessions/${sessionId}/messages`, {
         content,
         senderType: 'PLAYER',
       });
-      setMessages((prev) => [...prev, data]);
-      return data;
+      if (data?.message) {
+        setMessages((prev) => [...prev, data.message]);
+        return data.message;
+      }
+      return null;
     } catch (err) {
       setError(err instanceof APIError ? err.message : 'Mesaj gönderilemedi');
       return null;
@@ -264,7 +276,13 @@ export function useGM(sessionId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<{ message: Message }>(
+      const data = await post<{
+        success: boolean;
+        npcName: string;
+        dialogue: string;
+        messageId: string;
+        timestamp: string;
+      }>(
         '/gm/npc-dialogue',
         {
           sessionId,
@@ -293,7 +311,13 @@ export function useGM(sessionId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<{ message: Message; gameState: GameState }>(
+      const data = await post<{
+        success: boolean;
+        locationDescription: string;
+        messageId: string;
+        timestamp: string;
+        gameState: GameState;
+      }>(
         '/gm/describe-location',
         {
           sessionId,
@@ -322,7 +346,13 @@ export function useGM(sessionId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<{ message: Message; gameState: GameState }>(
+      const data = await post<{
+        success: boolean;
+        combatNarration: string;
+        messageId: string;
+        timestamp: string;
+        gameState: GameState;
+      }>(
         '/gm/combat-action',
         {
           sessionId,
@@ -532,6 +562,7 @@ export function useDice(sessionId: string) {
     setError(null);
     try {
       const data = await post<{
+        success: boolean;
         results: number[];
         total: number;
         message: Message;
@@ -576,9 +607,12 @@ export function useCharacters() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await get<Character[]>('/characters');
-      setCharacters(data);
-      return data;
+      const data = await get<{ success: boolean; characters: Character[] }>('/characters');
+      if (data?.characters) {
+        setCharacters(data.characters);
+        return data.characters;
+      }
+      return [];
     } catch (err) {
       setError(err instanceof APIError ? err.message : 'Karakterler yüklenemedi');
       return [];
@@ -594,9 +628,12 @@ export function useCharacters() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<Character>('/characters', characterData);
-      setCharacters((prev) => [...prev, data]);
-      return data;
+      const data = await post<{ success: boolean; character: Character }>('/characters', characterData);
+      if (data?.character) {
+        setCharacters((prev) => [...prev, data.character]);
+        return data.character;
+      }
+      return null;
     } catch (err) {
       setError(err instanceof APIError ? err.message : 'Karakter oluşturulamadı');
       return null;
@@ -636,9 +673,12 @@ export function useCampaigns() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await get<Campaign[]>('/campaigns');
-      setCampaigns(data);
-      return data;
+      const data = await get<{ success: boolean; campaigns: Campaign[] }>('/campaigns');
+      if (data?.campaigns) {
+        setCampaigns(data.campaigns);
+        return data.campaigns;
+      }
+      return [];
     } catch (err) {
       setError(err instanceof APIError ? err.message : 'Kampanyalar yüklenemedi');
       return [];
@@ -654,9 +694,12 @@ export function useCampaigns() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<Campaign>('/campaigns', campaignData);
-      setCampaigns((prev) => [...prev, data]);
-      return data;
+      const data = await post<{ success: boolean; campaign: Campaign }>('/campaigns', campaignData);
+      if (data?.campaign) {
+        setCampaigns((prev) => [...prev, data.campaign]);
+        return data.campaign;
+      }
+      return null;
     } catch (err) {
       setError(err instanceof APIError ? err.message : 'Kampanya oluşturulamadı');
       return null;

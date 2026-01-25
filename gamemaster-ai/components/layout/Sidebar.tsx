@@ -12,6 +12,7 @@ import {
   User,
   Shield,
   Settings,
+  Activity,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const navItems = [
 
 const adminItems = [
   { href: "/admin", label: "Admin Panel", icon: Shield },
+  { href: "/admin/active-sessions", label: "Aktif Oturumlar", icon: Activity },
   { href: "/admin/settings", label: "Sistem Ayarları", icon: Settings },
 ];
 

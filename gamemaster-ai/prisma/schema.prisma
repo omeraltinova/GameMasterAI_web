@@ -165,6 +165,7 @@ model Scenario {
   difficulty     String   @default("Medium")
   startingPrompt String
   isOfficial     Boolean  @default(false)
+  isFeatured     Boolean  @default(false)
   isAIGenerated  Boolean  @default(false)
   creatorId      String?
   tags           String?  // JSON array
@@ -174,6 +175,39 @@ model Scenario {
   // İlişkiler
   creator   User?      @relation(fields: [creatorId], references: [id])
   campaigns Campaign[]
+  collections ScenarioCollectionItem[]
+}
+
+// ==========================================
+// ScenarioCollection - Senaryo Koleksiyonları
+// ==========================================
+
+model ScenarioCollection {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items ScenarioCollectionItem[]
+}
+
+// ==========================================
+// ScenarioCollectionItem - Koleksiyon-Senaryo İlişkisi
+// ==========================================
+
+model ScenarioCollectionItem {
+  id           String   @id @default(cuid())
+  collectionId String
+  scenarioId   String
+  position     Int      @default(0)
+  addedAt      DateTime @default(now())
+
+  collection ScenarioCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  scenario   Scenario           @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, scenarioId])
+  @@index([collectionId, position])
 }
 
 // ==========================================

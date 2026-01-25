@@ -90,19 +90,57 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json();
-    const { id, isOfficial } = body ?? {};
+    const { id, isOfficial, isFeatured, difficulty, tags } = body ?? {};
 
     if (!id) {
       return NextResponse.json({ error: "ID gerekli" }, { status: 400 });
     }
 
-    if (typeof isOfficial !== "boolean") {
-      return NextResponse.json({ error: "isOfficial değeri gerekli" }, { status: 400 });
+    const updateData: Record<string, unknown> = {};
+
+    if (typeof isOfficial === "boolean") {
+      updateData.isOfficial = isOfficial;
+    }
+
+    if (typeof isFeatured === "boolean") {
+      updateData.isFeatured = isFeatured;
+    }
+
+    if (typeof difficulty === "string" && difficulty.trim()) {
+      updateData.difficulty = difficulty.trim();
+    }
+
+    let normalizedTags: string[] | null = null;
+    if (tags !== undefined) {
+      if (Array.isArray(tags)) {
+        normalizedTags = tags
+          .map((tag) => String(tag).trim())
+          .filter(Boolean);
+      } else if (typeof tags === "string") {
+        normalizedTags = tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean);
+      } else {
+        return NextResponse.json({ error: "tags formatı geçersiz" }, { status: 400 });
+      }
+      updateData.tags = JSON.stringify(normalizedTags);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: "Güncellenecek alan yok" }, { status: 400 });
     }
 
     const currentScenario = await prisma.scenario.findUnique({
       where: { id },
-      select: { id: true, title: true, isOfficial: true },
+      select: {
+        id: true,
+        title: true,
+        isOfficial: true,
+        isFeatured: true,
+        difficulty: true,
+        tags: true,
+      },
     });
 
     if (!currentScenario) {
@@ -111,22 +149,50 @@ export async function PATCH(req: Request) {
 
     const scenario = await prisma.scenario.update({
       where: { id },
-      data: { isOfficial },
+      data: updateData,
       select: {
         id: true,
         isOfficial: true,
+        isFeatured: true,
+        difficulty: true,
+        tags: true,
       },
     });
 
+    const changes: Record<string, { from: unknown; to: unknown }> = {};
+    if (typeof isOfficial === "boolean") {
+      changes.isOfficial = { from: currentScenario.isOfficial, to: isOfficial };
+    }
+    if (typeof isFeatured === "boolean") {
+      changes.isFeatured = { from: currentScenario.isFeatured, to: isFeatured };
+    }
+    if (typeof difficulty === "string" && difficulty.trim()) {
+      changes.difficulty = { from: currentScenario.difficulty, to: difficulty.trim() };
+    }
+    if (normalizedTags) {
+      let currentTags: string[] = [];
+      if (currentScenario.tags) {
+        try {
+          currentTags = typeof currentScenario.tags === "string"
+            ? JSON.parse(currentScenario.tags)
+            : (currentScenario.tags as string[]);
+        } catch {
+          currentTags = [];
+        }
+      }
+      changes.tags = { from: currentTags, to: normalizedTags };
+    }
+
     await logAdminAction({
       adminId: session.user.id,
-      action: "SCENARIO_OFFICIAL_TOGGLE",
+      action: Object.keys(changes).length === 1 && changes.isOfficial
+        ? "SCENARIO_OFFICIAL_TOGGLE"
+        : "SCENARIO_CURATION_UPDATE",
       entityType: "Scenario",
       entityId: id,
       metadata: {
         title: currentScenario.title,
-        from: currentScenario.isOfficial,
-        to: isOfficial,
+        changes,
       },
     });
 

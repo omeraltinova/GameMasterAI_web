@@ -134,10 +134,24 @@ export interface Scenario {
   difficulty: ScenarioDifficulty;
   startingPrompt: string;
   isOfficial: boolean;
+  isFeatured?: boolean;
   isAIGenerated: boolean;
   creatorId?: string;
   tags?: string[];
   createdAt: string;
+}
+
+// ==========================================
+// Scenario Collection Types
+// ==========================================
+
+export interface ScenarioCollection {
+  id: string;
+  name: string;
+  description?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  scenarios?: Scenario[];
 }
 
 // ==========================================
@@ -380,4 +394,3 @@ export interface RegisterInput {
   password: string;
   confirmPassword: string;
 }
-

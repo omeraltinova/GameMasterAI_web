@@ -12,10 +12,10 @@ Yapılan işleri ilerledikçe işaretleyelim.
 - [ ] Soft delete (kullanıcı içeriği korunarak pasifleştirme)
 
 ## 2) Aktif Oturum İzleme
-- [ ] Canlı session listesi (aktif kampanyalar + oyuncu sayısı)
-- [ ] Son mesajlar/özet görünümü
-- [ ] AI context özeti (kısaltılmış)
-- [ ] Force close / reset aksiyonu
+- [x] Canlı session listesi (aktif kampanyalar + oyuncu sayısı)
+- [x] Son mesajlar/özet görünümü
+- [x] AI context özeti (kısaltılmış)
+- [x] Force close / reset aksiyonu
 
 ## 3) Analitik ve Dashboard Genişletme
 - [x] Günlük/haftalık aktif kullanıcı
@@ -24,9 +24,9 @@ Yapılan işleri ilerledikçe işaretleyelim.
 - [x] Top creator listesi
 
 ## 4) İçerik Kürasyonu
-- [ ] Etiket/difficulty düzenleme
-- [ ] Featured senaryo listesi
-- [ ] Koleksiyonlar (tematik listeler)
+- [x] Etiket/difficulty düzenleme
+- [x] Featured senaryo listesi
+- [x] Koleksiyonlar (tematik listeler)
 
 ## 5) Sistem Ayarları + Denetim
 - [x] Bakım modu (uygulama genelinde banner/lock)

@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { get, post, put, buildQuery, APIError } from '@/lib/api/client';
+import { useGameStore } from '@/store/gameStore';
 import type {
   Message,
   GameSession,
@@ -18,9 +19,15 @@ import type {
  * useGame Hook - Oyun session yönetimi
  */
 export function useGame(sessionId: string) {
-  const [session, setSession] = useState<GameSession | null>(null);
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const session = useGameStore((state) => state.session);
+  const gameState = useGameStore((state) => state.gameState);
+  const messages = useGameStore((state) => state.messages);
+  const setSession = useGameStore((state) => state.setSession);
+  const setGameState = useGameStore((state) => state.setGameState);
+  const setMessages = useGameStore((state) => state.setMessages);
+  const addMessageToStore = useGameStore((state) => state.addMessage);
+  const addMessagesToStore = useGameStore((state) => state.addMessages);
+  const resetStore = useGameStore((state) => state.reset);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -112,7 +119,7 @@ export function useGame(sessionId: string) {
 
       const updates = data?.updates;
       if (updates?.messages && updates.messages.length > 0) {
-        setMessages((prev) => [...prev, ...updates.messages]);
+        addMessagesToStore(updates.messages);
       }
 
       if (updates?.gameStateChanged) {
@@ -143,7 +150,7 @@ export function useGame(sessionId: string) {
         senderType: 'PLAYER',
       });
       if (data?.message) {
-        setMessages((prev) => [...prev, data.message]);
+        addMessageToStore(data.message);
         return data.message;
       }
       return null;
@@ -177,15 +184,15 @@ export function useGame(sessionId: string) {
    * Mesaj ekle (dışarıdan mesaj ekleme için)
    */
   const addMessage = useCallback((message: Message) => {
-    setMessages((prev) => [...prev, message]);
-  }, []);
+    addMessageToStore(message);
+  }, [addMessageToStore]);
 
   /**
    * Birden fazla mesaj ekle
    */
   const addMessages = useCallback((newMessages: Message[]) => {
-    setMessages((prev) => [...prev, ...newMessages]);
-  }, []);
+    addMessagesToStore(newMessages);
+  }, [addMessagesToStore]);
 
   /**
    * Hata durumunu temizle
@@ -199,11 +206,13 @@ export function useGame(sessionId: string) {
    * Sadece sessionId varsa çağır
    */
   useEffect(() => {
-    if (sessionId) {
-      fetchSession();
-      fetchMessages();
+    if (!sessionId) {
+      return;
     }
-  }, [sessionId, fetchSession, fetchMessages]);
+    resetStore();
+    fetchSession();
+    fetchMessages();
+  }, [sessionId, fetchSession, fetchMessages, resetStore]);
 
   return {
     session,

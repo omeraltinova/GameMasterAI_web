@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import bcrypt from "bcryptjs";
 import { checkRateLimit, getClientIp } from "@/lib/security/rateLimit";
+import { registerSchema } from "@/lib/validators/auth";
 
 export async function POST(req: Request) {
   try {
@@ -12,11 +13,17 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: "Çok fazla deneme. Lütfen daha sonra tekrar deneyin." }, { status: 429 });
     }
 
-    const { username, email, password } = await req.json();
+    const payload = await req.json();
+    const parsed = registerSchema.safeParse(payload);
 
-    if (!username || !email || !password) {
-      return NextResponse.json({ message: "Eksik bilgi girdiniz." }, { status: 400 });
+    if (!parsed.success) {
+      return NextResponse.json(
+        { message: "Gecersiz veri girdiniz.", errors: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
     }
+
+    const { username, email, password } = parsed.data;
 
     // Kullanıcı zaten var mı?
     const existingUser = await prisma.user.findFirst({

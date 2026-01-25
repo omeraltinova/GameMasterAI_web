@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { characterCreateSchema } from '@/lib/validators/characters';
 
 /**
  * GET /api/characters
@@ -79,30 +80,27 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, race, class: charClass, level, experience, hp, maxHp, stats, background, imageUrl } = body;
-    const characterClass = charClass; // 'class' TypeScript'te rezerve kelime
+    const parsed = characterCreateSchema.safeParse(body);
 
-    // Validation
-    if (!name || typeof name !== 'string') {
+    if (!parsed.success) {
       return NextResponse.json(
-        { message: 'Karakter adı gerekiyor' },
+        { message: 'Gecersiz karakter verisi', errors: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
 
-    if (!race || typeof race !== 'string') {
-      return NextResponse.json(
-        { message: 'Irk gerekiyor' },
-        { status: 400 }
-      );
-    }
-
-    if (!charClass || typeof charClass !== 'string') {
-      return NextResponse.json(
-        { message: 'Sınıf gerekiyor' },
-        { status: 400 }
-      );
-    }
+    const {
+      name,
+      race,
+      class: characterClass,
+      level,
+      experience,
+      hp,
+      maxHp,
+      stats,
+      background,
+      imageUrl,
+    } = parsed.data;
 
     // Yeni karakter oluştur
     const character = await prisma.character.create({

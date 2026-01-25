@@ -1,0 +1,64 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
+import { getUserId } from "@/lib/auth/server";
+import { characterHpUpdateSchema } from "@/lib/validators/characters";
+
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const userId = await getUserId();
+    if (!userId) {
+      return NextResponse.json({ message: "Oturum acmaniz gerekiyor" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const character = await prisma.character.findUnique({
+      where: { id },
+      select: { id: true, userId: true, maxHp: true, hp: true },
+    });
+
+    if (!character) {
+      return NextResponse.json({ message: "Karakter bulunamadi" }, { status: 404 });
+    }
+
+    if (character.userId !== userId) {
+      return NextResponse.json({ message: "Bu karaktere erisim yetkiniz yok" }, { status: 403 });
+    }
+
+    const payload = await req.json();
+    const parsed = characterHpUpdateSchema.safeParse(payload);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { message: "Gecersiz HP verisi", errors: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const { hp, maxHp } = parsed.data;
+    const effectiveMax = typeof maxHp === "number" ? maxHp : character.maxHp;
+    const clampedHp = Math.min(Math.max(0, hp), effectiveMax);
+
+    const updated = await prisma.character.update({
+      where: { id },
+      data: {
+        hp: clampedHp,
+        ...(typeof maxHp === "number" ? { maxHp } : {}),
+      },
+      select: {
+        id: true,
+        hp: true,
+        maxHp: true,
+        level: true,
+        experience: true,
+      },
+    });
+
+    return NextResponse.json({ success: true, character: updated });
+  } catch (error) {
+    console.error("HP update error:", error);
+    return NextResponse.json({ message: "Sunucu hatasi olustu" }, { status: 500 });
+  }
+}

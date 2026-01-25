@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar, Progress } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { formatModifier, calculateModifier, getProficiencyBonus } from "@/lib/utils";
-import { get } from "@/lib/api/client";
+import { get, put } from "@/lib/api/client";
 import type { Character as CharacterType, InventoryItem, ItemProperties } from "@/types";
 import {
   ArrowLeft,
@@ -15,6 +15,8 @@ import {
   Shield,
   Sparkles,
   Sword,
+  Minus,
+  Plus,
   Backpack,
   BookOpen,
   User,
@@ -60,6 +62,11 @@ export default function CharacterDetailPage() {
   const [totalWeight, setTotalWeight] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [hpInput, setHpInput] = useState<number>(0);
+  const [isUpdatingHp, setIsUpdatingHp] = useState(false);
+  const [hpUpdateError, setHpUpdateError] = useState<string | null>(null);
+  const [isLevelingUp, setIsLevelingUp] = useState(false);
+  const [levelUpError, setLevelUpError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!characterId) return;
@@ -85,6 +92,7 @@ export default function CharacterDetailPage() {
         }
 
         setCharacter(foundCharacter);
+        setHpInput(foundCharacter.hp ?? 0);
 
         try {
           const inventoryResponse = await get<{
@@ -131,6 +139,12 @@ export default function CharacterDetailPage() {
     };
   }, [characterId]);
 
+  useEffect(() => {
+    if (character) {
+      setHpInput(character.hp);
+    }
+  }, [character]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -160,6 +174,7 @@ export default function CharacterDetailPage() {
   const baseAC = 10 + calculateModifier(stats.dexterity);
   const experience = character.experience || 0;
   const nextLevelProgress = 1000 - (experience % 1000);
+  const canLevelUp = character.level < 20 && experience >= character.level * 1000;
 
   const hasItems = equippedItems.length > 0 || inventoryItems.length > 0;
 
@@ -218,6 +233,66 @@ export default function CharacterDetailPage() {
         </div>
       </div>
     );
+  };
+
+  const handleHpUpdate = async () => {
+    if (!character) return;
+    setIsUpdatingHp(true);
+    setHpUpdateError(null);
+    try {
+      const response = await put<{
+        success: boolean;
+        character: { hp: number; maxHp: number; level: number; experience: number };
+      }>(`/characters/${character.id}/hp`, {
+        hp: hpInput,
+      });
+
+      if (response?.success && response.character) {
+        setCharacter((prev) =>
+          prev ? { ...prev, hp: response.character.hp, maxHp: response.character.maxHp } : prev
+        );
+      } else {
+        setHpUpdateError("HP guncellenemedi.");
+      }
+    } catch (error) {
+      console.error("HP update error:", error);
+      setHpUpdateError("HP guncellenemedi.");
+    } finally {
+      setIsUpdatingHp(false);
+    }
+  };
+
+  const handleLevelUp = async () => {
+    if (!character) return;
+    setIsLevelingUp(true);
+    setLevelUpError(null);
+    try {
+      const response = await put<{
+        success: boolean;
+        hpGain: number;
+        character: { level: number; hp: number; maxHp: number; experience: number };
+      }>(`/characters/${character.id}/levelup`, {});
+
+      if (response?.success && response.character) {
+        setCharacter((prev) =>
+          prev
+            ? {
+                ...prev,
+                level: response.character.level,
+                hp: response.character.hp,
+                maxHp: response.character.maxHp,
+              }
+            : prev
+        );
+      } else {
+        setLevelUpError("Seviye atlanamadi.");
+      }
+    } catch (error) {
+      console.error("Level up error:", error);
+      setLevelUpError("Seviye atlanamadi.");
+    } finally {
+      setIsLevelingUp(false);
+    }
   };
 
   return (
@@ -365,6 +440,45 @@ export default function CharacterDetailPage() {
                     variant={hpVariant}
                     size="lg"
                   />
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setHpInput((prev) => Math.max(0, prev - 1))}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <input
+                      type="number"
+                      min={0}
+                      max={character.maxHp}
+                      value={hpInput}
+                      onChange={(event) => {
+                        const nextValue = Number.parseInt(event.target.value, 10);
+                        setHpInput(Number.isFinite(nextValue) ? nextValue : 0);
+                      }}
+                      className="h-8 w-20 rounded-lg bg-input border border-border px-2 text-sm text-foreground"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setHpInput((prev) => Math.min(character.maxHp, prev + 1))
+                      }
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      isLoading={isUpdatingHp}
+                      onClick={handleHpUpdate}
+                    >
+                      Guncelle
+                    </Button>
+                  </div>
+                  {hpUpdateError && (
+                    <p className="text-xs text-danger mt-2">{hpUpdateError}</p>
+                  )}
                 </div>
 
                 {/* XP */}
@@ -392,6 +506,21 @@ export default function CharacterDetailPage() {
                   <p className="text-4xl font-bold text-primary">
                     {character.level}
                   </p>
+                  {canLevelUp && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="mt-3 gap-2"
+                      isLoading={isLevelingUp}
+                      onClick={handleLevelUp}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Seviye Atla
+                    </Button>
+                  )}
+                  {levelUpError && (
+                    <p className="text-xs text-danger mt-2">{levelUpError}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -474,5 +603,3 @@ export default function CharacterDetailPage() {
     </div>
   );
 }
-
-

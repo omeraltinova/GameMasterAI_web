@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Badge, Progress } from "@/components/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Badge, Progress, Avatar } from "@/components/ui";
 import { races, classes, backgrounds } from "@/lib/mock-data";
 import { rollAbilityScore, formatModifier, calculateModifier } from "@/lib/utils";
 import { post } from "@/lib/api/client";
@@ -38,6 +38,7 @@ export default function NewCharacterPage() {
     stats: initialStats,
     background: "",
     backstory: "",
+    imageUrl: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +108,7 @@ export default function NewCharacterPage() {
         maxHp: maxHp,
         stats: formData.stats,
         background: formData.background || undefined,
+        imageUrl: formData.imageUrl || undefined,
       });
 
       if (response.success && response.character) {
@@ -300,6 +302,55 @@ export default function NewCharacterPage() {
                   }
                 />
 
+                <div className="grid gap-4 sm:grid-cols-[120px,1fr] items-start">
+                  <div className="flex flex-col items-center gap-2">
+                    <Avatar
+                      src={formData.imageUrl || undefined}
+                      fallback={formData.name || "?"}
+                      size="xl"
+                      className="w-24 h-24"
+                    />
+                    <label className="text-xs text-foreground-muted">
+                      Görsel
+                    </label>
+                  </div>
+                  <div className="space-y-3">
+                    <Input
+                      label="Görsel URL (Opsiyonel)"
+                      placeholder="https://..."
+                      value={formData.imageUrl}
+                      onChange={(e) =>
+                        setFormData({ ...formData, imageUrl: e.target.value })
+                      }
+                    />
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                        Görsel Yükle (Opsiyonel)
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="block w-full text-sm text-foreground-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const result = reader.result;
+                            if (typeof result === "string") {
+                              setFormData((prev) => ({ ...prev, imageUrl: result }));
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                      <p className="mt-1 text-xs text-foreground-muted">
+                        Yüklenen görsel tarayıcıda base64 olarak kaydedilir.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">
                     Background
@@ -397,5 +448,4 @@ export default function NewCharacterPage() {
     </div>
   );
 }
-
 

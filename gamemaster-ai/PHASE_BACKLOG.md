@@ -15,10 +15,11 @@ Last update: 2026-01-25
 ## Faz 2 - Kullanici & Karakter
 | Durum | Is | Amac | Neden | Mevcut |
 | --- | --- | --- | --- | --- |
-| [ ] | Karakter olusturma wizard'ina gorsel/avatar secimi veya upload | Karaktere gorsel baglamak | Kartlar ve oyun arayuzu daha okunakli olur | `Character.imageUrl` var; wizard'da gorsel secimi yok |
-| [ ] | Karakter level-up endpoint + UI akisi | Level-up kurallarini tek yerden uygulamak | XP kontrolu ve HP artisi manuel olmamali | `PUT /api/characters/:id` level/experience aliyor; ozel level-up endpoint ve UI yok |
-| [ ] | Karakter HP hizli guncelleme endpoint + UI akisi | HP degisimi icin hizli akis | Combat/iyilesme akislari pratiklesir | `PUT /api/characters/:id` hp/maxHp kabul ediyor; hizli UI kontrolu yok |
-| [ ] | Sifre degistirme UI + API | Kullanici sifresini guvenle degistirebilsin | Hesap guvenligi | Profilde "Degistir" butonu disabled; sifre degistirme endpoint'i yok |
+| [x] | Karakter olusturma wizard'ina gorsel/avatar secimi veya upload | Karaktere gorsel baglamak | Kartlar ve oyun arayuzu daha okunakli olur | Wizard'a gorsel URL + upload eklendi (`app/(protected)/characters/new/page.tsx`) |
+| [x] | Karakter level-up endpoint + UI akisi | Level-up kurallarini tek yerden uygulamak | XP kontrolu ve HP artisi manuel olmamali | `PUT /api/characters/:id/levelup` eklendi + karakter detayinda seviye atla butonu |
+| [x] | Karakter HP hizli guncelleme endpoint + UI akisi | HP degisimi icin hizli akis | Combat/iyilesme akislari pratiklesir | `PUT /api/characters/:id/hp` eklendi + karakter detayinda hizli HP guncelleme |
+| [x] | Sifre degistirme UI + API | Kullanici sifresini guvenle degistirebilsin | Hesap guvenligi | `/api/auth/password` eklendi + profil sayfasinda sifre degistirme formu |
+| [ ] | 2FA/guvenlik ayarlari (opsiyonel) | Ek guvenlik katmani | Hesap ele gecirmeye karsi koruma | Profil UI'da \"Yakinda\" etiketi var, islev yok |
 
 ## Faz 3 - Kampanya Sistemi (plan-paritesi)
 | Durum | Is | Amac | Neden | Mevcut |
@@ -62,10 +63,10 @@ Last update: 2026-01-25
 | [ ] | /api/auth/login | Login endpointini planla uyumlu yapmak | Tek tip auth URL | `POST /api/login` var; NextAuth login de kullaniliyor |
 | [ ] | /api/auth/logout | Cikis icin planli endpoint | Standart auth akisi | NextAuth `signOut` `/api/auth/signout` kullanir; custom route yok |
 | [ ] | /api/auth/me | Aktif kullanici bilgisi almak | Istemci tarafinda session sync | NextAuth `GET /api/auth/session` var; custom `/auth/me` yok |
-| [ ] | /api/auth/password | Sifre degistirme | Guvenlik | Yok |
+| [x] | /api/auth/password | Sifre degistirme | Guvenlik | Endpoint eklendi ve profilde kullaniliyor |
 | [ ] | /api/users/* | Kullanici yonetimi icin public API alan | Planla uyum | Admin endpointleri `app/api/admin/users` |
-| [ ] | /api/characters/:id/levelup | Level-up icin kuralli islem | Tek noktada is kurallari | `PUT /api/characters/:id` ile level guncellenebiliyor |
-| [ ] | /api/characters/:id/hp | HP update icin tek islem | Combat akisi | `PUT /api/characters/:id` hp/maxHp kabul ediyor |
+| [x] | /api/characters/:id/levelup | Level-up icin kuralli islem | Tek noktada is kurallari | `PUT /api/characters/:id/levelup` eklendi |
+| [x] | /api/characters/:id/hp | HP update icin tek islem | Combat akisi | `PUT /api/characters/:id/hp` eklendi |
 | [ ] | /api/dice/roll-check | Ability check icin standart endpoint | Log/format birligi | Sadece `POST /api/dice/roll` var (purpose ile) |
 | [ ] | /api/dice/roll-attack | Attack roll icin standart endpoint | Log/format birligi | Sadece `POST /api/dice/roll` var (purpose ile) |
 | [ ] | /api/dice/roll-damage | Hasar roll icin standart endpoint | Log/format birligi | Sadece `POST /api/dice/roll` var (purpose ile) |

@@ -14,37 +14,52 @@ export async function PATCH(req: Request) {
 
     const body = await req.json();
     const { name } = body;
+    const data: Record<string, unknown> = {};
 
-    if (!name || name.trim().length < 3) {
-      return NextResponse.json(
-        { error: "Kullanıcı adı en az 3 karakter olmalıdır." },
-        { status: 400 }
-      );
-    }
-
-    // Kullanıcı adı değişmişse, başkası tarafından kullanılıyor mu kontrol et
-    if (name !== session.user.name) {
-      const existingUser = await prisma.user.findUnique({
-        where: { username: name },
-      });
-
-      if (existingUser) {
+    if (typeof name === "string") {
+      if (name.trim().length < 3) {
         return NextResponse.json(
-          { error: "Bu kullanıcı adı zaten kullanımda." },
-          { status: 409 }
+          { error: "Kullanıcı adı en az 3 karakter olmalıdır." },
+          { status: 400 }
         );
       }
+
+      // Kullanıcı adı değişmişse, başkası tarafından kullanılıyor mu kontrol et
+      if (name !== session.user.name) {
+        const existingUser = await prisma.user.findUnique({
+          where: { username: name },
+        });
+
+        if (existingUser) {
+          return NextResponse.json(
+            { error: "Bu kullanıcı adı zaten kullanımda." },
+            { status: 409 }
+          );
+        }
+      }
+
+      data.username = name;
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json(
+        { error: "Güncellenecek veri bulunamadı." },
+        { status: 400 }
+      );
     }
 
     // Güncelleme işlemi
     const updatedUser = await prisma.user.update({
       where: { email: session.user.email },
-      data: { username: name },
+      data,
     });
 
     return NextResponse.json({
       success: true,
-      user: { name: updatedUser.username, email: updatedUser.email },
+      user: {
+        name: updatedUser.username,
+        email: updatedUser.email,
+      },
     });
   } catch (error) {
     console.error("Profil güncelleme hatası:", error);

@@ -35,10 +35,16 @@ export default function ProfilePage() {
     name: "",
     email: "",
   });
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Manuel toast state'ine gerek kalmadı, useToast halledecek
 
@@ -88,6 +94,39 @@ export default function ProfilePage() {
       showToast(error.message, "error");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      showToast("Lutfen tum sifre alanlarini doldurun.", "error");
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      showToast("Yeni sifreler eslesmiyor.", "error");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await fetch("/api/auth/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(passwordForm),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.message || "Sifre degistirme basarisiz");
+      }
+
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      showToast("Sifre basariyla guncellendi", "success");
+    } catch (error: any) {
+      showToast(error.message, "error");
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -198,26 +237,49 @@ export default function ProfilePage() {
             Güvenlik
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-lg bg-background-elevated">
+        <CardContent className="space-y-6">
+          <form onSubmit={handlePasswordChange} className="space-y-4 p-4 rounded-lg bg-background-elevated">
             <div>
-              <h4 className="font-medium">Şifre</h4>
+              <h4 className="font-medium mb-1">Sifre Degistir</h4>
               <p className="text-sm text-foreground-muted">
-                Şifrenizi güvenli tutun
+                Mevcut sifren ile yeni sifreni dogrula
               </p>
             </div>
-            <Button variant="outline" size="sm" disabled title="Yakında">
-              Değiştir
+            <Input
+              label="Mevcut Sifre"
+              type="password"
+              value={passwordForm.currentPassword}
+              onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
+              placeholder="Mevcut sifren"
+            />
+            <Input
+              label="Yeni Sifre"
+              type="password"
+              value={passwordForm.newPassword}
+              onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
+              placeholder="Yeni sifre"
+            />
+            <Input
+              label="Yeni Sifre (Tekrar)"
+              type="password"
+              value={passwordForm.confirmPassword}
+              onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+              placeholder="Yeni sifreyi tekrar gir"
+            />
+            <Button type="submit" isLoading={isChangingPassword} className="gap-2">
+              <Save className="h-4 w-4" />
+              Sifreyi Guncelle
             </Button>
-          </div>
+          </form>
+
           <div className="flex items-center justify-between p-4 rounded-lg bg-background-elevated">
             <div>
-              <h4 className="font-medium">İki Faktörlü Doğrulama</h4>
+              <h4 className="font-medium">Iki Faktorlu Dogrulama</h4>
               <p className="text-sm text-foreground-muted">
-                Hesabını daha güvenli hale getir
+                Girislerde ek guvenlik katmani
               </p>
             </div>
-            <Badge variant="outline">Yakında</Badge>
+            <Badge variant="outline">Yakinda</Badge>
           </div>
         </CardContent>
       </Card>

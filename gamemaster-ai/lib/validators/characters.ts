@@ -23,3 +23,10 @@ export const characterCreateSchema = z.object({
 });
 
 export type CharacterCreateInput = z.infer<typeof characterCreateSchema>;
+
+export const characterHpUpdateSchema = z.object({
+  hp: z.number().int().min(0),
+  maxHp: z.number().int().min(1).optional(),
+});
+
+export type CharacterHpUpdateInput = z.infer<typeof characterHpUpdateSchema>;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
@@ -194,6 +194,7 @@ export default function PlayPage() {
     addMessage,
     addMessages,
     fetchMessages,
+    fetchUpdates,
   } = useGame(sessionId || '');
 
   const {
@@ -231,6 +232,25 @@ export default function PlayPage() {
     updateMap,
     deleteMap,
   } = useMaps(sessionId || '');
+
+  // Message polling - auto-refresh every 5 seconds when playing
+  const lastPollTime = useRef<number>(Date.now());
+  
+  useEffect(() => {
+    // Only poll when we have a session and are in playing phase
+    if (!sessionId || gamePhase !== 'playing') return;
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        await fetchUpdates(lastPollTime.current);
+        lastPollTime.current = Date.now();
+      } catch (err) {
+        console.error('Polling error:', err);
+      }
+    }, 5000); // Poll every 5 seconds
+    
+    return () => clearInterval(pollInterval);
+  }, [sessionId, gamePhase, fetchUpdates]);
 
   // Handle setup complete
   const handleSetupComplete = async (settings: WorldSettings) => {
@@ -382,22 +402,25 @@ export default function PlayPage() {
     // Önerileri temizle
     clearSuggestions();
 
-    // Önce oyuncu mesajını UI'a ekle (optimistic update)
-    const playerMessage: Message = {
-      id: `temp-${Date.now()}`,
-      sessionId: sessionId || '',
-      senderType: 'PLAYER',
-      senderName: character?.name || playerName,
-      content: content,
-      timestamp: new Date().toISOString(),
-    };
-    addMessage(playerMessage);
-
-    // AI GM çağrısı yap
+    // AI GM çağrısı yap - API hem oyuncu mesajını hem GM yanıtını kaydeder
     const result = await narrate(content);
 
     if (result && result.narration) {
-      // GM yanıtını önce mesajlara ekle
+      // API'den dönen mesajları al
+      // Oyuncu mesajı
+      if (result.playerMessageId) {
+        const playerMessage: Message = {
+          id: result.playerMessageId,
+          sessionId: sessionId || '',
+          senderType: 'PLAYER',
+          senderName: result.playerName || character?.name || playerName,
+          content: content,
+          timestamp: result.playerMessageTimestamp || new Date().toISOString(),
+        };
+        addMessage(playerMessage);
+      }
+
+      // GM yanıtı
       const gmMessage: Message = {
         id: result.messageId || `gm-${Date.now()}`,
         sessionId: sessionId || '',
@@ -451,24 +474,28 @@ export default function PlayPage() {
     // Önerileri temizle
     clearSuggestions();
 
-    // Seçilen aksiyonu oyuncu mesajı olarak ekle
-    const playerMessage: Message = {
-      id: `action-${Date.now()}`,
-      sessionId: sessionId || '',
-      senderType: 'PLAYER',
-      senderName: character?.name || playerName,
-      content: `[${action.label}] ${action.description || action.value || ''}`.trim(),
-      timestamp: new Date().toISOString(),
-    };
-    addMessage(playerMessage);
-
     // Zorunlu aksiyon state'ini temizle
     setPendingMandatoryAction(null);
 
-    // AI'ya seçimi gönder
+    // AI'ya seçimi gönder - API oyuncu mesajını da kaydeder
+    const actionContent = `[${action.label}] ${action.description || action.value || ''}`.trim();
     const result = await narrate(`${action.label}: ${action.value || action.description || ''}`);
 
     if (result && result.narration) {
+      // Oyuncu mesajı (API'den dönen ID ile)
+      if (result.playerMessageId) {
+        const playerMessage: Message = {
+          id: result.playerMessageId,
+          sessionId: sessionId || '',
+          senderType: 'PLAYER',
+          senderName: result.playerName || character?.name || playerName,
+          content: actionContent,
+          timestamp: result.playerMessageTimestamp || new Date().toISOString(),
+        };
+        addMessage(playerMessage);
+      }
+
+      // GM yanıtı
       const gmMessage: Message = {
         id: result.messageId || `gm-${Date.now()}`,
         sessionId: sessionId || '',
@@ -513,31 +540,38 @@ export default function PlayPage() {
 
   // Zar atışı handler'ı (ActionButtons'dan)
   const handleActionDiceRoll = async (action: GMAction, messageId: string) => {
+    // Zorunlu aksiyon state'ini temizle
+    setPendingMandatoryAction(null);
+
     // Zarı at
     const rollResult = rollDiceForAction(action);
-    // Gorsel basarili uretildiyse, sohbete GM mesaji olarak ekle
     const skillText = action.skill ? ` ${action.skill}` : '';
     const dcText = action.dc ? ` (DC ${action.dc})` : '';
     const successText = rollResult.success !== undefined
       ? (rollResult.success ? ' ✅ Başarılı!' : ' ❌ Başarısız')
       : '';
 
-    const diceMessage: Message = {
-      id: `dice-action-${Date.now()}`,
-      sessionId: sessionId || '',
-      senderType: 'DICE',
-      senderName: 'Zar Atışı',
-      content: `🎲 ${character?.name || playerName}${skillText}${dcText} atışı: [${rollResult.results.join(', ')}]${rollResult.modifier !== 0 ? ` + ${rollResult.modifier}` : ''} = ${rollResult.total}${successText}`,
-      timestamp: new Date().toISOString(),
-    };
-    addMessage(diceMessage);
+    // Zar mesajını API üzerinden kaydet
+    const diceContent = `🎲 ${character?.name || playerName}${skillText}${dcText} atışı: [${rollResult.results.join(', ')}]${rollResult.modifier !== 0 ? ` + ${rollResult.modifier}` : ''} = ${rollResult.total}${successText}`;
+    
+    try {
+      // Zar mesajını veritabanına kaydet
+      const diceResponse = await post(`/sessions/${sessionId}/messages`, {
+        senderType: 'DICE',
+        senderName: 'Zar Atışı',
+        content: diceContent,
+      }) as { success: boolean; message: Message };
 
-    // Zorunlu aksiyon state'ini temizle
-    setPendingMandatoryAction(null);
+      if (diceResponse.success && diceResponse.message) {
+        addMessage(diceResponse.message);
+      }
+    } catch (err) {
+      console.error('Dice message save error:', err);
+    }
 
-    // AI'ya zar sonucunu bildir
+    // AI'ya zar sonucunu bildir - skipPlayerMessageSave ile oyuncu mesajı kaydetme
     const actionText = `${action.skill || 'Zar'} kontrolü attım. Sonuç: ${rollResult.total}${rollResult.success !== undefined ? (rollResult.success ? ' (Başarılı)' : ' (Başarısız)') : ''}`;
-    const result = await narrate(actionText);
+    const result = await narrate(actionText, { skipPlayerMessageSave: true });
 
     if (result && result.narration) {
       const gmMessage: Message = {
@@ -590,16 +624,22 @@ export default function PlayPage() {
   ) => {
     // DiceRoller'dan gelen sonuçları kullan (tekrar atma!)
     const total = results.reduce((a, b) => a + b, 0) + modifier;
+    const diceContent = `🎲 ${character?.name || playerName} ${count}${diceType}${modifier >= 0 ? '+' : ''}${modifier !== 0 ? modifier : ''} attı: [${results.join(', ')}] = ${total}`;
 
-    const diceMessage: Message = {
-      id: `dice-${Date.now()}`,
-      sessionId: sessionId || '',
-      senderType: 'DICE',
-      senderName: 'Zar Atışı',
-      content: `🎲 ${character?.name || playerName} ${count}${diceType}${modifier >= 0 ? '+' : ''}${modifier !== 0 ? modifier : ''} attı: [${results.join(', ')}] = ${total}`,
-      timestamp: new Date().toISOString(),
-    };
-    addMessage(diceMessage);
+    // Zar mesajını API üzerinden kaydet
+    try {
+      const diceResponse = await post(`/sessions/${sessionId}/messages`, {
+        senderType: 'DICE',
+        senderName: 'Zar Atışı',
+        content: diceContent,
+      }) as { success: boolean; message: Message };
+
+      if (diceResponse.success && diceResponse.message) {
+        addMessage(diceResponse.message);
+      }
+    } catch (err) {
+      console.error('Dice message save error:', err);
+    }
   };
 
   // Sahne görseli üretme handler'ı

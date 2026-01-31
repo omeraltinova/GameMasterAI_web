@@ -244,8 +244,11 @@ export async function POST(req: NextRequest) {
       'Oyuncu';
 
     // Oyuncu mesajını kaydet (eğer regenerate değilse)
+    let playerMessageId: string | null = null;
+    let playerMessageTimestamp: Date | null = null;
+    
     if (!skipPlayerMessageSave) {
-      await prisma.message.create({
+      const playerMessage = await prisma.message.create({
         data: {
           sessionId,
           senderId: userId,
@@ -254,6 +257,8 @@ export async function POST(req: NextRequest) {
           content: playerAction,
         },
       });
+      playerMessageId = playerMessage.id;
+      playerMessageTimestamp = playerMessage.timestamp;
     }
 
     // GM yanıtını kaydet (metadata'da gmPrompt ve locationChange)
@@ -301,6 +306,10 @@ export async function POST(req: NextRequest) {
       locationChange,
       messageId: gmMessage.id,
       timestamp: gmMessage.timestamp,
+      // Oyuncu mesajı bilgileri
+      playerMessageId,
+      playerMessageTimestamp,
+      playerName,
       // Tool results
       toolResults: {
         newNPCs,

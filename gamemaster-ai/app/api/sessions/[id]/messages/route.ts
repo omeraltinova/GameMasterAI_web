@@ -122,7 +122,7 @@ export async function POST(
   try {
     const { id: sessionId } = await params;
     const body = await req.json();
-    const { content, senderType } = body;
+    const { content, senderType, senderName: requestSenderName } = body;
 
     // Validation
     if (!content || typeof content !== 'string') {
@@ -174,13 +174,17 @@ export async function POST(
       return forbiddenResponse('Bu session\'a mesaj gönderme yetkiniz yok');
     }
 
-    const resolvedSenderType =
-      isCreator && senderType === 'GM'
-        ? 'GM'
-        : 'PLAYER';
+    // SenderType belirleme - DICE ve SYSTEM mesajları için gelen değeri kullan
+    let resolvedSenderType = 'PLAYER';
+    if (senderType === 'DICE' || senderType === 'SYSTEM') {
+      resolvedSenderType = senderType;
+    } else if (isCreator && senderType === 'GM') {
+      resolvedSenderType = 'GM';
+    }
 
     // Oyuncunun karakter veya kullanıcı adını al
-    const senderName = currentPlayer?.character?.name || 
+    const senderName = requestSenderName || 
+                       currentPlayer?.character?.name || 
                        currentPlayer?.user?.username || 
                        'Oyuncu';
 
@@ -188,7 +192,7 @@ export async function POST(
     const message = await prisma.message.create({
       data: {
         sessionId,
-        senderId: userId,
+        senderId: resolvedSenderType === 'PLAYER' ? userId : null,
         senderType: resolvedSenderType,
         senderName,
         content,

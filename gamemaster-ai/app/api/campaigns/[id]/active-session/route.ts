@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { generateOpeningNarration } from '@/lib/ai/gamemaster';
 
 export async function GET(
   req: NextRequest,
@@ -10,7 +11,7 @@ export async function GET(
   const { id: campaignId } = await params;
 
   try {
-    // 1. Get campaign with all relations
+    // 1. Kampanyayı al
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
       include: {
@@ -25,47 +26,38 @@ export async function GET(
         sessions: {
           orderBy: { createdAt: 'desc' },
           take: 1,
+          include: {
+            messages: {
+              orderBy: { timestamp: 'asc' },
+              take: 50,
+            },
+          },
         },
       },
     });
 
     if (!campaign) {
-      return NextResponse.json(
-        { error: 'Kampanya bulunamadı' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: 'Kampanya bulunamadı' }, { status: 404 });
     }
 
-    // 2. Check access permissions
+    // 2. Erişim kontrolü
     const hasAccess = campaign.creatorId === userId ||
                      campaign.players.some((p: any) => p.userId === userId);
 
     if (!hasAccess) {
-      return NextResponse.json(
-        { error: 'Bu kampanyaya erişimin yok' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Bu kampanyaya erişimin yok' }, { status: 403 });
     }
 
-    // 3. Find or create active session
-    let session;
+    // 3. Session var mı?
+    let session = campaign.sessions[0];
     
-    if (campaign.status === 'ACTIVE' && campaign.sessions.length > 0) {
-      // CASE 1: Active session exists - return it
-      session = campaign.sessions[0];
-    } else if (campaign.status === 'PAUSED' && campaign.sessions.length > 0) {
-      // CASE 3: Paused campaign - resume session
-      session = campaign.sessions[0];
+    // Session yoksa oluştur
+    if (!session) {
+      console.log('[active-session] Yeni session oluşturuluyor...');
       
-      // Update campaign status to ACTIVE
-      await prisma.campaign.update({
-        where: { id: campaignId },
-        data: { status: 'ACTIVE' },
-      });
-    } else {
-      // CASE 2: No active session - create new one
+      // World settings parse
       let worldSettings = null;
-      // @ts-ignore - Prisma client out of sync
+      // @ts-ignore
       if (campaign.scenario?.worldSettings) {
         try {
           // @ts-ignore
@@ -74,52 +66,56 @@ export async function GET(
             ? JSON.parse(campaign.scenario.worldSettings) 
             // @ts-ignore
             : campaign.scenario.worldSettings;
-        } catch (e) {
-          console.error('Scenario world settings parsing err', e);
-        }
+        } catch (e) {}
       }
 
-      const initialState = {
-        worldSettings: worldSettings || {},
-        location: worldSettings?.startingLocation?.name || 
-                 (campaign.scenario?.startingPrompt ? campaign.scenario.startingPrompt.substring(0, 50) : 'Başlangıç'),
-        timeOfDay: 'morning',
-        weather: worldSettings?.startingLocation?.atmosphere?.split(',')[0] || 'clear', // Try to guess weather from atmosphere or default
-        activeNPCs: [],
-        activeQuests: [],
-        notes: worldSettings?.setting || 'Yeni macera başlıyor',
-      };
-
+      // Session oluştur
       session = await prisma.gameSession.create({
         data: {
           campaignId,
-          currentState: JSON.stringify(initialState),
+          currentState: JSON.stringify({
+            worldSettings: worldSettings || {},
+            location: worldSettings?.startingLocation?.name || 'Başlangıç',
+            timeOfDay: 'morning',
+            weather: 'clear',
+            activeNPCs: [],
+            activeQuests: [],
+          }),
           aiContext: campaign.scenario?.startingPrompt || '',
         },
         include: {
-          campaign: {
-            include: {
-              players: {
-                include: {
-                  character: true,
-                },
-              },
-            },
-          },
-          messages: {
-            orderBy: { timestamp: 'asc' },
-            take: 50, // Last 50 messages
-          },
-          npcs: true,
+          messages: true,
         },
       });
 
-      // Hoşgeldin mesajı oluştur
+      // İlk mesajı AI ile oluştur
+      let welcomeMessage: string;
       const scenarioName = campaign.scenario?.title || campaign.name;
-      const welcomeMessage = campaign.scenario?.startingPrompt 
-        ? campaign.scenario.startingPrompt
-        : `🎲 **${scenarioName}** kampanyasına hoş geldiniz!\n\nMacera başlamak üzere. Karakterinizi hazırlayın ve ilk adımınızı atın. Dünya sizi bekliyor...\n\n*Aksiyonunuzu yazarak hikayeye başlayabilirsiniz.*`;
+      const playerCharacter = campaign.players[0]?.character;
 
+      // AI'dan açılış mesajı al
+      if (campaign.scenario?.startingPrompt) {
+        try {
+          console.log('[active-session] AI açılış mesajı üretiliyor...');
+          welcomeMessage = await generateOpeningNarration({
+            scenarioTitle: campaign.scenario.title,
+            scenarioDescription: campaign.scenario.description,
+            gmInstructions: campaign.scenario.startingPrompt,
+            worldSettings,
+            characterName: playerCharacter?.name,
+            characterClass: playerCharacter?.class,
+            characterRace: playerCharacter?.race,
+          });
+          console.log('[active-session] AI mesajı oluşturuldu:', welcomeMessage.substring(0, 100));
+        } catch (err) {
+          console.error('[active-session] AI hatası:', err);
+          welcomeMessage = `🎲 **${scenarioName}** kampanyasına hoş geldiniz!\n\n${campaign.scenario.description || 'Macera başlamak üzere.'}`;
+        }
+      } else {
+        welcomeMessage = `🎲 **${scenarioName}** kampanyasına hoş geldiniz!\n\nMacera başlamak üzere.`;
+      }
+
+      // Mesajı kaydet
       await prisma.message.create({
         data: {
           sessionId: session.id,
@@ -129,7 +125,24 @@ export async function GET(
         },
       });
 
-      // Update campaign status to ACTIVE
+      // Session'ı mesajlarla birlikte yeniden al
+      const updatedSession = await prisma.gameSession.findUnique({
+        where: { id: session.id },
+        include: {
+          messages: {
+            orderBy: { timestamp: 'asc' },
+            take: 50,
+          },
+        },
+      });
+      
+      if (updatedSession) {
+        session = updatedSession;
+      }
+    }
+
+    // Kampanya durumunu ACTIVE yap
+    if (campaign.status !== 'ACTIVE') {
       await prisma.campaign.update({
         where: { id: campaignId },
         data: { status: 'ACTIVE' },
@@ -142,10 +155,7 @@ export async function GET(
       campaign,
     });
   } catch (error) {
-    console.error('Active session alınamadı:', error);
-    return NextResponse.json(
-      { error: 'Sunucu hatası' },
-      { status: 500 }
-    );
+    console.error('Active session hatası:', error);
+    return NextResponse.json({ error: 'Sunucu hatası' }, { status: 500 });
   }
 }

@@ -105,10 +105,12 @@ export function useGame(sessionId: string) {
    * Son güncellemeleri getir (polling)
    */
   const fetchUpdates = useCallback(async (since?: number) => {
-    setIsLoading(true);
+    // Don't set loading state for polling to avoid UI flicker
     setError(null);
     try {
-      const query = buildQuery({ since });
+      // Convert timestamp to ISO string for API
+      const sinceDate = since ? new Date(since).toISOString() : undefined;
+      const query = buildQuery({ since: sinceDate });
       const data = await get<{
         success: boolean;
         updates: {
@@ -131,10 +133,9 @@ export function useGame(sessionId: string) {
 
       return data;
     } catch (err) {
-      setError(err instanceof APIError ? err.message : 'Güncellemeler yüklenemedi');
+      // Silent error for polling - don't show error to user
+      console.error('Polling error:', err);
       return null;
-    } finally {
-      setIsLoading(false);
     }
   }, [sessionId]);
 
@@ -258,6 +259,10 @@ export function useGM(sessionId: string) {
         };
         messageId: string;
         timestamp: string;
+        // Oyuncu mesajı bilgileri
+        playerMessageId?: string;
+        playerMessageTimestamp?: string;
+        playerName?: string;
       }>(
         '/gm/narrate',
         {

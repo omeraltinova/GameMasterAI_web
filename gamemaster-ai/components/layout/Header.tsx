@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Button, Avatar } from "@/components/ui";
+import { Button, Avatar, ThemeSelector } from "@/components/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/Dropdown";
 // DEĞİŞİKLİK 1: useAuth yerine useSession ve signOut'u import ediyoruz
 import { useSession, signOut } from "next-auth/react";
-import { Sword, Menu, X, User, Settings, LogOut } from "lucide-react";
+import { Sword, Menu, X, User, Settings, LogOut, Palette } from "lucide-react";
 import { useState } from "react";
 
 const publicNavItems = [
@@ -67,8 +67,12 @@ export function Header() {
             ))}
           </nav>
 
-          {/* Auth Actions */}
+{/* Auth Actions */}
           <div className="hidden md:flex items-center gap-3">
+            {/* Theme Selector for guests */}
+            {!isAuthenticated && (
+              <ThemeSelector variant="inline" />
+            )}
             {isAuthenticated ? (
               <>
                 <Link href="/dashboard">
@@ -97,12 +101,18 @@ export function Header() {
                         Profil
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
+<DropdownMenuItem asChild>
                       <Link href="/profile" className="flex items-center gap-2">
                         <Settings className="h-4 w-4" />
                         Ayarlar
                       </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="flex items-center gap-2">
+                      <Palette className="h-4 w-4" />
+                      Tema
+                    </DropdownMenuLabel>
+                    <ThemeSelector variant="dropdown" />
                     <DropdownMenuSeparator />
                     {/* DEĞİŞİKLİK 4: logout fonksiyonu yerine signOut() kullanıyoruz */}
                     <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/" })} className="text-danger">
@@ -159,7 +169,15 @@ export function Header() {
                 {item.label}
               </Link>
             ))}
-            <div className="border-t border-border my-2 pt-2 flex flex-col gap-2">
+<div className="border-t border-border my-2 pt-2 flex flex-col gap-2">
+              {/* Mobile Theme Selector */}
+              <div className="px-3 py-2 flex items-center justify-between">
+                <span className="text-sm text-foreground-secondary flex items-center gap-2">
+                  <Palette className="h-4 w-4" />
+                  Tema
+                </span>
+                <ThemeSelector variant="inline" />
+              </div>
               {isAuthenticated ? (
                 <>
                   <Link href="/dashboard" onClick={() => setMobileMenuOpen(false)}>

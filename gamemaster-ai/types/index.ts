@@ -75,7 +75,24 @@ export interface Character {
 // Inventory Types
 // ==========================================
 
-export type ItemType = "Weapon" | "Armor" | "Potion" | "Scroll" | "Tool" | "Misc" | "Quest";
+export type ItemType = 
+  | "Weapon" 
+  | "Armor" 
+  | "Shield"
+  | "Helmet"
+  | "Boots"
+  | "Gloves"
+  | "Cloak"
+  | "Ring"
+  | "Amulet"
+  | "Accessory"
+  | "Potion" 
+  | "Scroll" 
+  | "Tool" 
+  | "Consumable"
+  | "Treasure"
+  | "Misc" 
+  | "Quest";
 
 export interface ItemProperties {
   damage?: string;
@@ -84,16 +101,21 @@ export interface ItemProperties {
   healing?: string;
   range?: string;
   properties?: string[];
+  [key: string]: unknown; // Allow additional properties
 }
 
+/**
+ * InventoryItem type for character inventory
+ * Note: `properties` can be a JSON string from DB or parsed object
+ */
 export interface InventoryItem {
   id: string;
-  characterId: string;
+  characterId?: string;
   name: string;
-  type: ItemType;
-  description?: string;
+  type: string; // Using string for flexibility, but should match ItemType values
+  description?: string | null;
   quantity: number;
-  properties?: ItemProperties;
+  properties?: Record<string, unknown> | string | null;
   equipped: boolean;
   weight: number;
 }
@@ -318,6 +340,24 @@ export interface Combat {
 // Map Types
 // ==========================================
 
+export type MapType = 
+  | "dungeon"
+  | "tavern" 
+  | "forest"
+  | "cave"
+  | "castle"
+  | "town"
+  | "port"
+  | "road"
+  | "camp"
+  | "battlefield"
+  | "temple"
+  | "underground"
+  | "mountain"
+  | "desert"
+  | "swamp"
+  | "other";
+
 export interface GameMap {
   id: string;
   sessionId: string;
@@ -327,6 +367,23 @@ export interface GameMap {
   isAIGenerated: boolean;
   prompt?: string;
   createdAt: string;
+}
+
+export interface CreateMapInput {
+  name: string;
+  description?: string;
+  locationType: MapType;
+  atmosphere?: string;
+  details?: string[];
+  imageUrl?: string; // For manual upload
+}
+
+export interface GenerateMapInput {
+  sessionId: string;
+  locationName: string;
+  locationType: MapType;
+  atmosphere?: string;
+  details?: string[];
 }
 
 // ==========================================

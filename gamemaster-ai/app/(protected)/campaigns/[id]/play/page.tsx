@@ -7,7 +7,8 @@ import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, ConfirmDialog } from "@/components/ui";
 import { ChatWindow, MessageInput, DiceRoller, CharacterMini, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage, DiceModal, NPCModal } from "@/components/game";
 import { InventoryModal } from "@/components/character";
-import { useGame, useGM, useDice, useSuggestions, useLocationImage } from "@/hooks/useGame";
+import { MapModal } from "@/components/map";
+import { useGame, useGM, useDice, useSuggestions, useLocationImage, useMaps } from "@/hooks/useGame";
 import { get, post, put } from "@/lib/api/client";
 import type { Message, DiceType, Character, Campaign, GMAction, GMPrompt, LocationChange } from "@/types";
 import {
@@ -20,6 +21,7 @@ import {
   RotateCcw,
   RefreshCw,
   Globe,
+  Map,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +73,8 @@ export default function PlayPage() {
   const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [showDiceModal, setShowDiceModal] = useState(false);
   const [showNPCModal, setShowNPCModal] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [worldSettings, setWorldSettings] = useState<WorldSettings | null>(null);
 
   // Get campaign ID from URL params
   const campaignId = params.id as string;
@@ -109,6 +113,13 @@ export default function PlayPage() {
           const scenarioIsPreset = Boolean(campaignData?.scenario?.isOfficial);
           const shouldSkipSetup = scenarioIsPreset || scenarioHasWorldSettings || hasWorldSettings;
           setIsNewSession(!shouldSkipSetup && messageCount <= 1);
+
+          // World settings'i kaydet
+          if (hasWorldSettings) {
+            setWorldSettings(currentState.worldSettings);
+          } else if (scenarioHasWorldSettings) {
+            setWorldSettings(campaignData.scenario.worldSettings);
+          }
 
           // Set campaign data
           setCampaign({
@@ -210,6 +221,16 @@ export default function PlayPage() {
     generateImage: generateLocationImage,
     clearImage: clearLocationImage,
   } = useLocationImage(sessionId || '');
+
+  const {
+    maps,
+    isLoading: isMapsLoading,
+    fetchMaps,
+    addMap,
+    generateMap,
+    updateMap,
+    deleteMap,
+  } = useMaps(sessionId || '');
 
   // Handle setup complete
   const handleSetupComplete = async (settings: WorldSettings) => {
@@ -933,6 +954,15 @@ export default function PlayPage() {
               <Button
                 variant="outline"
                 size="sm"
+                onClick={() => setShowMapModal(true)}
+                className="gap-1"
+              >
+                <Map className="h-4 w-4" />
+                Haritalar
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => toggleSidePanel("character")}
                 className={cn(
                   "gap-1",
@@ -1128,6 +1158,29 @@ export default function PlayPage() {
             // Send message to talk to NPC
             handleSendMessage(`${npc.name} ile konuşmak istiyorum`);
           }}
+        />
+      )}
+
+      {/* Map Modal */}
+      {sessionId && (
+        <MapModal
+          isOpen={showMapModal}
+          onClose={() => setShowMapModal(false)}
+          sessionId={sessionId}
+          maps={maps}
+          isLoading={isMapsLoading}
+          currentLocation={currentLocation}
+          worldName={worldSettings?.worldName || campaign?.name}
+          onMapCreated={(map) => {
+            // Map is automatically added by useMaps hook
+          }}
+          onMapDelete={async (mapId) => {
+            await deleteMap(mapId);
+          }}
+          onMapUpdate={async (mapId, data) => {
+            await updateMap(mapId, data);
+          }}
+          onRefresh={fetchMaps}
         />
       )}
     </div>

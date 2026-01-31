@@ -146,8 +146,8 @@ export async function GET() {
         })
       : [];
     const creatorMap = new Map(creators.map((creator) => [creator.id, creator]));
-    const topCreators = topCreatorsRaw
-      .filter((row) => Boolean(row.creatorId))
+const topCreators = topCreatorsRaw
+      .filter((row): row is typeof row & { creatorId: string } => Boolean(row.creatorId))
       .map((row) => ({
         id: row.creatorId,
         username: creatorMap.get(row.creatorId)?.username || "Bilinmeyen",

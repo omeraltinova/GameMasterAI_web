@@ -57,15 +57,15 @@ export async function GET(
       },
     });
 
-    // creatorId için tip assertion
-    const campaignWithCreatorId = session?.campaign as typeof session['campaign'] & { creatorId: string };
-
-    if (!session) {
+if (!session) {
       return NextResponse.json(
         { message: 'Session bulunamadı' },
         { status: 404 }
       );
     }
+
+    // creatorId için tip assertion
+    const campaignWithCreatorId = session.campaign as typeof session['campaign'] & { creatorId: string };
 
     // Kullanıcının yetkisi var mı? (creator veya player olabilir)
     const isCreator = campaignWithCreatorId?.creatorId === userId;

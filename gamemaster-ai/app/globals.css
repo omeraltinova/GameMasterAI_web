@@ -1,7 +1,12 @@
 @import "tailwindcss";
 
-/* GameMaster AI - Neon Arcane Theme */
-:root {
+/* GameMaster AI - Multi Theme System */
+
+/* ========================================
+   Theme: Arcane (Default - Pink/Purple)
+   ======================================== */
+:root,
+[data-theme="arcane"] {
   /* Background colors - Deep void */
   --background: #08060a;
   --background-secondary: #0e0a12;
@@ -62,6 +67,143 @@
   --glow-primary: 0 0 20px rgba(255, 77, 148, 0.35);
   --glow-secondary: 0 0 20px rgba(168, 85, 247, 0.3);
   --glow-accent: 0 0 20px rgba(0, 229, 204, 0.3);
+  
+  /* Theme-specific gradient colors for body background */
+  --gradient-primary: rgba(255, 77, 148, 0.05);
+  --gradient-secondary: rgba(168, 85, 247, 0.04);
+  --gradient-accent: rgba(0, 229, 204, 0.02);
+}
+
+/* ========================================
+   Theme: Ocean (Blue/Cyan)
+   ======================================== */
+[data-theme="ocean"] {
+  /* Background colors - Deep ocean */
+  --background: #060a10;
+  --background-secondary: #0a1018;
+  --background-tertiary: #101820;
+  --background-elevated: #152230;
+  
+  /* Foreground/Text colors - Cool tones */
+  --foreground: #e8f0f8;
+  --foreground-secondary: #a8b8c8;
+  --foreground-muted: #5c7088;
+  
+  /* Border colors */
+  --border: #1e2a3a;
+  --border-hover: #2e4058;
+  
+  /* Primary - Electric Blue */
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --primary-foreground: #ffffff;
+  
+  /* Secondary - Cyan */
+  --secondary: #06b6d4;
+  --secondary-hover: #22d3ee;
+  --secondary-foreground: #ffffff;
+  
+  /* Accent - Light Cyan */
+  --accent: #22d3ee;
+  --accent-foreground: #0a0a0a;
+  
+  /* Status colors */
+  --success: #10b981;
+  --success-foreground: #ffffff;
+  --warning: #f59e0b;
+  --warning-foreground: #0a0a0a;
+  --danger: #ef4444;
+  --danger-foreground: #ffffff;
+  --info: #0ea5e9;
+  --info-foreground: #ffffff;
+  
+  /* Card/Container */
+  --card: #101820;
+  --card-hover: #152230;
+  --card-foreground: #e8f0f8;
+  
+  /* Input/Form */
+  --input: #152230;
+  --input-focus: #1e2a3a;
+  
+  /* Ring for focus states */
+  --ring: #3b82f6;
+  
+  /* Glow effects */
+  --glow-primary: 0 0 20px rgba(59, 130, 246, 0.35);
+  --glow-secondary: 0 0 20px rgba(6, 182, 212, 0.3);
+  --glow-accent: 0 0 20px rgba(34, 211, 238, 0.3);
+  
+  /* Theme-specific gradient colors for body background */
+  --gradient-primary: rgba(59, 130, 246, 0.05);
+  --gradient-secondary: rgba(6, 182, 212, 0.04);
+  --gradient-accent: rgba(34, 211, 238, 0.02);
+}
+
+/* ========================================
+   Theme: Mystic (Purple/Fuchsia)
+   ======================================== */
+[data-theme="mystic"] {
+  /* Background colors - Deep purple void */
+  --background: #0a0610;
+  --background-secondary: #100a18;
+  --background-tertiary: #180f24;
+  --background-elevated: #201530;
+  
+  /* Foreground/Text colors - Light purple tones */
+  --foreground: #f4e8ff;
+  --foreground-secondary: #c4a8e0;
+  --foreground-muted: #7a5c98;
+  
+  /* Border colors */
+  --border: #2e1e48;
+  --border-hover: #4a2e70;
+  
+  /* Primary - Vibrant Violet */
+  --primary: #8b5cf6;
+  --primary-hover: #a78bfa;
+  --primary-foreground: #ffffff;
+  
+  /* Secondary - Light Purple */
+  --secondary: #c084fc;
+  --secondary-hover: #d8b4fe;
+  --secondary-foreground: #0a0a0a;
+  
+  /* Accent - Fuchsia */
+  --accent: #e879f9;
+  --accent-foreground: #0a0a0a;
+  
+  /* Status colors */
+  --success: #22c55e;
+  --success-foreground: #0a0a0a;
+  --warning: #fbbf24;
+  --warning-foreground: #0a0a0a;
+  --danger: #f43f5e;
+  --danger-foreground: #ffffff;
+  --info: #a78bfa;
+  --info-foreground: #0a0a0a;
+  
+  /* Card/Container */
+  --card: #180f24;
+  --card-hover: #201530;
+  --card-foreground: #f4e8ff;
+  
+  /* Input/Form */
+  --input: #201530;
+  --input-focus: #2e1e48;
+  
+  /* Ring for focus states */
+  --ring: #8b5cf6;
+  
+  /* Glow effects */
+  --glow-primary: 0 0 20px rgba(139, 92, 246, 0.35);
+  --glow-secondary: 0 0 20px rgba(192, 132, 252, 0.3);
+  --glow-accent: 0 0 20px rgba(232, 121, 249, 0.3);
+  
+  /* Theme-specific gradient colors for body background */
+  --gradient-primary: rgba(139, 92, 246, 0.05);
+  --gradient-secondary: rgba(192, 132, 252, 0.04);
+  --gradient-accent: rgba(232, 121, 249, 0.02);
 }
 
 @theme inline {
@@ -117,10 +259,10 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), system-ui, sans-serif;
   background-image: 
-    radial-gradient(ellipse at 20% 0%, rgba(255, 77, 148, 0.05) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(168, 85, 247, 0.04) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, rgba(0, 229, 204, 0.02) 0%, transparent 40%),
-    radial-gradient(circle at 50% 50%, #0e0a12 0%, #08060a 100%);
+    radial-gradient(ellipse at 20% 0%, var(--gradient-primary) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, var(--gradient-secondary) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, var(--gradient-accent) 0%, transparent 40%),
+    radial-gradient(circle at 50% 50%, var(--background-secondary) 0%, var(--background) 100%);
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -192,7 +334,7 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: var(--glow-primary);
   }
   50% {
-    box-shadow: 0 0 30px rgba(255, 77, 148, 0.5);
+    box-shadow: var(--glow-primary), 0 0 30px var(--primary);
   }
 }
 
@@ -222,7 +364,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Glass effect */
 .glass {
-  background: rgba(20, 20, 24, 0.85);
+  background: color-mix(in srgb, var(--background-elevated) 85%, transparent);
   backdrop-filter: blur(12px);
   border: 1px solid var(--border);
 }
@@ -231,7 +373,7 @@ h1, h2, h3, h4, h5, h6 {
 .parchment {
   background: 
     linear-gradient(to bottom, rgba(245, 240, 232, 0.02) 0%, transparent 100%),
-    linear-gradient(135deg, #1a1a1f 0%, #141418 100%);
+    linear-gradient(135deg, var(--background-tertiary) 0%, var(--background-secondary) 100%);
   position: relative;
 }
 
@@ -289,10 +431,10 @@ h1, h2, h3, h4, h5, h6 {
 /* Rune glow */
 @keyframes runeGlow {
   0%, 100% { 
-    text-shadow: 0 0 10px var(--primary), 0 0 20px rgba(255, 77, 148, 0.3);
+    text-shadow: 0 0 10px var(--primary), var(--glow-primary);
   }
   50% { 
-    text-shadow: 0 0 20px var(--primary), 0 0 40px rgba(255, 77, 148, 0.5);
+    text-shadow: 0 0 20px var(--primary), 0 0 40px var(--primary);
   }
 }
 

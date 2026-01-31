@@ -749,3 +749,187 @@ export function usePolling(
     return () => clearInterval(intervalId);
   }, [callback, interval, enabled]);
 }
+
+/**
+ * useMaps Hook - Session harita yönetimi
+ */
+export interface GameMap {
+  id: string;
+  sessionId: string;
+  name?: string;
+  description?: string;
+  imageUrl: string;
+  isAIGenerated: boolean;
+  prompt?: string;
+  createdAt: string;
+}
+
+export function useMaps(sessionId: string) {
+  const [maps, setMaps] = useState<GameMap[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Session haritalarını getir
+   */
+  const fetchMaps = useCallback(async () => {
+    if (!sessionId) return [];
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/maps`);
+      const data = await response.json();
+
+      if (data.success) {
+        setMaps(data.maps);
+        return data.maps;
+      } else {
+        throw new Error(data.message || 'Haritalar yüklenemedi');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Haritalar yüklenemedi');
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  /**
+   * Manuel harita ekle
+   */
+  const addMap = useCallback(async (mapData: { name: string; description?: string; imageUrl: string }) => {
+    if (!sessionId) return null;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/maps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mapData),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMaps((prev) => [data.map, ...prev]);
+        return data.map;
+      } else {
+        throw new Error(data.message || 'Harita eklenemedi');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Harita eklenemedi');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  /**
+   * AI ile harita oluştur
+   */
+  const generateMap = useCallback(async (input: {
+    locationName: string;
+    locationType: string;
+    atmosphere?: string;
+    details?: string[];
+  }) => {
+    if (!sessionId) return null;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/gm/generate-map', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          ...input,
+        }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMaps((prev) => [data.map, ...prev]);
+        return data.map;
+      } else {
+        throw new Error(data.message || 'Harita oluşturulamadı');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Harita oluşturulamadı');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  /**
+   * Harita güncelle
+   */
+  const updateMap = useCallback(async (mapId: string, updateData: { name?: string; description?: string }) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/maps/${mapId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMaps((prev) => prev.map((m) => (m.id === mapId ? data.map : m)));
+        return data.map;
+      } else {
+        throw new Error(data.message || 'Harita güncellenemedi');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Harita güncellenemedi');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /**
+   * Harita sil
+   */
+  const deleteMap = useCallback(async (mapId: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/maps/${mapId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMaps((prev) => prev.filter((m) => m.id !== mapId));
+        return true;
+      } else {
+        throw new Error(data.message || 'Harita silinemedi');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Harita silinemedi');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return {
+    maps,
+    isLoading,
+    error,
+    fetchMaps,
+    addMap,
+    generateMap,
+    updateMap,
+    deleteMap,
+  };
+}

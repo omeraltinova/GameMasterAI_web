@@ -69,14 +69,14 @@ export async function GET(
       where: { sessionId },
     });
 
-    // Mesajları işle - metadata'dan gmPrompt'u çıkar
+// Mesajları işle - metadata'dan gmPrompt'u çıkar
     const processedMessages = messages.map((msg) => {
       let gmPrompt = undefined;
       let metadata: Record<string, unknown> | undefined = undefined;
       if (msg.metadata) {
         try {
           metadata = JSON.parse(msg.metadata);
-          if (metadata.gmPrompt) {
+          if (metadata && metadata.gmPrompt) {
             gmPrompt = metadata.gmPrompt;
           }
         } catch (e) {

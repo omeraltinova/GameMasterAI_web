@@ -21,7 +21,10 @@ import {
   BookOpen,
   User,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
+import { EquipmentSlots } from "@/components/character/EquipmentSlots";
+import { ItemDetailModal } from "@/components/character/ItemDetailModal";
 
 const abilityNames: Record<string, string> = {
   strength: "STR",
@@ -67,6 +70,30 @@ export default function CharacterDetailPage() {
   const [hpUpdateError, setHpUpdateError] = useState<string | null>(null);
   const [isLevelingUp, setIsLevelingUp] = useState(false);
   const [levelUpError, setLevelUpError] = useState<string | null>(null);
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItemData | null>(null);
+
+  // Item tipi emojileri
+  const getItemEmoji = (type: string): string => {
+    const emojis: Record<string, string> = {
+      Weapon: '⚔️',
+      Armor: '🛡️',
+      Shield: '🛡️',
+      Helmet: '🪖',
+      Boots: '👢',
+      Gloves: '🧤',
+      Cloak: '🧥',
+      Ring: '💍',
+      Amulet: '📿',
+      Accessory: '🎀',
+      Potion: '🧪',
+      Scroll: '📜',
+      Tool: '🔧',
+      Consumable: '🍖',
+      Treasure: '💎',
+      Misc: '📦',
+    };
+    return emojis[type] || '📦';
+  };
 
   useEffect(() => {
     if (!characterId) return;
@@ -529,49 +556,136 @@ export default function CharacterDetailPage() {
 
         {/* Inventory Tab */}
         <TabsContent value="inventory">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Backpack className="h-5 w-5 text-primary" />
-                Envanter
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {hasItems ? (
-                <div className="space-y-6">
-                  {typeof totalWeight === "number" && (
-                    <div className="flex items-center justify-between text-xs text-foreground-muted">
-                      <span>Toplam Ağırlık</span>
-                      <span>{totalWeight} lb</span>
-                    </div>
-                  )}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Equipment Slots */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Ekipman Slotları
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <EquipmentSlots
+                  equippedItems={equippedItems.map(item => ({
+                    ...item,
+                    properties: typeof item.properties === 'string' 
+                      ? JSON.parse(item.properties) 
+                      : item.properties || null
+                  }))}
+                  onSlotClick={(slot, item) => {
+                    if (item) {
+                      // Find the original item from equippedItems
+                      const originalItem = equippedItems.find(i => i.id === item.id);
+                      if (originalItem) {
+                        setSelectedInventoryItem(originalItem);
+                      }
+                    }
+                  }}
+                />
+              </CardContent>
+            </Card>
 
-                  {equippedItems.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-3">Kuşanılanlar</h4>
-                      <div className="space-y-3">
-                        {equippedItems.map((item) => renderItem(item))}
-                      </div>
-                    </div>
-                  )}
+            {/* Quick Inventory */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-base">
+                    <Backpack className="h-5 w-5 text-primary" />
+                    Çanta
+                  </span>
+                  <Badge variant="secondary" size="sm">
+                    {inventoryItems.length} item
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {inventoryItems.length > 0 ? (
+                  <div className="space-y-2">
+                    {inventoryItems.slice(0, 5).map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => setSelectedInventoryItem(item)}
+                        className="w-full flex items-center gap-3 p-2 rounded-lg bg-background-elevated hover:bg-border/50 transition-all text-left"
+                      >
+                        <span className="text-lg">
+                          {getItemEmoji(item.type)}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{item.name}</p>
+                          <p className="text-xs text-foreground-muted">{item.type}</p>
+                        </div>
+                        {item.quantity > 1 && (
+                          <Badge variant="outline" size="sm">x{item.quantity}</Badge>
+                        )}
+                      </button>
+                    ))}
+                    {inventoryItems.length > 5 && (
+                      <p className="text-xs text-foreground-muted text-center pt-2">
+                        +{inventoryItems.length - 5} daha fazla item
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center">
+                    <Backpack className="h-10 w-10 text-foreground-muted mx-auto mb-2 opacity-30" />
+                    <p className="text-sm text-foreground-secondary">Çanta boş</p>
+                  </div>
+                )}
 
-                  {inventoryItems.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-3">Envanter</h4>
-                      <div className="space-y-3">
-                        {inventoryItems.map((item) => renderItem(item))}
-                      </div>
+                {/* Weight info */}
+                {typeof totalWeight === "number" && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-foreground-muted">Toplam Ağırlık</span>
+                      <span className="font-medium">{totalWeight} lb</span>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="py-12 text-center">
-                  <Backpack className="h-12 w-12 text-foreground-muted mx-auto mb-3" />
-                  <p className="text-foreground-secondary">Envanter boş</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  </div>
+                )}
+
+                {/* Full Inventory Link */}
+                <Link href={`/characters/${characterId}/inventory`} className="block mt-4">
+                  <Button variant="outline" className="w-full gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Tam Envanteri Görüntüle
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Item Detail Modal */}
+          <ItemDetailModal
+            item={selectedInventoryItem ? {
+              ...selectedInventoryItem,
+              properties: typeof selectedInventoryItem.properties === 'string'
+                ? JSON.parse(selectedInventoryItem.properties)
+                : selectedInventoryItem.properties || null
+            } : null}
+            isOpen={!!selectedInventoryItem}
+            onClose={() => setSelectedInventoryItem(null)}
+            onEquip={async (itemId, equip) => {
+              try {
+                await put(`/characters/${characterId}/inventory/${itemId}/equip`, { equipped: equip });
+                // Refresh inventory
+                const inventoryResponse = await get<{
+                  success: boolean;
+                  equipped: InventoryItemData[];
+                  inventory: InventoryItemData[];
+                  totalWeight: number;
+                }>(`/characters/${characterId}/inventory`);
+                if (inventoryResponse?.success) {
+                  setEquippedItems(inventoryResponse.equipped ?? []);
+                  setInventoryItems(inventoryResponse.inventory ?? []);
+                  setTotalWeight(inventoryResponse.totalWeight ?? null);
+                }
+                setSelectedInventoryItem(null);
+              } catch (error) {
+                console.error("Equip error:", error);
+              }
+            }}
+            editable={false}
+          />
         </TabsContent>
 
         {/* Background Tab */}

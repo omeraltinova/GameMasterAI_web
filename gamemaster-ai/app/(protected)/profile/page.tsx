@@ -12,8 +12,11 @@ import {
   Badge,
   useToast, // Toast yerine useToast import ettik
   ConfirmDialog,
+  ThemeSelector,
 } from "@/components/ui";
 import { useSession, signOut } from "next-auth/react";
+import { useTheme } from "next-themes";
+import { themeConfig, type ThemeColor } from "@/components/providers/ThemeProvider";
 import {
   User,
   Mail,
@@ -22,8 +25,10 @@ import {
   Save,
   Lock,
   Palette,
+  Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 export default function ProfilePage() {
   const { data: session, update } = useSession();
@@ -149,9 +154,78 @@ export default function ProfilePage() {
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
-  };
+};
 
   if (!user) return null;
+
+  // Theme Preference Component
+  const ThemePreference = () => {
+    const { theme, setTheme } = useTheme();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+      setMounted(true);
+    }, []);
+
+    if (!mounted) {
+      return (
+        <div className="p-4 rounded-lg bg-background-elevated">
+          <div className="animate-pulse h-20 bg-background-tertiary rounded" />
+        </div>
+      );
+    }
+
+    const themes = Object.entries(themeConfig) as [ThemeColor, typeof themeConfig[ThemeColor]][];
+    const currentTheme = themeConfig[theme as ThemeColor] || themeConfig.arcane;
+
+    return (
+      <div className="p-4 rounded-lg bg-background-elevated space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h4 className="font-medium">Tema</h4>
+            <p className="text-sm text-foreground-muted">Arayüz renk teması</p>
+          </div>
+          <Badge variant="primary">{currentTheme.label}</Badge>
+        </div>
+        <div className="flex gap-3">
+          {themes.map(([key, config]) => (
+            <button
+              key={key}
+              onClick={() => setTheme(key)}
+              className={cn(
+                "flex-1 p-4 rounded-lg border-2 transition-all duration-200",
+                "hover:scale-[1.02] active:scale-[0.98]",
+                theme === key
+                  ? "border-primary bg-primary/10"
+                  : "border-border hover:border-border-hover bg-background-tertiary"
+              )}
+            >
+              <div className="flex flex-col items-center gap-2">
+                <div
+                  className={cn(
+                    "w-8 h-8 rounded-full flex items-center justify-center",
+                    "ring-2 ring-offset-2 ring-offset-background-elevated",
+                    theme === key ? "ring-primary" : "ring-transparent"
+                  )}
+                  style={{ backgroundColor: config.color }}
+                >
+                  {theme === key && (
+                    <Check className="h-4 w-4 text-white" />
+                  )}
+                </div>
+                <span className={cn(
+                  "text-sm font-medium",
+                  theme === key ? "text-primary" : "text-foreground-secondary"
+                )}>
+                  {config.label}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-10">
@@ -284,7 +358,7 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Preferences */}
+{/* Preferences */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -293,13 +367,7 @@ export default function ProfilePage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-lg bg-background-elevated">
-            <div>
-              <h4 className="font-medium">Tema</h4>
-              <p className="text-sm text-foreground-muted">Arayüz görünümü</p>
-            </div>
-            <Badge variant="primary">Karanlık</Badge>
-          </div>
+          <ThemePreference />
           <div className="flex items-center justify-between p-4 rounded-lg bg-background-elevated">
             <div>
               <h4 className="font-medium">Dil</h4>

@@ -162,6 +162,7 @@ export default function NewCharacterPage() {
         maxHp: maxHp,
         stats: formData.stats,
         background: formData.background || undefined,
+        backstory: formData.backstory || undefined,
         imageUrl: formData.imageUrl || undefined,
       });
 

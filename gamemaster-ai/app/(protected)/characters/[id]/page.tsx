@@ -1,12 +1,12 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar, Progress } from "@/components/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar, Progress, ConfirmDialog } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { formatModifier, calculateModifier, getProficiencyBonus } from "@/lib/utils";
-import { get, put } from "@/lib/api/client";
+import { get, put, del } from "@/lib/api/client";
 import type { Character as CharacterType, InventoryItem, ItemProperties } from "@/types";
 import {
   ArrowLeft,
@@ -22,6 +22,7 @@ import {
   User,
   Loader2,
   ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { EquipmentSlots } from "@/components/character/EquipmentSlots";
 import { ItemDetailModal } from "@/components/character/ItemDetailModal";
@@ -58,6 +59,7 @@ const defaultStats = {
 
 export default function CharacterDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const characterId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [character, setCharacter] = useState<Character | null>(null);
   const [equippedItems, setEquippedItems] = useState<InventoryItemData[]>([]);
@@ -68,9 +70,12 @@ export default function CharacterDetailPage() {
   const [hpInput, setHpInput] = useState<number>(0);
   const [isUpdatingHp, setIsUpdatingHp] = useState(false);
   const [hpUpdateError, setHpUpdateError] = useState<string | null>(null);
-  const [isLevelingUp, setIsLevelingUp] = useState(false);
+const [isLevelingUp, setIsLevelingUp] = useState(false);
   const [levelUpError, setLevelUpError] = useState<string | null>(null);
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItemData | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Item tipi emojileri
   const getItemEmoji = (type: string): string => {
@@ -317,8 +322,28 @@ export default function CharacterDetailPage() {
     } catch (error) {
       console.error("Level up error:", error);
       setLevelUpError("Seviye atlanamadi.");
-    } finally {
+  } finally {
       setIsLevelingUp(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!character) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const response = await del<{ success: boolean; message: string }>(`/characters/${character.id}`);
+
+      if (response?.success) {
+        router.push("/characters");
+      } else {
+        setDeleteError("Karakter silinemedi.");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      setDeleteError("Karakter silinemedi.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -364,12 +389,23 @@ export default function CharacterDetailPage() {
                     </div>
                   )}
                 </div>
-                <Link href={`/characters/${character.id}/edit`}>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Edit className="h-4 w-4" />
-                    Düzenle
+                <div className="flex gap-2">
+                  <Link href={`/characters/${character.id}/edit`}>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Edit className="h-4 w-4" />
+                      Düzenle
+                    </Button>
+                  </Link>
+                  <Button 
+                    variant="danger" 
+                    size="sm" 
+                    className="gap-2"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Sil
                   </Button>
-                </Link>
+                </div>
               </div>
 
               {/* Quick Stats */}
@@ -698,10 +734,19 @@ export default function CharacterDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {character.background ? (
-                <p className="text-foreground-secondary leading-relaxed">
-                  {character.background}
-                </p>
+              {character.backstory ? (
+                <div className="space-y-4">
+                  {character.background && (
+                    <div>
+                      <Badge variant="outline" className="mb-2">
+                        {character.background}
+                      </Badge>
+                    </div>
+                  )}
+                  <p className="text-foreground-secondary leading-relaxed whitespace-pre-wrap">
+                    {character.backstory}
+                  </p>
+                </div>
               ) : (
                 <div className="py-12 text-center">
                   <User className="h-12 w-12 text-foreground-muted mx-auto mb-3" />
@@ -714,6 +759,19 @@ export default function CharacterDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDelete}
+        title="Karakteri Sil"
+        description={`"${character?.name}" karakterini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`}
+        confirmText="Sil"
+        cancelText="İptal"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

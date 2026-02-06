@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
         maxHp: char.maxHp,
         stats: JSON.parse(char.stats),
         background: char.background,
+        backstory: char.backstory,
         imageUrl: char.imageUrl,
         campaignId: char.campaignId,
         campaign: char.campaign,
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
       maxHp,
       stats,
       background,
+      backstory,
       imageUrl,
     } = parsed.data;
 
@@ -113,7 +115,7 @@ export async function POST(req: NextRequest) {
         experience: experience || 0,
         hp: hp || 10,
         maxHp: maxHp || 10,
-        stats: typeof stats === 'object' 
+        stats: typeof stats === 'object'
           ? JSON.stringify(stats)
           : JSON.stringify({
               strength: 10,
@@ -124,6 +126,7 @@ export async function POST(req: NextRequest) {
               charisma: 10,
             }),
         background,
+        backstory,
         imageUrl,
       },
     });
@@ -141,6 +144,7 @@ export async function POST(req: NextRequest) {
         maxHp: character.maxHp,
         stats: JSON.parse(character.stats),
         background: character.background,
+        backstory: character.backstory,
         imageUrl: character.imageUrl,
         createdAt: character.createdAt,
       },

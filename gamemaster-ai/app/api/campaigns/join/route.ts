@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
 
-// POST /api/campaigns/join - Davet kodu ile kampanyayı bul
+// POST /api/campaigns/join - Davet kodu ile oturumu bul
 export async function POST(req: NextRequest) {
   try {
     const userId = await getUserId();
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Kampanyayı davet kodu ile bul
+    // Oturumu davet kodu ile bul
     const campaign = await prisma.campaign.findFirst({
       where: {
         inviteCode: inviteCode.toUpperCase(),
@@ -53,19 +53,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Kampanya durumunu kontrol et
+    // Oturum durumunu kontrol et
     if (campaign.status === "COMPLETED") {
       return NextResponse.json(
-        { success: false, error: "Bu kampanya tamamlanmış" },
+        { success: false, error: "Bu oturum tamamlanmış" },
         { status: 400 }
       );
     }
 
-    // Kullanıcı zaten kampanyada mı
+    // Kullanıcı zaten oturumda mı
     const isAlreadyPlayer = campaign.players.some((p) => p.userId === userId);
     const isCreator = campaign.creatorId === userId;
 
-    // Kampanya dolu mu
+    // Oturum dolu mu
     const isFull = campaign.players.length >= campaign.maxPlayers;
 
     return NextResponse.json({

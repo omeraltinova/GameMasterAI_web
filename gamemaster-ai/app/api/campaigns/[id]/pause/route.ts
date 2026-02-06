@@ -17,7 +17,7 @@ export async function POST(
 
     if (!campaign) {
       return NextResponse.json(
-        { error: 'Kampanya bulunamadı' },
+        { error: 'Oturum bulunamadı' },
         { status: 404 }
       );
     }
@@ -40,7 +40,7 @@ export async function POST(
 
       if (!creatorPlayer) {
         return NextResponse.json(
-          { error: 'Kampanyayi baslatmak icin once karakter secmelisiniz' },
+          { error: 'Oturumu baslatmak icin once karakter secmelisiniz' },
           { status: 400 }
         );
       }
@@ -54,7 +54,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: 'Kampanya duraklatıldı',
+      message: 'Oturum duraklatıldı',
     });
   } catch (error) {
     console.error('Pause hatası:', error);

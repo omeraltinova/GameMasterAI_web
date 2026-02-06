@@ -7,6 +7,7 @@ import { get, post, put, buildQuery, APIError } from '@/lib/api/client';
 import { useGameStore } from '@/store/gameStore';
 import type {
   Message,
+  Suggestion,
   GameSession,
   GameState,
   Character,
@@ -27,6 +28,7 @@ export function useGame(sessionId: string) {
   const setMessages = useGameStore((state) => state.setMessages);
   const addMessageToStore = useGameStore((state) => state.addMessage);
   const addMessagesToStore = useGameStore((state) => state.addMessages);
+  const removeMessageFromStore = useGameStore((state) => state.removeMessage);
   const resetStore = useGameStore((state) => state.reset);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -196,6 +198,13 @@ export function useGame(sessionId: string) {
   }, [addMessagesToStore]);
 
   /**
+   * Mesaj sil (temp mesajları kaldırmak için)
+   */
+  const removeMessage = useCallback((id: string) => {
+    removeMessageFromStore(id);
+  }, [removeMessageFromStore]);
+
+  /**
    * Hata durumunu temizle
    */
   const clearError = useCallback(() => {
@@ -229,6 +238,7 @@ export function useGame(sessionId: string) {
     updateSession,
     addMessage,
     addMessages,
+    removeMessage,
     clearError,
   };
 }
@@ -392,14 +402,9 @@ export function useGM(sessionId: string) {
   };
 }
 
-/**
- * Suggestion tipi
- */
-export interface Suggestion {
-  id: string;
-  shortLabel: string;
-  detailedAction: string;
-}
+// Suggestion tipi artık types/index.ts'den geliyor
+export type { Suggestion } from '@/types';
+import type { Suggestion } from '@/types';
 
 interface LocationImageOptions {
   createMessage?: boolean;
@@ -409,6 +414,7 @@ interface LocationImageOptions {
 
 /**
  * useSuggestions Hook - AI aksiyon önerileri
+ * Kaydedilmiş önerileri mesajdan yükler, yeni önerileri API'den alır ve DB'ye kaydeder
  */
 export function useSuggestions(sessionId: string) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -416,9 +422,29 @@ export function useSuggestions(sessionId: string) {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Önerileri getir
+   * Mesajlardan kaydedilmiş önerileri yükle (API çağrısı yapmaz)
    */
-  const fetchSuggestions = useCallback(async (lastGMMessage: string) => {
+  const loadSuggestionsFromMessages = useCallback((messages: Message[]) => {
+    // Son GM mesajını bul
+    const lastGM = [...messages].reverse().find(m => m.senderType === 'GM');
+    if (!lastGM) return;
+
+    // GM zaten aksiyon seçeneği sunmuşsa suggestions gösterme
+    if (lastGM.gmPrompt?.actions && lastGM.gmPrompt.actions.length > 0) {
+      setSuggestions([]);
+      return;
+    }
+
+    // Kaydedilmiş suggestions varsa yükle
+    if (lastGM.suggestions && lastGM.suggestions.length > 0) {
+      setSuggestions(lastGM.suggestions);
+    }
+  }, []);
+
+  /**
+   * Yeni öneriler getir (API çağrısı yapar - Yeniden Öner butonu veya ilk oluşturma)
+   */
+  const fetchSuggestions = useCallback(async (lastGMMessage: string, messageId?: string) => {
     if (!sessionId) return null;
 
     setIsLoading(true);
@@ -434,6 +460,7 @@ export function useSuggestions(sessionId: string) {
         {
           sessionId,
           lastGMMessage,
+          messageId,
         }
       );
 
@@ -461,6 +488,7 @@ export function useSuggestions(sessionId: string) {
     isLoading,
     error,
     fetchSuggestions,
+    loadSuggestionsFromMessages,
     clearSuggestions,
   };
 }
@@ -673,7 +701,7 @@ export function useCharacters() {
 }
 
 /**
- * useCampaigns Hook - Kampanya yönetimi
+ * useCampaigns Hook - Oturum yönetimi
  */
 export function useCampaigns() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -681,7 +709,7 @@ export function useCampaigns() {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Kullanıcının kampanyalarını getir
+   * Kullanıcının oturumlarını getir
    */
   const fetchCampaigns = useCallback(async () => {
     setIsLoading(true);
@@ -694,7 +722,7 @@ export function useCampaigns() {
       }
       return [];
     } catch (err) {
-      setError(err instanceof APIError ? err.message : 'Kampanyalar yüklenemedi');
+      setError(err instanceof APIError ? err.message : 'Oturumlar yüklenemedi');
       return [];
     } finally {
       setIsLoading(false);
@@ -702,7 +730,7 @@ export function useCampaigns() {
   }, []);
 
   /**
-   * Yeni kampanya oluştur
+   * Yeni oturum oluştur
    */
   const createCampaign = useCallback(async (campaignData: Partial<Campaign>) => {
     setIsLoading(true);
@@ -715,7 +743,7 @@ export function useCampaigns() {
       }
       return null;
     } catch (err) {
-      setError(err instanceof APIError ? err.message : 'Kampanya oluşturulamadı');
+      setError(err instanceof APIError ? err.message : 'Oturum oluşturulamadı');
       return null;
     } finally {
       setIsLoading(false);
@@ -723,7 +751,7 @@ export function useCampaigns() {
   }, []);
 
   /**
-   * Component mount olduğunda kampanyaları getir
+   * Component mount olduğunda oturumları getir
    */
   useEffect(() => {
     fetchCampaigns();

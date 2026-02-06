@@ -10,6 +10,7 @@ import {
   Swords,
   Map,
   User,
+  UserSearch,
   Shield,
   Settings,
   Activity,
@@ -23,6 +24,7 @@ const navItems = [
   { href: "/characters", label: "Karakterler", icon: Users },
   { href: "/campaigns", label: "Oturumlar", icon: Swords },
   { href: "/scenarios", label: "Senaryolar", icon: Map },
+  { href: "/players", label: "Oyuncular", icon: UserSearch },
   { href: "/profile", label: "Profil", icon: User },
 ];
 

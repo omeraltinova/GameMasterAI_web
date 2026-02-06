@@ -128,11 +128,11 @@ export default function ActiveSessionsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold">Aktif Oturumlar</h1>
-          <p className="text-foreground-secondary">Canlı kampanyaları izle ve yönet</p>
+          <p className="text-foreground-secondary">Canlı oturumları izle ve yönet</p>
         </div>
         <div className="w-full sm:w-auto">
           <Input
-            placeholder="Kampanya, yazar veya senaryo ara..."
+            placeholder="Oturum, yazar veya senaryo ara..."
             leftIcon={<Search className="h-4 w-4" />}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -147,7 +147,7 @@ export default function ActiveSessionsPage() {
             <table className="w-full">
               <thead className="bg-background-elevated border-b border-border">
                 <tr>
-                  <th className="text-left py-3 px-4 text-sm font-medium">Kampanya</th>
+                  <th className="text-left py-3 px-4 text-sm font-medium">Oturum</th>
                   <th className="text-left py-3 px-4 text-sm font-medium">Senaryo</th>
                   <th className="text-left py-3 px-4 text-sm font-medium">Oyuncu</th>
                   <th className="text-left py-3 px-4 text-sm font-medium">Son Aktivite</th>
@@ -176,7 +176,7 @@ export default function ActiveSessionsPage() {
                         </div>
                       </td>
                       <td className="py-3 px-4 text-sm text-foreground-secondary">
-                        {item.scenario?.title || "Özel Kampanya"}
+                        {item.scenario?.title || "Özel Oturum"}
                       </td>
                       <td className="py-3 px-4 text-sm text-foreground-secondary">
                         {item.playersCount} oyuncu
@@ -302,7 +302,7 @@ export default function ActiveSessionsPage() {
         description={
           confirmAction?.type === "reset"
             ? "Bu işlem tüm mesajları sıfırlar ve yeni bir başlangıç yapar."
-            : "Bu işlem kampanyayı duraklatır ve oyuncular erişemez."
+            : "Bu işlem oturumu duraklatır ve oyuncular erişemez."
         }
         variant={confirmAction?.type === "reset" ? "warning" : "danger"}
         confirmText={confirmAction?.type === "reset" ? "Sıfırla" : "Duraklat"}

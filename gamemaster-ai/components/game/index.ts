@@ -10,3 +10,4 @@ export { GameSetupWizard } from "./GameSetupWizard";
 export { ActionButtons, rollDiceForAction } from "./ActionButtons";
 export { ActionSuggestions } from "./ActionSuggestions";
 export { LocationImage } from './LocationImage';
+export { CharacterModal } from './CharacterModal';

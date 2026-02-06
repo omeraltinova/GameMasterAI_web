@@ -19,7 +19,7 @@ export async function GET() {
 
     return NextResponse.json(campaigns);
   } catch (error) {
-    return NextResponse.json({ error: "Kampanyalar alınamadı" }, { status: 500 });
+    return NextResponse.json({ error: "Oturumlar alınamadı" }, { status: 500 });
   }
 }
 
@@ -39,7 +39,7 @@ export async function DELETE(req: Request) {
     });
 
     if (!campaign) {
-      return NextResponse.json({ error: "Kampanya bulunamadı" }, { status: 404 });
+      return NextResponse.json({ error: "Oturum bulunamadı" }, { status: 404 });
     }
 
     await prisma.campaign.delete({ where: { id } });

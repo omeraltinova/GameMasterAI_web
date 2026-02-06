@@ -27,7 +27,7 @@ export async function POST(
       );
     }
 
-    // Kampanyayı kontrol et
+    // Oturumu kontrol et
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
       include: {
@@ -37,7 +37,7 @@ export async function POST(
 
     if (!campaign) {
       return NextResponse.json(
-        { success: false, error: "Kampanya bulunamadı" },
+        { success: false, error: "Oturum bulunamadı" },
         { status: 404 }
       );
     }
@@ -57,19 +57,19 @@ export async function POST(
       );
     }
 
-    // Karakterin başka kampanyada olup olmadığını kontrol et
+    // Karakterin başka oturumda olup olmadığını kontrol et
     if (character.campaignId && character.campaignId !== campaignId) {
       return NextResponse.json(
-        { success: false, error: "Bu karakter başka bir kampanyada" },
+        { success: false, error: "Bu karakter başka bir oturumda" },
         { status: 400 }
       );
     }
 
-    // Kampanya dolu mu kontrol et
+    // Oturum dolu mu kontrol et
     const activePlayerCount = campaign.players.filter((p) => p.isActive).length;
     if (activePlayerCount >= campaign.maxPlayers) {
       return NextResponse.json(
-        { success: false, error: "Kampanya dolu" },
+        { success: false, error: "Oturum dolu" },
         { status: 400 }
       );
     }

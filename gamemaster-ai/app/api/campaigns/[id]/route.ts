@@ -140,10 +140,15 @@ export async function PUT(
     if (body.maxPlayers !== undefined) updateData.maxPlayers = body.maxPlayers;
     if (body.isMultiplayer !== undefined) updateData.isMultiplayer = body.isMultiplayer;
 
+    // Davet kodunu kapatma (null olarak set etme)
+    if (body.inviteCode === null) {
+      updateData.inviteCode = null;
+    }
+
     if (body.scenarioId !== undefined) {
       if (campaign.status !== "DRAFT") {
         return NextResponse.json(
-          { success: false, error: "Senaryo sadece taslak kampanyada degistirilebilir" },
+          { success: false, error: "Senaryo sadece taslak oturumda degistirilebilir" },
           { status: 400 }
         );
       }

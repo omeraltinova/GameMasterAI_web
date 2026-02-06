@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
 
-// POST /api/campaigns/:id/complete - Kampanyayı tamamla
+// POST /api/campaigns/:id/complete - Oturumu tamamla
 export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -18,14 +18,14 @@ export async function POST(
 
         const { id: campaignId } = await params;
 
-        // Kampanyayı bul
+        // Oturumu bul
         const campaign = await prisma.campaign.findUnique({
             where: { id: campaignId },
         });
 
         if (!campaign) {
             return NextResponse.json(
-                { success: false, error: 'Kampanya bulunamadı' },
+                { success: false, error: 'Oturum bulunamadı' },
                 { status: 404 }
             );
         }
@@ -41,12 +41,12 @@ export async function POST(
         // Zaten tamamlanmış mı kontrol et
         if (campaign.status === 'COMPLETED') {
             return NextResponse.json(
-                { success: false, error: 'Kampanya zaten tamamlandı' },
+                { success: false, error: 'Oturum zaten tamamlandı' },
                 { status: 400 }
             );
         }
 
-        // Kampanyayı COMPLETED yap
+        // Oturumu COMPLETED yap
         await prisma.campaign.update({
             where: { id: campaignId },
             data: { status: 'COMPLETED' },
@@ -54,7 +54,7 @@ export async function POST(
 
         return NextResponse.json({
             success: true,
-            message: 'Kampanya tamamlandı',
+            message: 'Oturum tamamlandı',
         });
     } catch (error) {
         console.error('Complete campaign error:', error);

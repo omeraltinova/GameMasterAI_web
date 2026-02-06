@@ -7,6 +7,7 @@ export type SystemSettingsInput = {
   maintenanceMessage?: string | null;
   aiPrimaryModel?: string | null;
   aiFallbackModel?: string | null;
+  aiSuggestionsModel?: string | null;
   aiRequestsPerMinute?: number | null;
   updatedById?: string | null;
 };
@@ -22,6 +23,7 @@ export function normalizeSystemSettingsInput(input: SystemSettingsInput) {
     maintenanceMessage: input.maintenanceMessage?.trim() || null,
     aiPrimaryModel: input.aiPrimaryModel?.trim() || null,
     aiFallbackModel: input.aiFallbackModel?.trim() || null,
+    aiSuggestionsModel: input.aiSuggestionsModel?.trim() || null,
     aiRequestsPerMinute: normalizedRequestsPerMinute,
     updatedById: input.updatedById || null,
   };

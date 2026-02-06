@@ -11,6 +11,7 @@ interface GameStoreState {
   addMessage: (message: Message) => void;
   addMessages: (messages: Message[]) => void;
   updateMessage: (id: string, updates: Partial<Message>) => void;
+  removeMessage: (id: string) => void;
   reset: () => void;
 }
 
@@ -57,6 +58,10 @@ export const useGameStore = create<GameStoreState>((set) => ({
       messages: state.messages.map((m) =>
         m.id === id ? { ...m, ...updates } : m
       ),
+    })),
+  removeMessage: (id) =>
+    set((state) => ({
+      messages: state.messages.filter((m) => m.id !== id),
     })),
   reset: () => set({ session: null, gameState: null, messages: [] }),
 }));

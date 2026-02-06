@@ -19,6 +19,10 @@ import {
   LogOut,
   UserCheck,
   Search,
+  LinkIcon,
+  Unlink,
+  RefreshCw,
+  User,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { formatDate } from "@/lib/utils";
@@ -47,6 +51,7 @@ export default function CampaignLobbyPage() {
   const [isLoadingScenarios, setIsLoadingScenarios] = useState(false);
   const [isUpdatingScenario, setIsUpdatingScenario] = useState(false);
   const [scenarioUpdateError, setScenarioUpdateError] = useState<string | null>(null);
+  const [isTogglingInvite, setIsTogglingInvite] = useState(false);
 
   const currentUserId = session?.user?.id;
   const isCreator = campaign?.creatorId === currentUserId;
@@ -85,7 +90,7 @@ export default function CampaignLobbyPage() {
           // Get user's available characters
           const charsResponse = await get('/characters') as { success: boolean; characters: any[] };
           if (charsResponse && charsResponse.success && charsResponse.characters) {
-            // Başka kampanyada olmayan veya bu kampanyada olan karakterler
+            // Başka oturumda olmayan veya bu oturumda olan karakterler
             const available = charsResponse.characters.filter(
               (c: any) => !c.campaignId || c.campaignId === response.campaign.id
             );
@@ -186,6 +191,40 @@ export default function CampaignLobbyPage() {
     }
   };
 
+  // Davet kodunu kapat
+  const handleDisableInvite = async () => {
+    if (!campaign) return;
+    setIsTogglingInvite(true);
+    try {
+      const response = await put(`/campaigns/${campaign.id}`, {
+        inviteCode: null,
+      }) as { success: boolean };
+      if (response && response.success) {
+        setCampaign((prev: any) => prev ? { ...prev, inviteCode: null } : prev);
+      }
+    } catch (error) {
+      console.error('Davet kodu kapatma hatası:', error);
+    } finally {
+      setIsTogglingInvite(false);
+    }
+  };
+
+  // Davet kodunu aç (yeni kod üret)
+  const handleEnableInvite = async () => {
+    if (!campaign) return;
+    setIsTogglingInvite(true);
+    try {
+      const response = await post(`/campaigns/${campaign.id}/invite`) as { success: boolean; inviteCode?: string };
+      if (response && response.success && response.inviteCode) {
+        setCampaign((prev: any) => prev ? { ...prev, inviteCode: response.inviteCode } : prev);
+      }
+    } catch (error) {
+      console.error('Davet kodu oluşturma hatası:', error);
+    } finally {
+      setIsTogglingInvite(false);
+    }
+  };
+
   const handleScenarioChange = async (scenarioId: string | null) => {
     if (!campaign) return;
 
@@ -228,7 +267,7 @@ export default function CampaignLobbyPage() {
   if (!campaign) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <h1 className="text-2xl font-bold mb-4">Kampanya bulunamadı</h1>
+        <h1 className="text-2xl font-bold mb-4">Oturum bulunamadı</h1>
         <Link href="/campaigns">
           <Button variant="outline">Oturumlara Dön</Button>
         </Link>
@@ -251,6 +290,7 @@ export default function CampaignLobbyPage() {
     COMPLETED: "secondary",
   };
 
+  const isSolo = !campaign.isMultiplayer;
   const hasCharacterSelected = Boolean(selectedCharacterId);
   const canChangeScenario = isCreator && campaign?.status === "DRAFT";
   const filteredScenarios = availableScenarios.filter((item) => {
@@ -351,11 +391,11 @@ export default function CampaignLobbyPage() {
               <Button
                 className="gap-2"
                 disabled={!hasCharacterSelected}
-                title={!hasCharacterSelected ? "Kampanyayı başlatmak için önce karakter seçmelisin" : undefined}
+                title={!hasCharacterSelected ? "Oturumu başlatmak için önce karakter seçmelisin" : undefined}
                 onClick={async () => {
                   if (!hasCharacterSelected) return;
                   try {
-                    // Kampanya durumunu ACTIVE yap
+                    // Oturum durumunu ACTIVE yap
                     await post(`/campaigns/${campaign.id}/pause`); // Bu endpoint ACTIVE'e de çevirebilir
                     window.location.reload();
                   } catch (err) {
@@ -364,7 +404,7 @@ export default function CampaignLobbyPage() {
                 }}
               >
                 <Play className="h-4 w-4" />
-                Kampanyayı Başlat
+                Oturumu Başlat
               </Button>
             )}
 
@@ -387,8 +427,8 @@ export default function CampaignLobbyPage() {
               </Button>
             )}
 
-            {/* Lobiden Ayrıl - creator değilse */}
-            {hasJoined && !isCreator && (
+            {/* Lobiden Ayrıl - multiplayer & creator değilse */}
+            {!isSolo && hasJoined && !isCreator && (
               <Button
                 variant="outline"
                 className="gap-2 text-danger hover:bg-danger/10"
@@ -484,8 +524,17 @@ export default function CampaignLobbyPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5 text-primary" />
-                  Oyuncular ({allParticipants.length}/{campaign.maxPlayers})
+                  {isSolo ? (
+                    <>
+                      <User className="h-5 w-5 text-primary" />
+                      Oyuncu
+                    </>
+                  ) : (
+                    <>
+                      <Users className="h-5 w-5 text-primary" />
+                      Oyuncular ({allParticipants.length}/{campaign.maxPlayers})
+                    </>
+                  )}
                 </CardTitle>
               </div>
             </CardHeader>
@@ -507,13 +556,17 @@ export default function CampaignLobbyPage() {
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h4 className="font-semibold">
+                        <Link
+                          href={`/players/${player.userId}`}
+                          className="font-semibold hover:text-primary transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           {player.user?.username}
                           {player.userId === currentUserId && (
                             <span className="text-primary ml-1">(Sen)</span>
                           )}
-                        </h4>
-                        {player.isCreator && (
+                        </Link>
+                        {!isSolo && player.isCreator && (
                           <Badge variant="warning" size="sm" className="gap-1">
                             <Crown className="h-3 w-3" />
                             Kurucu
@@ -531,13 +584,15 @@ export default function CampaignLobbyPage() {
                         </p>
                       )}
                     </div>
-                    <Badge variant={player.isActive ? "success" : "default"}>
-                      {player.isActive ? "Hazır" : "Bekliyor"}
-                    </Badge>
+                    {!isSolo && (
+                      <Badge variant={player.isActive ? "success" : "default"}>
+                        {player.isActive ? "Hazır" : "Bekliyor"}
+                      </Badge>
+                    )}
                   </div>
                 ))}
 
-                {allParticipants.length < campaign.maxPlayers && (
+                {!isSolo && allParticipants.length < campaign.maxPlayers && (
                   <div className="flex items-center justify-center gap-2 p-4 rounded-lg border-2 border-dashed border-border text-foreground-muted">
                     <UserPlus className="h-5 w-5" />
                     <span>Oyuncu bekleniyor...</span>
@@ -550,34 +605,116 @@ export default function CampaignLobbyPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          {/* Invite Code - her zaman göster */}
-          {campaign.inviteCode && (
+          {/* Invite Code - sadece multiplayer modda göster */}
+          {!isSolo && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Davet Kodu</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <LinkIcon className="h-4 w-4" />
+                    Davet Kodu
+                  </CardTitle>
+                  {isCreator && (
+                    campaign.inviteCode ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleDisableInvite}
+                        disabled={isTogglingInvite}
+                        className="text-foreground-muted hover:text-danger gap-1 text-xs"
+                        title="Davet kodunu kapat"
+                      >
+                        {isTogglingInvite ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Unlink className="h-3 w-3" />
+                        )}
+                        Kapat
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleEnableInvite}
+                        disabled={isTogglingInvite}
+                        className="text-foreground-muted hover:text-success gap-1 text-xs"
+                        title="Davet kodunu aç"
+                      >
+                        {isTogglingInvite ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <LinkIcon className="h-3 w-3" />
+                        )}
+                        Aç
+                      </Button>
+                    )
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 px-4 py-3 rounded-lg bg-background-elevated font-mono text-lg text-center">
-                    {campaign.inviteCode}
-                  </code>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopyCode}
-                    className="shrink-0"
-                  >
-                    {codeCopied ? (
-                      <Check className="h-4 w-4 text-success" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
+                {campaign.inviteCode ? (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 px-4 py-3 rounded-lg bg-background-elevated font-mono text-lg text-center">
+                        {campaign.inviteCode}
+                      </code>
+                      <div className="flex flex-col gap-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCopyCode}
+                          className="shrink-0"
+                          title="Kopyala"
+                        >
+                          {codeCopied ? (
+                            <Check className="h-4 w-4 text-success" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
+                        {isCreator && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleEnableInvite}
+                            disabled={isTogglingInvite}
+                            className="shrink-0"
+                            title="Yeni kod üret"
+                          >
+                            <RefreshCw className={`h-4 w-4 ${isTogglingInvite ? 'animate-spin' : ''}`} />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-xs text-foreground-muted mt-2 text-center">
+                      Bu kodu arkadaşlarınla paylaşarak onları oturuma davet
+                      edebilirsin.
+                    </p>
+                  </>
+                ) : (
+                  <div className="text-center py-4">
+                    <Unlink className="h-8 w-8 mx-auto mb-2 text-foreground-muted opacity-50" />
+                    <p className="text-sm text-foreground-muted">
+                      Davet kodu kapalı. Yeni oyuncular katılamaz.
+                    </p>
+                    {isCreator && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 gap-2"
+                        onClick={handleEnableInvite}
+                        disabled={isTogglingInvite}
+                      >
+                        {isTogglingInvite ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <LinkIcon className="h-4 w-4" />
+                        )}
+                        Daveti Aç
+                      </Button>
                     )}
-                  </Button>
-                </div>
-                <p className="text-xs text-foreground-muted mt-2 text-center">
-                  Bu kodu arkadaşlarınla paylaşarak onları kampanyaya davet
-                  edebilirsin.
-                </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}
@@ -614,11 +751,37 @@ export default function CampaignLobbyPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <UserCheck className="h-5 w-5 text-primary" />
-                Karakterini Seç
+                {hasCharacterSelected && campaign.status !== "DRAFT" ? "Karakterin" : "Karakterini Seç"}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {availableCharacters.length > 0 ? (
+              {/* Oyun başladıysa ve karakter seçiliyse, değiştirmeye izin verme */}
+              {hasCharacterSelected && campaign.status !== "DRAFT" ? (
+                <div className="space-y-3">
+                  {(() => {
+                    const selectedChar = availableCharacters.find((c: any) => c.id === selectedCharacterId);
+                    if (!selectedChar) return null;
+                    return (
+                      <div className="flex items-center gap-3 p-3 rounded-lg border border-primary bg-primary/10">
+                        <Avatar fallback={selectedChar.name} size="sm" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{selectedChar.name}</p>
+                          <p className="text-xs text-foreground-muted">
+                            Lv.{selectedChar.level} {selectedChar.race} {selectedChar.class}
+                          </p>
+                        </div>
+                        <Badge variant="success" size="sm">
+                          <Check className="h-3 w-3 mr-1" />
+                          Seçili
+                        </Badge>
+                      </div>
+                    );
+                  })()}
+                  <p className="text-xs text-foreground-muted text-center">
+                    Oyun başladıktan sonra karakter değiştirilemez.
+                  </p>
+                </div>
+              ) : availableCharacters.length > 0 ? (
                 <div className="space-y-2">
                   {availableCharacters.map((char: any) => {
                     const isSelected = selectedCharacterId === char.id;

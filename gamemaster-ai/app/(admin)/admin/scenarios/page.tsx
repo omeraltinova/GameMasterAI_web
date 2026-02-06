@@ -472,7 +472,7 @@ export default function ScenariosPage() {
                             </div>
                           </td>
                           <td className="py-3 px-4 text-sm text-foreground-secondary">
-                            {scenario._count.campaigns} Kampanya
+                            {scenario._count.campaigns} Oturum
                           </td>
                           <td className="py-3 px-4 text-right">
                             <div className="flex justify-end gap-2">

@@ -26,6 +26,14 @@ import {
   Lock,
   Palette,
   Check,
+  Eye,
+  EyeOff,
+  Globe,
+  Swords,
+  Scroll,
+  BarChart3,
+  Users,
+  Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -46,12 +54,20 @@ export default function ProfilePage() {
     confirmPassword: "",
   });
 
+  const [privacy, setPrivacy] = useState({
+    profilePublic: true,
+    showCharacters: true,
+    showCampaigns: true,
+    showScenarios: true,
+    showStats: true,
+  });
+  const [privacyLoaded, setPrivacyLoaded] = useState(false);
+  const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
+
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-
-  // Manuel toast state'ine gerek kalmadı, useToast halledecek
 
   // Session yüklendiğinde formu doldur
   useEffect(() => {
@@ -62,6 +78,29 @@ export default function ProfilePage() {
       });
     }
   }, [session]);
+
+  // Gizlilik ayarlarını yükle
+  useEffect(() => {
+    const loadPrivacy = async () => {
+      try {
+        const res = await fetch("/api/profile");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.user) {
+            setPrivacy({
+              profilePublic: data.user.profilePublic ?? true,
+              showCharacters: data.user.showCharacters ?? true,
+              showCampaigns: data.user.showCampaigns ?? true,
+              showScenarios: data.user.showScenarios ?? true,
+              showStats: data.user.showStats ?? true,
+            });
+          }
+        }
+      } catch { /* ignore */ }
+      setPrivacyLoaded(true);
+    };
+    loadPrivacy();
+  }, []);
 
   const showToast = (message: string, type: "success" | "error") => {
     addToast({
@@ -135,6 +174,24 @@ export default function ProfilePage() {
     }
   };
 
+  const handlePrivacySave = async () => {
+    setIsSavingPrivacy(true);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ privacy }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Güncelleme başarısız");
+      showToast("Gizlilik ayarları kaydedildi", "success");
+    } catch (error: any) {
+      showToast(error.message, "error");
+    } finally {
+      setIsSavingPrivacy(false);
+    }
+  };
+
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
@@ -187,13 +244,13 @@ export default function ProfilePage() {
           </div>
           <Badge variant="primary">{currentTheme.label}</Badge>
         </div>
-        <div className="flex gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
           {themes.map(([key, config]) => (
             <button
               key={key}
               onClick={() => setTheme(key)}
               className={cn(
-                "flex-1 p-4 rounded-lg border-2 transition-all duration-200",
+                "p-3 sm:p-4 rounded-lg border-2 transition-all duration-200",
                 "hover:scale-[1.02] active:scale-[0.98]",
                 theme === key
                   ? "border-primary bg-primary/10"
@@ -358,7 +415,82 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-{/* Preferences */}
+      {/* Privacy Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Eye className="h-5 w-5 text-primary" />
+            Profil Gizliliği
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {!privacyLoaded ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-foreground-muted" />
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-foreground-muted">
+                Profilinin diğer oyunculara nasıl göründüğünü kontrol et.
+              </p>
+
+              {/* Ana toggle: Profil herkese açık mı */}
+              <PrivacyToggle
+                icon={Globe}
+                label="Profil Herkese Açık"
+                description="Kapatırsan profilin sadece sana görünür"
+                checked={privacy.profilePublic}
+                onChange={(v) => setPrivacy((p) => ({ ...p, profilePublic: v }))}
+              />
+
+              <div className={cn(
+                "space-y-3 pl-4 border-l-2 border-border transition-opacity",
+                !privacy.profilePublic && "opacity-40 pointer-events-none"
+              )}>
+                <PrivacyToggle
+                  icon={Users}
+                  label="Karakterleri Göster"
+                  description="Karakter listenin profilinde gözükmesi"
+                  checked={privacy.showCharacters}
+                  onChange={(v) => setPrivacy((p) => ({ ...p, showCharacters: v }))}
+                />
+                <PrivacyToggle
+                  icon={Swords}
+                  label="Oturumları Göster"
+                  description="Oturum listenin profilinde gözükmesi"
+                  checked={privacy.showCampaigns}
+                  onChange={(v) => setPrivacy((p) => ({ ...p, showCampaigns: v }))}
+                />
+                <PrivacyToggle
+                  icon={Scroll}
+                  label="Senaryoları Göster"
+                  description="Oluşturduğun senaryoların profilinde gözükmesi"
+                  checked={privacy.showScenarios}
+                  onChange={(v) => setPrivacy((p) => ({ ...p, showScenarios: v }))}
+                />
+                <PrivacyToggle
+                  icon={BarChart3}
+                  label="İstatistikleri Göster"
+                  description="Zar, mesaj ve başarım istatistiklerinin gözükmesi"
+                  checked={privacy.showStats}
+                  onChange={(v) => setPrivacy((p) => ({ ...p, showStats: v }))}
+                />
+              </div>
+
+              <Button
+                onClick={handlePrivacySave}
+                isLoading={isSavingPrivacy}
+                className="gap-2"
+              >
+                <Save className="h-4 w-4" />
+                Gizlilik Ayarlarını Kaydet
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Preferences */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -426,12 +558,56 @@ export default function ProfilePage() {
         onClose={() => setShowDeleteConfirm(false)}
         onConfirm={handleDeleteAccount}
         title="Hesabınızı silmek istediğinize emin misiniz?"
-        description="Bu işlem geri alınamaz. Tüm karakterleriniz, kampanyalarınız ve verileriniz kalıcı olarak silinecektir."
+        description="Bu işlem geri alınamaz. Tüm karakterleriniz, oturumlarınız ve verileriniz kalıcı olarak silinecektir."
         confirmText="Evet, Hesabı Sil"
         cancelText="İptal"
         variant="danger"
         isLoading={isDeleting}
       />
+    </div>
+  );
+}
+
+// Toggle bileşeni
+function PrivacyToggle({
+  icon: Icon,
+  label,
+  description,
+  checked,
+  onChange,
+}: {
+  icon: React.ElementType;
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (value: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between p-4 rounded-lg bg-background-elevated">
+      <div className="flex items-center gap-3">
+        <Icon className="h-4 w-4 text-foreground-secondary shrink-0" />
+        <div>
+          <h4 className="font-medium text-sm">{label}</h4>
+          <p className="text-xs text-foreground-muted">{description}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        className={cn(
+          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200",
+          checked ? "bg-primary" : "bg-foreground-muted/30"
+        )}
+      >
+        <span
+          className={cn(
+            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200",
+            checked ? "translate-x-5" : "translate-x-0"
+          )}
+        />
+      </button>
     </div>
   );
 }

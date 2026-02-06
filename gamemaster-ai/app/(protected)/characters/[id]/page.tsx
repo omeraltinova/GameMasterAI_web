@@ -358,7 +358,7 @@ export default function CharacterDetailPage() {
                     <div className="mt-2">
                       <Link href={`/campaigns/${character.campaign.id}`}>
                         <Badge variant="outline">
-                          Kampanya: {character.campaign.name}
+                          Oturum: {character.campaign.name}
                         </Badge>
                       </Link>
                     </div>

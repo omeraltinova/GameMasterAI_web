@@ -202,7 +202,7 @@ export async function DELETE(
         // Sadece creator silebilir
         if (session.campaign.creatorId !== userId) {
             return NextResponse.json(
-                { success: false, error: 'Sadece kampanya sahibi NPC silebilir' },
+                { success: false, error: 'Sadece oturum sahibi NPC silebilir' },
                 { status: 403 }
             );
         }

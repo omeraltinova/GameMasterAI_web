@@ -19,14 +19,14 @@ export async function POST(
 
     const { id: campaignId } = await params;
 
-    // Kampanyayı bul
+    // Oturumu bul
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
     });
 
     if (!campaign) {
       return NextResponse.json(
-        { success: false, error: 'Kampanya bulunamadı' },
+        { success: false, error: 'Oturum bulunamadı' },
         { status: 404 }
       );
     }
@@ -42,7 +42,7 @@ export async function POST(
     // Yeni benzersiz davet kodu oluştur
     const newInviteCode = randomBytes(4).toString('hex').toUpperCase();
 
-    // Kampanyayı güncelle
+    // Oturumu güncelle
     const updatedCampaign = await prisma.campaign.update({
       where: { id: campaignId },
       data: { inviteCode: newInviteCode },

@@ -18,14 +18,14 @@ export async function DELETE(
 
         const { id: campaignId, playerId } = await params;
 
-        // Kampanyayı bul
+        // Oturumu bul
         const campaign = await prisma.campaign.findUnique({
             where: { id: campaignId },
         });
 
         if (!campaign) {
             return NextResponse.json(
-                { success: false, error: 'Kampanya bulunamadı' },
+                { success: false, error: 'Oturum bulunamadı' },
                 { status: 404 }
             );
         }
@@ -51,10 +51,10 @@ export async function DELETE(
             );
         }
 
-        // Kampanya kurucusunu atamazsın
+        // Oturum kurucusunu atamazsın
         if (player.userId === campaign.creatorId) {
             return NextResponse.json(
-                { success: false, error: 'Kampanya kurucusunu atamazsınız' },
+                { success: false, error: 'Oturum kurucusunu atamazsınız' },
                 { status: 400 }
             );
         }
@@ -74,7 +74,7 @@ export async function DELETE(
 
         return NextResponse.json({
             success: true,
-            message: 'Oyuncu kampanyadan çıkarıldı',
+            message: 'Oyuncu oturumdan çıkarıldı',
         });
     } catch (error) {
         console.error('Kick player error:', error);

@@ -305,7 +305,7 @@ export default function AdminDashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Kampanya Tamamlanma</CardTitle>
+              <CardTitle>Oturum Tamamlanma</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">

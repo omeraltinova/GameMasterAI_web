@@ -153,7 +153,7 @@ export default function UsersPage() {
                       </Badge>
                     </td>
                     <td className="py-3 px-4 text-sm text-foreground-secondary">
-                      {user._count.characters} Karakter, {user._count.campaigns} Kampanya
+                      {user._count.characters} Karakter, {user._count.campaigns} Oturum
                     </td>
                     <td className="py-3 px-4 text-sm text-foreground-secondary">
                       {new Date(user.createdAt).toLocaleDateString("tr-TR")}
@@ -194,7 +194,7 @@ export default function UsersPage() {
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         title="Kullanıcıyı Sil"
-        description="Bu kullanıcı ve tüm verileri (karakterler, kampanyalar) kalıcı olarak silinecek. Emin misiniz?"
+        description="Bu kullanıcı ve tüm verileri (karakterler, oturumlar) kalıcı olarak silinecek. Emin misiniz?"
         variant="danger"
         confirmText="Sil"
       />

@@ -78,7 +78,7 @@ async function main() {
   });
   console.log('✅ Karakter oluşturuldu:', character.name);
 
-  // 4. Test kampanya oluştur
+  // 4. Test oturum oluştur
   const campaign = await prisma.campaign.upsert({
     where: { id: 'campaign_test_1' },
     update: {},
@@ -94,9 +94,9 @@ async function main() {
       status: 'ACTIVE',
     },
   });
-  console.log('✅ Kampanya oluşturuldu:', campaign.name);
+  console.log('✅ Oturum oluşturuldu:', campaign.name);
 
-  // 5. Kampanya-oyuncu ilişkisi oluştur
+  // 5. Oturum-oyuncu ilişkisi oluştur
   const campaignPlayer = await prisma.campaignPlayer.upsert({
     where: { 
       campaignId_userId: {
@@ -112,14 +112,14 @@ async function main() {
       isActive: true,
     },
   });
-  console.log('✅ Kampanya-oyuncu ilişkisi oluşturuldu');
+  console.log('✅ Oturum-oyuncu ilişkisi oluşturuldu');
 
-  // 6. Karakteri kampanyaya atayalım
+  // 6. Karakteri oturuma atayalım
   const updatedCharacter = await prisma.character.update({
     where: { id: character.id },
     data: { campaignId: campaign.id },
   });
-  console.log('✅ Karakter kampanyaya atandı');
+  console.log('✅ Karakter oturuma atandı');
 
   // 7. Test envanter öğeleri oluştur
   const items = [
@@ -232,7 +232,7 @@ async function main() {
   console.log('📝 Test bilgileri:');
   console.log('   Email: test@example.com');
   console.log('   Password: password123');
-  console.log('   Kampanya ID:', campaign.id);
+  console.log('   Oturum ID:', campaign.id);
   console.log('   Session ID:', session.id);
   console.log('   Karakter ID:', character.id);
   console.log('\n🔗 Test URL: http://localhost:3000/campaigns/' + campaign.id + '/play');

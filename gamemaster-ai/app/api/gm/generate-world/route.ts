@@ -51,8 +51,8 @@ ${JSON.stringify(currentSettings, null, 2)}
 Bu ayarları daha detaylı ve ilgi çekici hale getir:`;
     } else {
       // Sıfırdan öner
-      userPrompt = `"${campaignName}" adlı bir D&D kampanyası için dünya ayarları öner.
-${campaignDescription ? `Kampanya açıklaması: ${campaignDescription}` : ''}
+      userPrompt = `"${campaignName}" adlı bir D&D oturumu için dünya ayarları öner.
+${campaignDescription ? `Oturum açıklaması: ${campaignDescription}` : ''}
 ${worldType ? `İstenen dünya tipi: ${worldType}` : ''}
 
 Yaratıcı ve ilgi çekici bir dünya tasarla:`;
@@ -60,7 +60,7 @@ Yaratıcı ve ilgi çekici bir dünya tasarla:`;
 
     const systemPrompt = `Sen yaratıcı bir D&D Game Master'sın. Görevin oyuncular için ilgi çekici ve sürükleyici dünya ayarları oluşturmak.
 
-GÖREV: Bir D&D kampanyası için dünya ayarları oluştur.
+GÖREV: Bir D&D oturumu için dünya ayarları oluştur.
 
 ÇIKTI FORMATI: Aşağıdaki JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
 {

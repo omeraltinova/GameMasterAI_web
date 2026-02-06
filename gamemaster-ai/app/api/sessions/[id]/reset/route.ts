@@ -51,7 +51,7 @@ export async function POST(
     const isCreator = session.campaign.creatorId === userId;
     if (!isCreator) {
       return NextResponse.json(
-        { message: 'Sadece kampanya yaratıcısı oyunu sıfırlayabilir' },
+        { message: 'Sadece oturum yaratıcısı oyunu sıfırlayabilir' },
         { status: 403 }
       );
     }

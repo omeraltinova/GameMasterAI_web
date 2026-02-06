@@ -2,7 +2,7 @@
 
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 
-export type ThemeColor = "arcane" | "ocean" | "mystic";
+export type ThemeColor = "arcane" | "ocean" | "mystic" | "ember" | "shadow" | "verdant";
 
 export const themeConfig = {
   arcane: {
@@ -20,6 +20,21 @@ export const themeConfig = {
     description: "Mor ve fuşya tonları", 
     color: "#8b5cf6",
   },
+  ember: {
+    label: "Ember",
+    description: "Ateş ve ejderha tonları",
+    color: "#f97316",
+  },
+  shadow: {
+    label: "Shadow",
+    description: "Gece ve gölge tonları",
+    color: "#94a3b8",
+  },
+  verdant: {
+    label: "Verdant",
+    description: "Orman ve doğa tonları",
+    color: "#10b981",
+  },
 } as const;
 
 export const themes = Object.keys(themeConfig) as ThemeColor[];
@@ -32,7 +47,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   return (
     <NextThemesProvider
       attribute="data-theme"
-      defaultTheme="arcane"
+      defaultTheme="shadow"
       themes={themes}
       enableSystem={false}
       disableTransitionOnChange={false}

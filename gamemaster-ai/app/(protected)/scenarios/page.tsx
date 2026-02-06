@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button, Card, CardContent, Badge } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { ScenarioCard } from "@/components/scenario/ScenarioCard";
-import { Plus, Search, Sparkles, BookOpen, Map, Loader2 } from "lucide-react";
+import { Plus, Search, Sparkles, BookOpen, Map, Loader2, LayoutGrid, Hash } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -26,7 +26,8 @@ export default function ScenariosPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [genreFilter, setGenreFilter] = useState<string>("");
-  const [activeTab, setActiveTab] = useState("official");
+  const [tagFilter, setTagFilter] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("all");
   
   const [officialScenarios, setOfficialScenarios] = useState<Scenario[]>([]);
   const [myScenarios, setMyScenarios] = useState<Scenario[]>([]);
@@ -58,6 +59,11 @@ export default function ScenariosPage() {
            if (data.data) {
              setAllScenarios(data.data.filter((s: Scenario) => !s.isOfficial));
            }
+        } else if (activeTab === "all") {
+           const res = await fetch(`/api/scenarios?${params.toString()}`);
+           const data = await res.json();
+           const scenarios = Array.isArray(data) ? data : data.data || [];
+           setAllScenarios(scenarios);
         } else {
            const res = await fetch(`${url}?${params.toString()}`);
            const data = await res.json();
@@ -84,10 +90,33 @@ export default function ScenariosPage() {
   }, [activeTab, searchQuery, genreFilter]);
 
 
-  const displayedScenarios = 
+  // Aktif sekmeye göre baz senaryoları belirle
+  const baseScenarios = 
+    activeTab === "all" ? allScenarios :
     activeTab === "official" ? officialScenarios :
     activeTab === "mine" ? myScenarios :
     allScenarios;
+
+  // Tag parse yardımcı fonksiyonu
+  const parseTags = (tags: any): string[] => {
+    const parsed = typeof tags === "string" ? JSON.parse(tags) : tags;
+    return Array.isArray(parsed) ? parsed : [];
+  };
+
+  // Mevcut senaryolardan benzersiz tag'leri topla
+  const availableTags = useMemo(() => {
+    const tagSet = new Set<string>();
+    baseScenarios.forEach((s) => {
+      parseTags(s.tags).forEach((tag) => tagSet.add(tag));
+    });
+    return Array.from(tagSet).sort();
+  }, [baseScenarios]);
+
+  // Tag filtresi uygulanmış senaryolar
+  const displayedScenarios = useMemo(() => {
+    if (!tagFilter) return baseScenarios;
+    return baseScenarios.filter((s) => parseTags(s.tags).includes(tagFilter));
+  }, [baseScenarios, tagFilter]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -141,9 +170,37 @@ export default function ScenariosPage() {
         </div>
       </div>
 
+      {/* Tag Filters */}
+      {availableTags.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <Hash className="h-4 w-4 text-foreground-muted shrink-0" />
+          <Button
+            variant={!tagFilter ? "primary" : "outline"}
+            size="sm"
+            onClick={() => setTagFilter("")}
+          >
+            Tümü
+          </Button>
+          {availableTags.map((tag) => (
+            <Button
+              key={tag}
+              variant={tagFilter === tag ? "primary" : "outline"}
+              size="sm"
+              onClick={() => setTagFilter(tag)}
+            >
+              #{tag}
+            </Button>
+          ))}
+        </div>
+      )}
+
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={(val) => { setActiveTab(val); setTagFilter(""); }}>
         <TabsList>
+          <TabsTrigger value="all">
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Tümü
+          </TabsTrigger>
           <TabsTrigger value="official">
             <BookOpen className="h-4 w-4 mr-2" />
             Resmi

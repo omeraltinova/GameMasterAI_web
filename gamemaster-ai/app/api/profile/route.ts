@@ -3,7 +3,50 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
 
-// KULLANICI GÜNCELLEME (PATCH)
+// KULLANICI BİLGİLERİ (GET) — gizlilik ayarları dahil
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Oturum açılmamış" }, { status: 401 });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        avatar: true,
+        role: true,
+        createdAt: true,
+        profilePublic: true,
+        showCharacters: true,
+        showCampaigns: true,
+        showScenarios: true,
+        showStats: true,
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "Kullanıcı bulunamadı" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    console.error("Profil bilgileri hatası:", error);
+    return NextResponse.json(
+      { error: "Profil bilgileri alınırken bir hata oluştu." },
+      { status: 500 }
+    );
+  }
+}
+
+// KULLANICI GÜNCELLEME (PATCH) — gizlilik ayarları dahil
 export async function PATCH(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -13,7 +56,7 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json();
-    const { name } = body;
+    const { name, privacy } = body;
     const data: Record<string, unknown> = {};
 
     if (typeof name === "string") {
@@ -41,6 +84,23 @@ export async function PATCH(req: Request) {
       data.username = name;
     }
 
+    // Gizlilik ayarları
+    if (privacy && typeof privacy === "object") {
+      const booleanFields = [
+        "profilePublic",
+        "showCharacters",
+        "showCampaigns",
+        "showScenarios",
+        "showStats",
+      ] as const;
+
+      for (const field of booleanFields) {
+        if (typeof privacy[field] === "boolean") {
+          data[field] = privacy[field];
+        }
+      }
+    }
+
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
         { error: "Güncellenecek veri bulunamadı." },
@@ -52,6 +112,15 @@ export async function PATCH(req: Request) {
     const updatedUser = await prisma.user.update({
       where: { email: session.user.email },
       data,
+      select: {
+        username: true,
+        email: true,
+        profilePublic: true,
+        showCharacters: true,
+        showCampaigns: true,
+        showScenarios: true,
+        showStats: true,
+      },
     });
 
     return NextResponse.json({
@@ -59,6 +128,13 @@ export async function PATCH(req: Request) {
       user: {
         name: updatedUser.username,
         email: updatedUser.email,
+        privacy: {
+          profilePublic: updatedUser.profilePublic,
+          showCharacters: updatedUser.showCharacters,
+          showCampaigns: updatedUser.showCampaigns,
+          showScenarios: updatedUser.showScenarios,
+          showStats: updatedUser.showStats,
+        },
       },
     });
   } catch (error) {

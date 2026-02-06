@@ -11,7 +11,7 @@ export async function GET(
   const { id: campaignId } = await params;
 
   try {
-    // 1. Kampanyayı al
+    // 1. Oturumu al
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
       include: {
@@ -37,7 +37,7 @@ export async function GET(
     });
 
     if (!campaign) {
-      return NextResponse.json({ error: 'Kampanya bulunamadı' }, { status: 404 });
+      return NextResponse.json({ error: 'Oturum bulunamadı' }, { status: 404 });
     }
 
     // 2. Erişim kontrolü
@@ -45,7 +45,7 @@ export async function GET(
                      campaign.players.some((p: any) => p.userId === userId);
 
     if (!hasAccess) {
-      return NextResponse.json({ error: 'Bu kampanyaya erişimin yok' }, { status: 403 });
+      return NextResponse.json({ error: 'Bu oturuma erişimin yok' }, { status: 403 });
     }
 
     // 3. Session var mı?
@@ -109,10 +109,10 @@ export async function GET(
           console.log('[active-session] AI mesajı oluşturuldu:', welcomeMessage.substring(0, 100));
         } catch (err) {
           console.error('[active-session] AI hatası:', err);
-          welcomeMessage = `🎲 **${scenarioName}** kampanyasına hoş geldiniz!\n\n${campaign.scenario.description || 'Macera başlamak üzere.'}`;
+          welcomeMessage = `🎲 **${scenarioName}** oturumuna hoş geldiniz!\n\n${campaign.scenario.description || 'Macera başlamak üzere.'}`;
         }
       } else {
-        welcomeMessage = `🎲 **${scenarioName}** kampanyasına hoş geldiniz!\n\nMacera başlamak üzere.`;
+        welcomeMessage = `🎲 **${scenarioName}** oturumuna hoş geldiniz!\n\nMacera başlamak üzere.`;
       }
 
       // Mesajı kaydet
@@ -141,7 +141,7 @@ export async function GET(
       }
     }
 
-    // Kampanya durumunu ACTIVE yap
+    // Oturum durumunu ACTIVE yap
     if (campaign.status !== 'ACTIVE') {
       await prisma.campaign.update({
         where: { id: campaignId },
@@ -149,9 +149,40 @@ export async function GET(
       });
     }
 
+    // Mesajlardaki metadata'yı parse et (gmPrompt ve suggestions çıkar)
+    const processedSession = {
+      ...session,
+      messages: (session.messages || []).map((msg: any) => {
+        let gmPrompt = undefined;
+        let suggestions = undefined;
+        let metadata: Record<string, unknown> | undefined = undefined;
+
+        if (msg.metadata) {
+          try {
+            metadata = typeof msg.metadata === 'string' ? JSON.parse(msg.metadata) : msg.metadata;
+            if (metadata && metadata.gmPrompt) {
+              gmPrompt = metadata.gmPrompt;
+            }
+            if (metadata && metadata.suggestions) {
+              suggestions = metadata.suggestions;
+            }
+          } catch {
+            // metadata parse edilemezse ignore et
+          }
+        }
+
+        return {
+          ...msg,
+          metadata,
+          gmPrompt,
+          suggestions,
+        };
+      }),
+    };
+
     return NextResponse.json({
       success: true,
-      session,
+      session: processedSession,
       campaign,
     });
   } catch (error) {

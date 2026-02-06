@@ -5,7 +5,7 @@ import { randomBytes } from 'crypto';
 
 /**
  * GET /api/campaigns
- * Kullanıcının kampanyaları endpoint'i
+ * Kullanıcının oturumları endpoint'i
  */
 export async function GET(req: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
       return unauthorizedResponse();
     }
 
-    // Kullanıcının kampanyalarını al
+    // Kullanıcının oturumlarını al
     const campaigns = await prisma.campaign.findMany({
       where: {
         OR: [
@@ -97,7 +97,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/campaigns
- * Yeni kampanya endpoint'i
+ * Yeni oturum endpoint'i
  */
 export async function POST(req: NextRequest) {
   try {
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     // Validation
     if (!name || typeof name !== 'string') {
       return NextResponse.json(
-        { message: 'Kampanya adı gerekiyor' },
+        { message: 'Oturum adı gerekiyor' },
         { status: 400 }
       );
     }
@@ -120,9 +120,9 @@ export async function POST(req: NextRequest) {
 
     const inviteCode = randomBytes(4).toString('hex').toUpperCase();
 
-    // Yeni kampanya oluştur
+    // Yeni oturum oluştur
     // Not: CampaignPlayer kaydı karakter seçildikten sonra oluşturulacak
-    // Creator'ın kampanyayı görmesi için creatorId yeterli
+    // Creator'ın oturumu görmesi için creatorId yeterli
     const campaign = await prisma.campaign.create({
       data: {
         name,
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
         status: campaign.status,
         createdAt: campaign.createdAt,
       },
-      message: 'Kampanya başarıyla oluşturuldu',
+      message: 'Oturum başarıyla oluşturuldu',
     });
   } catch (error) {
     console.error('Campaign creation error:', error);

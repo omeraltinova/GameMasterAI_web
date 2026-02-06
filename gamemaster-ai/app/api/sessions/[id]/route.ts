@@ -77,8 +77,33 @@ if (!session) {
       return forbiddenResponse('Bu session\'a erişim yetkiniz yok');
     }
 
-    // Mesajları kronolojik sıraya koy
-    const messages = session.messages.reverse();
+    // Mesajları kronolojik sıraya koy ve metadata parse et
+    const processedMessages = session.messages.reverse().map((msg) => {
+      let gmPrompt = undefined;
+      let suggestions = undefined;
+      let metadata: Record<string, unknown> | undefined = undefined;
+
+      if (msg.metadata) {
+        try {
+          metadata = typeof msg.metadata === 'string' ? JSON.parse(msg.metadata) : msg.metadata;
+          if (metadata && metadata.gmPrompt) {
+            gmPrompt = metadata.gmPrompt;
+          }
+          if (metadata && metadata.suggestions) {
+            suggestions = metadata.suggestions;
+          }
+        } catch {
+          // metadata parse edilemezse ignore et
+        }
+      }
+
+      return {
+        ...msg,
+        metadata,
+        gmPrompt,
+        suggestions,
+      };
+    });
 
     return NextResponse.json({
       success: true,
@@ -97,7 +122,7 @@ if (!session) {
         },
         currentState: JSON.parse(session.currentState),
         aiContext: session.aiContext,
-        messages,
+        messages: processedMessages,
         npcs: session.npcs,
         combats: session.combats,
         maps: session.maps,

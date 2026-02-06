@@ -69,15 +69,19 @@ export async function GET(
       where: { sessionId },
     });
 
-// Mesajları işle - metadata'dan gmPrompt'u çıkar
+// Mesajları işle - metadata'dan gmPrompt ve suggestions çıkar
     const processedMessages = messages.map((msg) => {
       let gmPrompt = undefined;
+      let suggestions = undefined;
       let metadata: Record<string, unknown> | undefined = undefined;
       if (msg.metadata) {
         try {
           metadata = JSON.parse(msg.metadata);
           if (metadata && metadata.gmPrompt) {
             gmPrompt = metadata.gmPrompt;
+          }
+          if (metadata && metadata.suggestions) {
+            suggestions = metadata.suggestions;
           }
         } catch (e) {
           // metadata parse edilemezse ignore et
@@ -87,6 +91,7 @@ export async function GET(
         ...msg,
         metadata,
         gmPrompt,
+        suggestions,
         locationImageUrl: msg.locationImageUrl,
         locationName: msg.locationName,
       };

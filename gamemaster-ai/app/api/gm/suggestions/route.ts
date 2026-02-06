@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import { getAIResponseWithContext } from '@/lib/ai/openrouter';
+import { getAIResponseWithContext, resolveSuggestionsModel } from '@/lib/ai/openrouter';
 import { getUserId } from '@/lib/auth/server';
 import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { sessionId, lastGMMessage } = body;
+    const { sessionId, lastGMMessage, messageId } = body;
 
     if (!sessionId) {
       return NextResponse.json(
@@ -140,11 +140,15 @@ Yanıtını aşağıdaki JSON formatında ver:
 - Her öneri farklı bir yaklaşımı temsil etsin (savaş, diplomasi, gizlilik, keşif, vb.)
 - Duruma uygun ve mantıklı öneriler sun`;
 
+    // Suggestions için ayrı model kullan (admin paneli / env ile ayarlanabilir)
+    const suggestionsModel = await resolveSuggestionsModel();
+
     const aiResponse = await getAIResponseWithContext(
       SUGGESTIONS_SYSTEM_PROMPT,
       contextPrompt,
       userPrompt,
       {
+        model: suggestionsModel,
         temperature: 0.9, // Daha yaratıcı öneriler için
         maxTokens: 10000,  // Öneri yanıtları için yeterli
       }
@@ -230,6 +234,46 @@ Yanıtını aşağıdaki JSON formatında ver:
         { id: 'fallback_2', shortLabel: '💬 Konuş', detailedAction: 'Birisiyle konuşmaya çalışıyorum' },
         { id: 'fallback_3', shortLabel: '🚶 İlerle', detailedAction: 'Dikkatli bir şekilde ilerliyorum' },
       ];
+    }
+
+    // Suggestions'ı ilgili GM mesajının metadata'sına kaydet
+    // messageId gönderildiyse onu kullan, yoksa son GM mesajını bul
+    try {
+      let targetMessageId = messageId;
+
+      if (!targetMessageId) {
+        const lastGM = await prisma.message.findFirst({
+          where: { sessionId, senderType: 'GM' },
+          orderBy: { timestamp: 'desc' },
+          select: { id: true, metadata: true },
+        });
+        targetMessageId = lastGM?.id;
+      }
+
+      if (targetMessageId) {
+        // Mevcut metadata'yı oku ve suggestions ekle
+        const targetMsg = await prisma.message.findUnique({
+          where: { id: targetMessageId },
+          select: { metadata: true },
+        });
+
+        let existingMetadata: Record<string, unknown> = {};
+        if (targetMsg?.metadata) {
+          try {
+            existingMetadata = JSON.parse(targetMsg.metadata);
+          } catch { /* ignore */ }
+        }
+
+        await prisma.message.update({
+          where: { id: targetMessageId },
+          data: {
+            metadata: JSON.stringify({ ...existingMetadata, suggestions }),
+          },
+        });
+      }
+    } catch (saveErr) {
+      console.error('Suggestions kaydetme hatası:', saveErr);
+      // Kaydetme başarısız olsa bile önerileri döndür
     }
 
     return NextResponse.json({

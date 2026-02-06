@@ -5,8 +5,15 @@
 /* ========================================
    Theme: Arcane (Default - Pink/Purple)
    ======================================== */
+:root {
+  /* Shadows (tema-bağımsız) */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.6);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.7), 0 4px 6px -4px rgb(0 0 0 / 0.7);
+}
+
 :root,
-[data-theme="arcane"] {
+html[data-theme="arcane"] {
   /* Background colors - Deep void */
   --background: #08060a;
   --background-secondary: #0e0a12;
@@ -58,11 +65,6 @@
   /* Ring for focus states */
   --ring: #ff4d94;
   
-  /* Shadows */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
-  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.6), 0 2px 4px -2px rgb(0 0 0 / 0.6);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.7), 0 4px 6px -4px rgb(0 0 0 / 0.7);
-  
   /* Glow effects - Neon */
   --glow-primary: 0 0 20px rgba(255, 77, 148, 0.35);
   --glow-secondary: 0 0 20px rgba(168, 85, 247, 0.3);
@@ -77,7 +79,7 @@
 /* ========================================
    Theme: Ocean (Blue/Cyan)
    ======================================== */
-[data-theme="ocean"] {
+html[data-theme="ocean"] {
   /* Background colors - Deep ocean */
   --background: #060a10;
   --background-secondary: #0a1018;
@@ -143,7 +145,7 @@
 /* ========================================
    Theme: Mystic (Purple/Fuchsia)
    ======================================== */
-[data-theme="mystic"] {
+html[data-theme="mystic"] {
   /* Background colors - Deep purple void */
   --background: #0a0610;
   --background-secondary: #100a18;
@@ -204,6 +206,204 @@
   --gradient-primary: rgba(139, 92, 246, 0.05);
   --gradient-secondary: rgba(192, 132, 252, 0.04);
   --gradient-accent: rgba(232, 121, 249, 0.02);
+}
+
+/* ========================================
+   Theme: Ember (Red/Orange - Fire & Dragons)
+   ======================================== */
+html[data-theme="ember"] {
+  /* Background colors - Volcanic depths */
+  --background: #0c0604;
+  --background-secondary: #140c08;
+  --background-tertiary: #1c120c;
+  --background-elevated: #261a12;
+  
+  /* Foreground/Text colors - Warm ash tones */
+  --foreground: #f8f0e8;
+  --foreground-secondary: #c8b0a0;
+  --foreground-muted: #8a6e5c;
+  
+  /* Border colors */
+  --border: #3a2418;
+  --border-hover: #4e3424;
+  
+  /* Primary - Inferno Orange */
+  --primary: #f97316;
+  --primary-hover: #fb923c;
+  --primary-foreground: #ffffff;
+  
+  /* Secondary - Crimson Red */
+  --secondary: #ef4444;
+  --secondary-hover: #f87171;
+  --secondary-foreground: #ffffff;
+  
+  /* Accent - Molten Gold */
+  --accent: #fbbf24;
+  --accent-foreground: #0a0a0a;
+  
+  /* Status colors */
+  --success: #22c55e;
+  --success-foreground: #0a0a0a;
+  --warning: #fbbf24;
+  --warning-foreground: #0a0a0a;
+  --danger: #dc2626;
+  --danger-foreground: #ffffff;
+  --info: #fb923c;
+  --info-foreground: #0a0a0a;
+  
+  /* Card/Container */
+  --card: #1c120c;
+  --card-hover: #261a12;
+  --card-foreground: #f8f0e8;
+  
+  /* Input/Form */
+  --input: #261a12;
+  --input-focus: #3a2418;
+  
+  /* Ring for focus states */
+  --ring: #f97316;
+  
+  /* Glow effects */
+  --glow-primary: 0 0 20px rgba(249, 115, 22, 0.35);
+  --glow-secondary: 0 0 20px rgba(239, 68, 68, 0.3);
+  --glow-accent: 0 0 20px rgba(251, 191, 36, 0.3);
+  
+  /* Theme-specific gradient colors for body background */
+  --gradient-primary: rgba(249, 115, 22, 0.06);
+  --gradient-secondary: rgba(239, 68, 68, 0.04);
+  --gradient-accent: rgba(251, 191, 36, 0.02);
+}
+
+/* ========================================
+   Theme: Shadow (Gray/Silver - Rogue & Night)
+   ======================================== */
+html[data-theme="shadow"] {
+  /* Background colors - Abyssal darkness */
+  --background: #09090b;
+  --background-secondary: #0f0f12;
+  --background-tertiary: #16161a;
+  --background-elevated: #1e1e24;
+  
+  /* Foreground/Text colors - Moonlit silver */
+  --foreground: #ececf0;
+  --foreground-secondary: #a0a0b0;
+  --foreground-muted: #606072;
+  
+  /* Border colors */
+  --border: #26262e;
+  --border-hover: #38383e;
+  
+  /* Primary - Moonlight Silver */
+  --primary: #94a3b8;
+  --primary-hover: #b0bec5;
+  --primary-foreground: #0a0a0a;
+  
+  /* Secondary - Steel Blue */
+  --secondary: #64748b;
+  --secondary-hover: #78909c;
+  --secondary-foreground: #ffffff;
+  
+  /* Accent - Pale Gold Dagger */
+  --accent: #d4a853;
+  --accent-foreground: #0a0a0a;
+  
+  /* Status colors */
+  --success: #4ade80;
+  --success-foreground: #0a0a0a;
+  --warning: #facc15;
+  --warning-foreground: #0a0a0a;
+  --danger: #f87171;
+  --danger-foreground: #0a0a0a;
+  --info: #93c5fd;
+  --info-foreground: #0a0a0a;
+  
+  /* Card/Container */
+  --card: #16161a;
+  --card-hover: #1e1e24;
+  --card-foreground: #ececf0;
+  
+  /* Input/Form */
+  --input: #1e1e24;
+  --input-focus: #26262e;
+  
+  /* Ring for focus states */
+  --ring: #94a3b8;
+  
+  /* Glow effects */
+  --glow-primary: 0 0 20px rgba(148, 163, 184, 0.2);
+  --glow-secondary: 0 0 20px rgba(100, 116, 139, 0.2);
+  --glow-accent: 0 0 20px rgba(212, 168, 83, 0.25);
+  
+  /* Theme-specific gradient colors for body background */
+  --gradient-primary: rgba(148, 163, 184, 0.03);
+  --gradient-secondary: rgba(100, 116, 139, 0.02);
+  --gradient-accent: rgba(212, 168, 83, 0.02);
+}
+
+/* ========================================
+   Theme: Verdant (Green/Gold - Forest & Druid)
+   ======================================== */
+html[data-theme="verdant"] {
+  /* Background colors - Deep forest floor */
+  --background: #060a06;
+  --background-secondary: #0a120a;
+  --background-tertiary: #101a10;
+  --background-elevated: #162216;
+  
+  /* Foreground/Text colors - Soft leaf tones */
+  --foreground: #e8f4e8;
+  --foreground-secondary: #a8c8a8;
+  --foreground-muted: #5c8a5c;
+  
+  /* Border colors */
+  --border: #1e3a1e;
+  --border-hover: #2e5030;
+  
+  /* Primary - Emerald Green */
+  --primary: #10b981;
+  --primary-hover: #34d399;
+  --primary-foreground: #ffffff;
+  
+  /* Secondary - Forest Gold */
+  --secondary: #d4a853;
+  --secondary-hover: #e0be6f;
+  --secondary-foreground: #0a0a0a;
+  
+  /* Accent - Blossom Pink */
+  --accent: #f0abfc;
+  --accent-foreground: #0a0a0a;
+  
+  /* Status colors */
+  --success: #22c55e;
+  --success-foreground: #0a0a0a;
+  --warning: #eab308;
+  --warning-foreground: #0a0a0a;
+  --danger: #ef4444;
+  --danger-foreground: #ffffff;
+  --info: #34d399;
+  --info-foreground: #0a0a0a;
+  
+  /* Card/Container */
+  --card: #101a10;
+  --card-hover: #162216;
+  --card-foreground: #e8f4e8;
+  
+  /* Input/Form */
+  --input: #162216;
+  --input-focus: #1e3a1e;
+  
+  /* Ring for focus states */
+  --ring: #10b981;
+  
+  /* Glow effects */
+  --glow-primary: 0 0 20px rgba(16, 185, 129, 0.3);
+  --glow-secondary: 0 0 20px rgba(212, 168, 83, 0.25);
+  --glow-accent: 0 0 20px rgba(240, 171, 252, 0.2);
+  
+  /* Theme-specific gradient colors for body background */
+  --gradient-primary: rgba(16, 185, 129, 0.05);
+  --gradient-secondary: rgba(212, 168, 83, 0.03);
+  --gradient-accent: rgba(240, 171, 252, 0.02);
 }
 
 @theme inline {

@@ -79,21 +79,28 @@ export async function GET(
 
     const sanitizedUpdates = updates.map((msg) => {
       let gmPrompt: unknown = undefined;
+      let suggestions: unknown = undefined;
       if (msg.metadata) {
         try {
           const parsed = JSON.parse(msg.metadata);
           if (parsed && typeof parsed === 'object') {
             gmPrompt = (parsed as { gmPrompt?: unknown }).gmPrompt;
+            suggestions = (parsed as { suggestions?: unknown }).suggestions;
           }
         } catch {
           gmPrompt = undefined;
         }
       }
 
+      const metadata: Record<string, unknown> = {};
+      if (gmPrompt) metadata.gmPrompt = gmPrompt;
+      if (suggestions) metadata.suggestions = suggestions;
+
       return {
         ...msg,
-        metadata: gmPrompt ? { gmPrompt } : undefined,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         gmPrompt,
+        suggestions,
         locationImageUrl: msg.locationImageUrl,
         locationName: msg.locationName,
       };

@@ -24,6 +24,13 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Profil gizlilik ayarları
+  profilePublic  Boolean @default(true)
+  showCharacters Boolean @default(true)
+  showCampaigns  Boolean @default(true)
+  showScenarios  Boolean @default(true)
+  showStats      Boolean @default(true)
+
   // İlişkiler
   characters      Character[]
   campaigns       Campaign[]       @relation("CampaignCreator")
@@ -318,6 +325,7 @@ model SystemSetting {
   maintenanceMessage  String?
   aiPrimaryModel      String?
   aiFallbackModel     String?
+  aiSuggestionsModel  String?
   aiRequestsPerMinute Int?
   updatedAt           DateTime @updatedAt
   updatedById         String?

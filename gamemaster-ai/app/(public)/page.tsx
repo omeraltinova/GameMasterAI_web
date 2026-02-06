@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import { FadeInView, StaggerContainer, StaggerItem } from "@/components/layout/PageTransition";
@@ -19,7 +20,42 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+const GM_TYPING_TEXT = "Rünlerden birini çözmeyi başarıyorsun: 'Ateşin koruyucusu burada uyuyor. Onu uyandırmak cesaretten fazlasını gerektirir...'";
+
+function useTypewriter(text: string, delay: number = 1500, speed: number = 35) {
+  const [displayedText, setDisplayedText] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [isDone, setIsDone] = useState(false);
+
+  useEffect(() => {
+    // Önce noktaları göster, sonra yazmaya başla
+    const startTimer = setTimeout(() => {
+      setIsTyping(true);
+    }, delay);
+
+    return () => clearTimeout(startTimer);
+  }, [delay]);
+
+  useEffect(() => {
+    if (!isTyping || isDone) return;
+
+    if (displayedText.length >= text.length) {
+      setIsDone(true);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setDisplayedText(text.slice(0, displayedText.length + 1));
+    }, speed);
+
+    return () => clearTimeout(timer);
+  }, [isTyping, isDone, displayedText, text, speed]);
+
+  return { displayedText, isTyping, isDone };
+}
+
 export default function HomePage() {
+  const { displayedText, isTyping, isDone } = useTypewriter(GM_TYPING_TEXT, 1800, 35);
   return (
     <div className="relative overflow-hidden">
       {/* Atmospheric Background */}
@@ -165,14 +201,23 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                {/* Typing indicator */}
-                <div className="flex gap-3 items-center">
+                {/* Typing GM message */}
+                <div className="flex gap-3">
                   <span className="text-primary font-bold shrink-0 w-12">GM:</span>
-                  <div className="flex gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
+                  {!isTyping ? (
+                    <div className="flex gap-1 items-center pt-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  ) : (
+                    <span className="text-foreground-secondary leading-relaxed">
+                      {displayedText}
+                      {!isDone && (
+                        <span className="inline-block w-[2px] h-[1em] bg-primary/80 ml-0.5 align-middle animate-pulse" />
+                      )}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -197,7 +242,7 @@ export default function HomePage() {
           <StaggerContainer className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto" delay={0.1}>
             {[
               { step: 1, title: "Kahraman Yarat", desc: "Irk, sınıf ve yeteneklerini seç. Hikayeni şekillendir.", icon: Shield },
-              { step: 2, title: "Kampanya Seç", desc: "Hazır senaryolar veya AI'dan yeni bir macera iste.", icon: Map },
+              { step: 2, title: "Oturum Seç", desc: "Hazır senaryolar veya AI'dan yeni bir macera iste.", icon: Map },
               { step: 3, title: "Oyna", desc: "AI Game Master rehberliğinde epik hikayeler yaz.", icon: Sword },
             ].map((item, i) => (
               <StaggerItem key={i} className="relative group">
@@ -239,7 +284,7 @@ export default function HomePage() {
                   Kendi Efsaneni Yaz
                 </h2>
                 <p className="text-foreground-secondary mb-8 max-w-lg mx-auto text-lg">
-                  Hesabını oluştur, karakterini yarat ve ilk kampanyanı dakikalar içinde başlat.
+                  Hesabını oluştur, karakterini yarat ve ilk oturumunu dakikalar içinde başlat.
                 </p>
                 <Link href="/register">
                   <Button size="lg" className="h-14 px-12 text-base font-semibold gap-2">

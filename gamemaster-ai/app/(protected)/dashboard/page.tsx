@@ -176,7 +176,7 @@ export default function DashboardPage() {
           <Link href="/campaigns/new">
             <Button className="gap-2">
               <Swords className="h-4 w-4" />
-              Yeni Kampanya
+              Yeni Oturum
             </Button>
           </Link>
         </div>
@@ -231,7 +231,7 @@ export default function DashboardPage() {
                   Karakterler yükleniyor...
                 </div>
               ) : userCharacters.length > 0 ? (
-                userCharacters.map((character) => (
+                userCharacters.slice(0, 4).map((character) => (
                   <Link
                     key={character.id}
                     href={`/characters/${character.id}`}
@@ -326,10 +326,10 @@ export default function DashboardPage() {
               <div className="p-6 text-center">
                 <Swords className="h-10 w-10 text-foreground-muted mx-auto mb-3" />
                 <p className="text-foreground-secondary text-sm mb-4">
-                  Aktif kampanya yok
+                  Aktif oturum yok
                 </p>
                 <Link href="/campaigns/new">
-                  <Button size="sm" variant="outline">Kampanya Başlat</Button>
+                  <Button size="sm" variant="outline">Oturum Başlat</Button>
                 </Link>
               </div>
             )}
@@ -345,7 +345,7 @@ export default function DashboardPage() {
         <CardContent>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { href: "/campaigns/join", icon: Users, label: "Kampanyaya Katıl", desc: "Davet koduyla katıl" },
+              { href: "/campaigns/join", icon: Users, label: "Oturuma Katıl", desc: "Davet koduyla katıl" },
               { href: "/scenarios", icon: Map, label: "Senaryolar", desc: "Macera senaryolarını keşfet" },
               { href: "/rules", icon: Clock, label: "Kurallar", desc: "D&D 5e kurallarını incele" },
               { href: "/profile", icon: TrendingUp, label: "Profil", desc: "Ayarlarını düzenle" },

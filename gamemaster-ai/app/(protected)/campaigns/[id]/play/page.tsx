@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, ConfirmDialog } from "@/components/ui";
-import { ChatWindow, MessageInput, DiceRoller, CharacterMini, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage, DiceModal, NPCModal } from "@/components/game";
+import { ChatWindow, MessageInput, DiceRoller, CharacterModal, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage, DiceModal, NPCModal } from "@/components/game";
 import { InventoryModal } from "@/components/character";
 import { MapModal } from "@/components/map";
 import { useGame, useGM, useDice, useSuggestions, useLocationImage, useMaps } from "@/hooks/useGame";
@@ -25,7 +25,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type SidePanelView = "character" | "dice" | "inventory" | null;
 type GamePhase = "loading" | "setup" | "playing";
 
 interface WorldSettings {
@@ -54,10 +53,12 @@ export default function PlayPage() {
   const params = useParams();
   const router = useRouter();
   const { data: authSession } = useSession();
-  const [sidePanelView, setSidePanelView] = useState<SidePanelView>("character");
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [character, setCharacter] = useState<Character | null>(null);
   const [playerName, setPlayerName] = useState<string>("Oyuncu");
+  const [allPlayers, setAllPlayers] = useState<Array<{ userId: string; username: string; character: Character | null; isCreator: boolean }>>([]);
+  const [showSidePanel, setShowSidePanel] = useState(false);
+  const [selectedCharacterForModal, setSelectedCharacterForModal] = useState<Character | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -74,6 +75,7 @@ export default function PlayPage() {
   const [showDiceModal, setShowDiceModal] = useState(false);
   const [showNPCModal, setShowNPCModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [showCharacterModal, setShowCharacterModal] = useState(false);
   const [worldSettings, setWorldSettings] = useState<WorldSettings | null>(null);
 
   // Get campaign ID from URL params
@@ -124,7 +126,7 @@ export default function PlayPage() {
           // Set campaign data
           setCampaign({
             id: campaignData.id,
-            name: campaignData.name || 'Kampanya',
+            name: campaignData.name || 'Oturum',
             description: campaignData.description,
             creatorId: campaignData.creatorId || '',
             scenarioId: campaignData.scenarioId,
@@ -139,6 +141,15 @@ export default function PlayPage() {
           // Get current user's player data and character
           const currentUserId = authSession?.user?.id;
           if (campaignData.players && campaignData.players.length > 0 && currentUserId) {
+            // Tüm oyuncuları kaydet
+            const playersList = campaignData.players.map((p: any) => ({
+              userId: p.userId || p.user?.id || '',
+              username: p.user?.username || 'Oyuncu',
+              character: p.character || null,
+              isCreator: p.userId === campaignData.creatorId,
+            }));
+            setAllPlayers(playersList);
+
             // Find current user's player record
             const currentPlayer = campaignData.players.find(
               (p: any) => p.userId === currentUserId || p.user?.id === currentUserId
@@ -193,6 +204,7 @@ export default function PlayPage() {
     sendMessage: apiSendMessage,
     addMessage,
     addMessages,
+    removeMessage,
     fetchMessages,
     fetchUpdates,
   } = useGame(sessionId || '');
@@ -212,6 +224,7 @@ export default function PlayPage() {
     suggestions,
     isLoading: isSuggestionsLoading,
     fetchSuggestions,
+    loadSuggestionsFromMessages,
     clearSuggestions,
   } = useSuggestions(sessionId || '');
 
@@ -251,6 +264,37 @@ export default function PlayPage() {
     
     return () => clearInterval(pollInterval);
   }, [sessionId, gamePhase, fetchUpdates]);
+
+  // Sayfa yüklendiğinde (F5 / ilk açılış) kaydedilmiş suggestions'ı mesajlardan oku
+  const lastCheckedGMMessageId = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      gamePhase !== 'playing' ||
+      !sessionId ||
+      messages.length === 0 ||
+      suggestions.length > 0 ||
+      isSuggestionsLoading
+    ) return;
+
+    // Son GM mesajını bul
+    const lastGM = [...messages].reverse().find(m => m.senderType === 'GM');
+    if (!lastGM) return;
+
+    // GM zaten aksiyon seçeneği sunmuşsa suggestions gösterme
+    if (lastGM.gmPrompt?.actions && lastGM.gmPrompt.actions.length > 0) return;
+
+    // Bu mesajda kaydedilmiş suggestions varsa yükle
+    if (lastGM.suggestions && lastGM.suggestions.length > 0) {
+      lastCheckedGMMessageId.current = lastGM.id;
+      loadSuggestionsFromMessages(messages);
+      return;
+    }
+
+    // Suggestions yoksa ve bu mesajı daha önce kontrol ettiysek tekrar deneme
+    // (fetchSession parsed olmadan gelmiş olabilir, fetchMessages ile tekrar gelecek)
+    if (lastCheckedGMMessageId.current === lastGM.id) return;
+    lastCheckedGMMessageId.current = lastGM.id;
+  }, [gamePhase, sessionId, messages, suggestions.length, isSuggestionsLoading, loadSuggestionsFromMessages]);
 
   // Handle setup complete
   const handleSetupComplete = async (settings: WorldSettings) => {
@@ -303,10 +347,16 @@ export default function PlayPage() {
       router.push(`/campaigns/${campaignId}`);
     } catch (err) {
       console.error('Pause hatası:', err);
-      setError('Kampanya duraklatılamadı');
+      setError('Oturum duraklatılamadı');
     }
   };
 
+
+  // Son GM mesajında hazır aksiyonlar var mı?
+  const lastGMHasActions = (() => {
+    const lastGM = [...messages].reverse().find(m => m.senderType === 'GM');
+    return !!(lastGM?.gmPrompt?.actions && lastGM.gmPrompt.actions.length > 0);
+  })();
 
   if (isLoading || gamePhase === "loading") {
     return (
@@ -333,7 +383,7 @@ export default function PlayPage() {
   if (!campaign) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <h1 className="text-2xl font-bold mb-4">Kampanya bulunamadı</h1>
+        <h1 className="text-2xl font-bold mb-4">Oturum bulunamadı</h1>
         <Link href="/campaigns">
           <Button variant="outline">Oturumlara Dön</Button>
         </Link>
@@ -341,14 +391,14 @@ export default function PlayPage() {
     );
   }
 
-  // Kullanıcı kampanya creator mı? (erken tanımlama)
+  // Kullanıcı oturum creator mı? (erken tanımlama)
   const isCreator = campaign?.creatorId === authSession?.user?.id;
 
   if (campaign?.status === 'COMPLETED') {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <h1 className="text-2xl font-bold mb-4">Kampanya Tamamlandı</h1>
-        <p className="text-muted-foreground mb-4">Bu kampanya zaten tamamlanmış.</p>
+        <h1 className="text-2xl font-bold mb-4">Oturum Tamamlandı</h1>
+        <p className="text-muted-foreground mb-4">Bu oturum zaten tamamlanmış.</p>
         <Link href="/campaigns">
           <Button variant="outline">Oturumlara Dön</Button>
         </Link>
@@ -364,14 +414,14 @@ export default function PlayPage() {
           <Users className="h-16 w-16 mx-auto mb-4 text-primary opacity-50" />
           <h1 className="text-2xl font-bold mb-4">Karakter Gerekli</h1>
           <p className="text-muted-foreground mb-6">
-            Bu kampanyaya katılmak için önce bir karakter oluşturmanız gerekiyor.
+            Bu oturuma katılmak için önce bir karakter oluşturmanız gerekiyor.
           </p>
           <div className="flex flex-col gap-3">
             <Link href={`/campaigns/${campaignId}/characters/new`}>
               <Button className="w-full">Karakter Oluştur</Button>
             </Link>
             <Link href={`/campaigns/${campaignId}`}>
-              <Button variant="outline" className="w-full">Kampanyaya Dön</Button>
+              <Button variant="outline" className="w-full">Oturuma Dön</Button>
             </Link>
           </div>
         </div>
@@ -402,12 +452,27 @@ export default function PlayPage() {
     // Önerileri temizle
     clearSuggestions();
 
+    // Optimistic UI update - Show player message immediately
+    const tempId = `temp-player-${Date.now()}`;
+    const tempPlayerMessage: Message = {
+      id: tempId,
+      sessionId: sessionId || '',
+      senderType: 'PLAYER',
+      senderName: character?.name || playerName,
+      content: content,
+      timestamp: new Date().toISOString(),
+    };
+    addMessage(tempPlayerMessage);
+
     // AI GM çağrısı yap - API hem oyuncu mesajını hem GM yanıtını kaydeder
     const result = await narrate(content);
 
+    // Temp mesajı kaldır
+    removeMessage(tempId);
+
     if (result && result.narration) {
       // API'den dönen mesajları al
-      // Oyuncu mesajı
+      // Oyuncu mesajı - gerçek ID ile ekle
       if (result.playerMessageId) {
         const playerMessage: Message = {
           id: result.playerMessageId,
@@ -460,7 +525,7 @@ export default function PlayPage() {
         // GM aksiyon önerileri vermemişse AI suggestions getir
         const hasGMActions = result.gmPrompt?.actions && result.gmPrompt.actions.length > 0;
         if (!hasGMActions) {
-          fetchSuggestions(result.narration);
+          fetchSuggestions(result.narration, result.messageId);
         } else {
           // GM aksiyon vermiş, suggestions'ı temizle
           clearSuggestions();
@@ -530,7 +595,7 @@ export default function PlayPage() {
         // GM aksiyon önerileri vermemişse AI suggestions getir
         const hasGMActions = result.gmPrompt?.actions && result.gmPrompt.actions.length > 0;
         if (!hasGMActions) {
-          fetchSuggestions(result.narration);
+          fetchSuggestions(result.narration, result.messageId);
         } else {
           clearSuggestions();
         }
@@ -608,7 +673,7 @@ export default function PlayPage() {
         // GM aksiyon önerileri vermemişse AI suggestions getir
         const hasGMActions = result.gmPrompt?.actions && result.gmPrompt.actions.length > 0;
         if (!hasGMActions) {
-          fetchSuggestions(result.narration);
+          fetchSuggestions(result.narration, result.messageId);
         } else {
           clearSuggestions();
         }
@@ -683,10 +748,6 @@ export default function PlayPage() {
         await fetchMessages();
       }
     }
-  };
-
-  const toggleSidePanel = (view: SidePanelView) => {
-    setSidePanelView(sidePanelView === view ? null : view);
   };
 
   // Belirli mesajdan itibaren yeniden başlatma handler'ı
@@ -797,7 +858,7 @@ export default function PlayPage() {
           // GM aksiyon önerileri vermemişse AI suggestions getir
           const hasGMActions = result.gmPrompt?.actions && result.gmPrompt.actions.length > 0;
           if (!hasGMActions) {
-            fetchSuggestions(result.narration);
+            fetchSuggestions(result.narration, result.messageId);
           } else {
             clearSuggestions();
           }
@@ -822,7 +883,7 @@ export default function PlayPage() {
             <Pause className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="font-semibold">{campaign?.name || 'Kampanya'}</h1>
+            <h1 className="font-semibold">{campaign?.name || 'Oturum'}</h1>
             <p className="text-xs text-foreground-muted">
               {character?.name || playerName} olarak oynuyorsun
             </p>
@@ -917,12 +978,20 @@ export default function PlayPage() {
               </div>
             )}
 
-            {/* AI Action Suggestions - Sadece suggestions varsa ve GM zorunlu aksiyon vermemişse göster */}
-            {!pendingMandatoryAction?.isMandatory && suggestions.length > 0 && (
+            {/* AI Action Suggestions - Sadece son GM mesajında hazır aksiyon yoksa göster */}
+            {!pendingMandatoryAction?.isMandatory &&
+             !lastGMHasActions &&
+             (suggestions.length > 0 || isSuggestionsLoading) && (
               <ActionSuggestions
                 suggestions={suggestions}
                 isLoading={isSuggestionsLoading}
                 onSelect={(detailedAction) => handleSendMessage(detailedAction)}
+                onRefresh={() => {
+                  const lastGM = [...messages].reverse().find(m => m.senderType === 'GM');
+                  if (lastGM) {
+                    fetchSuggestions(lastGM.content, lastGM.id);
+                  }
+                }}
                 disabled={isGMLoading}
               />
             )}
@@ -1003,10 +1072,10 @@ export default function PlayPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => toggleSidePanel("character")}
+                onClick={() => setShowSidePanel(!showSidePanel)}
                 className={cn(
                   "gap-1",
-                  sidePanelView === "character" && "bg-primary/10 border-primary"
+                  showSidePanel && "bg-primary/10 border-primary"
                 )}
               >
                 🧙 Karakter
@@ -1015,38 +1084,121 @@ export default function PlayPage() {
           </div>
         </div>
 
-        {/* Side Panel */}
-        {sidePanelView && (
+        {/* Side Panel - Karakter Listesi */}
+        {showSidePanel && (
           <aside className="w-80 border-l border-border bg-background-secondary overflow-y-auto animate-slide-up">
             <div className="p-4">
               {/* Panel Header */}
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">
-                  {sidePanelView === "character" && "Karakter"}
-                </h3>
+                <h3 className="font-semibold">Karakterler</h3>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setSidePanelView(null)}
+                  onClick={() => setShowSidePanel(false)}
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              {/* Panel Content */}
-              {sidePanelView === "character" && character && (
-                <CharacterMini character={character} />
-              )}
+              {/* Karakter Listesi */}
+              <div className="space-y-2">
+                {allPlayers.length > 0 ? (
+                  allPlayers.map((player) => {
+                    const char = player.character;
+                    const isMe = player.userId === authSession?.user?.id;
+                    return (
+                      <button
+                        key={player.userId}
+                        onClick={() => {
+                          if (char) {
+                            setSelectedCharacterForModal(char);
+                            setShowCharacterModal(true);
+                          }
+                        }}
+                        disabled={!char}
+                        className={cn(
+                          "w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left",
+                          char
+                            ? "hover:border-primary/50 hover:bg-background-elevated cursor-pointer"
+                            : "opacity-50 cursor-not-allowed",
+                          isMe
+                            ? "border-primary/30 bg-primary/5"
+                            : "border-border"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
+                          isMe ? "bg-primary/20 text-primary" : "bg-background-elevated text-foreground-muted"
+                        )}>
+                          {char ? char.name.charAt(0).toUpperCase() : "?"}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/players/${player.userId}`}
+                              className="font-medium text-sm truncate hover:text-primary transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {char?.name || player.username}
+                            </Link>
+                            {isMe && (
+                              <Badge variant="primary" size="sm">Sen</Badge>
+                            )}
+                          </div>
+                          {char ? (
+                            <p className="text-xs text-foreground-muted truncate">
+                              Lv.{char.level} {char.race} {char.class}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-foreground-muted italic">
+                              Karakter seçmedi
+                            </p>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  /* Solo mod veya veri yüklenemedi - sadece kendi karakterini göster */
+                  character && (
+                    <button
+                      onClick={() => {
+                        setSelectedCharacterForModal(character);
+                        setShowCharacterModal(true);
+                      }}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5 hover:border-primary/50 hover:bg-background-elevated transition-all text-left cursor-pointer"
+                    >
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 bg-primary/20 text-primary">
+                        {character.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm truncate">{character.name}</p>
+                          <Badge variant="primary" size="sm">Sen</Badge>
+                        </div>
+                        <p className="text-xs text-foreground-muted truncate">
+                          Lv.{character.level} {character.race} {character.class}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                )}
+              </div>
 
-              {!character && sidePanelView === "character" && (
-                <div className="text-center text-muted-foreground py-8">
-                  <p>Karakter bilgisi yükleniyor...</p>
-                </div>
-              )}
+              <p className="text-xs text-foreground-muted text-center mt-4">
+                Detay görmek için karaktere tıkla
+              </p>
             </div>
           </aside>
         )}
       </div>
+
+      {/* Character Detail Modal */}
+      <CharacterModal
+        isOpen={showCharacterModal}
+        onClose={() => setShowCharacterModal(false)}
+        character={selectedCharacterForModal}
+      />
 
       {/* Full Reset Options Dialog */}
       {showFullResetDialog && (

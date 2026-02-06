@@ -41,6 +41,7 @@ const SETTINGS_CACHE_MS = 30_000;
 type AIModelConfig = {
   primaryModel: string;
   fallbackModel?: string;
+  suggestionsModel?: string;
 };
 
 let cachedConfig: AIModelConfig | null = null;
@@ -60,17 +61,31 @@ async function resolveAIModelConfig(): Promise<AIModelConfig> {
         process.env.OPENROUTER_MODEL ||
         'anthropic/claude-3-sonnet',
       fallbackModel: settings?.aiFallbackModel || process.env.OPENROUTER_FALLBACK_MODEL,
+      suggestionsModel:
+        settings?.aiSuggestionsModel ||
+        process.env.OPENROUTER_SUGGESTIONS_MODEL ||
+        undefined, // undefined ise primaryModel kullanılır
     };
   } catch (error) {
     console.error('Failed to load AI model settings:', error);
     cachedConfig = {
       primaryModel: process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet',
       fallbackModel: process.env.OPENROUTER_FALLBACK_MODEL,
+      suggestionsModel: process.env.OPENROUTER_SUGGESTIONS_MODEL || undefined,
     };
   }
 
   cachedAt = now;
   return cachedConfig;
+}
+
+/**
+ * Suggestions için model çözümler
+ * Admin paneli > env variable > primary model sıralamasıyla
+ */
+export async function resolveSuggestionsModel(): Promise<string> {
+  const config = await resolveAIModelConfig();
+  return config.suggestionsModel || config.primaryModel;
 }
 
 /**

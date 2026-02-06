@@ -32,7 +32,7 @@ export async function GET(
 
     if (!campaign) {
       return NextResponse.json(
-        { message: 'Kampanya bulunamadı' },
+        { message: 'Oturum bulunamadı' },
         { status: 404 }
       );
     }
@@ -43,7 +43,7 @@ export async function GET(
 
     if (!hasAccess) {
       return NextResponse.json(
-        { message: 'Bu kampanyaya erişim yetkiniz yok' },
+        { message: 'Bu oturuma erişim yetkiniz yok' },
         { status: 403 }
       );
     }
@@ -109,7 +109,7 @@ export async function POST(
 
     if (!campaign) {
       return NextResponse.json(
-        { message: 'Kampanya bulunamadı' },
+        { message: 'Oturum bulunamadı' },
         { status: 404 }
       );
     }
@@ -120,7 +120,7 @@ export async function POST(
 
     if (!hasAccess) {
       return NextResponse.json(
-        { message: 'Bu kampanyaya erişim yetkiniz yok' },
+        { message: 'Bu oturuma erişim yetkiniz yok' },
         { status: 403 }
       );
     }
@@ -155,7 +155,7 @@ export async function POST(
       data: {
         sessionId: session.id,
         senderType: 'SYSTEM',
-        content: `🎮 Oyun başladı! ${campaign.name} kampanyasına hoş geldiniz.`,
+        content: `🎮 Oyun başladı! ${campaign.name} oturumuna hoş geldiniz.`,
       },
     });
 

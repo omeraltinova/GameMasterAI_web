@@ -254,6 +254,12 @@ export interface LocationChange {
   description?: string; // İngilizce görsel açıklaması
 }
 
+export interface Suggestion {
+  id: string;
+  shortLabel: string;
+  detailedAction: string;
+}
+
 export interface Message {
   id: string;
   sessionId: string;
@@ -265,6 +271,8 @@ export interface Message {
   timestamp: string;
   // GM aksiyonları için
   gmPrompt?: GMPrompt;
+  // AI önerilen aksiyonlar
+  suggestions?: Suggestion[];
   // Mekan görseli için
   locationImageUrl?: string;
   locationName?: string;

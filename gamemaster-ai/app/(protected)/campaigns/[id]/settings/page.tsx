@@ -82,7 +82,7 @@ export default function CampaignSettingsPage() {
         }
       } catch (err) {
         console.error("Campaign alınamadı:", err);
-        setError("Kampanya yüklenemedi");
+        setError("Oturum yüklenemedi");
       } finally {
         setIsLoading(false);
       }
@@ -182,9 +182,9 @@ export default function CampaignSettingsPage() {
         const newStatus = action === 'pause' ? 'PAUSED' : action === 'resume' ? 'ACTIVE' : 'COMPLETED';
         setCampaign({ ...campaign, status: newStatus });
         setSuccessMessage(
-          action === 'pause' ? 'Kampanya duraklatıldı' :
-            action === 'resume' ? 'Kampanya devam ediyor' :
-              'Kampanya tamamlandı'
+          action === 'pause' ? 'Oturum duraklatıldı' :
+            action === 'resume' ? 'Oturum devam ediyor' :
+              'Oturum tamamlandı'
         );
         setTimeout(() => setSuccessMessage(null), 3000);
         setShowCompleteConfirm(false);
@@ -212,7 +212,7 @@ export default function CampaignSettingsPage() {
           ...campaign,
           players: campaign.players.filter((p: any) => p.id !== playerId),
         });
-        setSuccessMessage("Oyuncu kampanyadan çıkarıldı");
+        setSuccessMessage("Oyuncu oturumdan çıkarıldı");
         setTimeout(() => setSuccessMessage(null), 3000);
       }
     } catch (err: any) {
@@ -233,7 +233,7 @@ export default function CampaignSettingsPage() {
   if (!campaign) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
-        <h1 className="text-2xl font-bold mb-4">Kampanya bulunamadı</h1>
+        <h1 className="text-2xl font-bold mb-4">Oturum bulunamadı</h1>
         <Link href="/campaigns">
           <Button variant="outline">Oturumlara Dön</Button>
         </Link>
@@ -248,7 +248,7 @@ export default function CampaignSettingsPage() {
         <Link href={`/campaigns/${campaignId}`}>
           <Button variant="ghost" size="sm" className="gap-2">
             <ArrowLeft className="h-4 w-4" />
-            Kampanyaya Dön
+            Oturuma Dön
           </Button>
         </Link>
 
@@ -257,7 +257,7 @@ export default function CampaignSettingsPage() {
             <AlertTriangle className="h-16 w-16 text-warning mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Yetkiniz Yok</h2>
             <p className="text-foreground-secondary">
-              Kampanya ayarlarını sadece kampanya kurucusu düzenleyebilir.
+              Oturum ayarlarını sadece oturum kurucusu düzenleyebilir.
             </p>
           </CardContent>
         </Card>
@@ -271,13 +271,13 @@ export default function CampaignSettingsPage() {
       <Link href={`/campaigns/${campaignId}`}>
         <Button variant="ghost" size="sm" className="gap-2">
           <ArrowLeft className="h-4 w-4" />
-          Kampanyaya Dön
+          Oturuma Dön
         </Button>
       </Link>
 
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold mb-2">Kampanya Ayarları</h1>
+        <h1 className="text-3xl font-bold mb-2">Oturum Ayarları</h1>
         <p className="text-foreground-secondary">{campaign.name}</p>
       </div>
 
@@ -303,10 +303,10 @@ export default function CampaignSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
-            label="Kampanya Adı"
+            label="Oturum Adı"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            placeholder="Kampanya adı..."
+            placeholder="Oturum adı..."
           />
 
           <Textarea
@@ -315,7 +315,7 @@ export default function CampaignSettingsPage() {
             onChange={(e) =>
               setFormData({ ...formData, description: e.target.value })
             }
-            placeholder="Kampanya açıklaması..."
+            placeholder="Oturum açıklaması..."
           />
 
           <div>
@@ -360,7 +360,7 @@ export default function CampaignSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-foreground-secondary">
-            Bu kodu diğer oyuncularla paylaşarak kampanyaya katılmalarını sağlayabilirsiniz.
+            Bu kodu diğer oyuncularla paylaşarak oturuma katılmalarını sağlayabilirsiniz.
           </p>
           <div className="flex items-center gap-3">
             <div className="flex-1 p-3 bg-background-elevated rounded-lg font-mono text-lg tracking-wider text-center">
@@ -404,7 +404,7 @@ export default function CampaignSettingsPage() {
             {campaign.status === 'PAUSED' && <Pause className="h-5 w-5 text-warning" />}
             {campaign.status === 'COMPLETED' && <CheckCircle className="h-5 w-5 text-primary" />}
             {campaign.status === 'DRAFT' && <Settings className="h-5 w-5 text-foreground-muted" />}
-            Kampanya Durumu
+            Oturum Durumu
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -466,7 +466,7 @@ export default function CampaignSettingsPage() {
                   className="gap-2"
                 >
                   <CheckCircle className="h-4 w-4" />
-                  Kampanyayı Tamamla
+                  Oturumu Tamamla
                 </Button>
               ) : (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-warning/10 border border-warning">
@@ -499,7 +499,7 @@ export default function CampaignSettingsPage() {
 
           {campaign.status === 'COMPLETED' && (
             <p className="text-sm text-foreground-muted">
-              Bu kampanya tamamlanmış. Artık durum değiştirilemez.
+              Bu oturum tamamlanmış. Artık durum değiştirilemez.
             </p>
           )}
         </CardContent>
@@ -573,7 +573,7 @@ export default function CampaignSettingsPage() {
         <CardContent>
           <div className="space-y-4">
             <p className="text-sm text-foreground-secondary">
-              Kampanyayı silmek geri alınamaz bir işlemdir. Tüm oyun verileri,
+              Oturumu silmek geri alınamaz bir işlemdir. Tüm oyun verileri,
               mesajlar ve session bilgileri kalıcı olarak silinecektir.
             </p>
 
@@ -584,12 +584,12 @@ export default function CampaignSettingsPage() {
                 onClick={() => setShowDeleteConfirm(true)}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Kampanyayı Sil
+                Oturumu Sil
               </Button>
             ) : (
               <div className="p-4 rounded-lg bg-destructive/10 border border-destructive space-y-4">
                 <p className="text-sm font-medium text-destructive">
-                  Bu işlem geri alınamaz! Kampanyayı silmek istediğinize emin
+                  Bu işlem geri alınamaz! Oturumu silmek istediğinize emin
                   misiniz?
                 </p>
                 <div className="flex gap-3">

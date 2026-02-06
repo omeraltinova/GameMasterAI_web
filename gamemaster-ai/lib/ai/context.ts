@@ -49,7 +49,7 @@ export async function buildSessionContext(sessionId: string): Promise<GameContex
 
   // Context'i oluştur
   const context: GameContext = {
-    scenario: session.campaign.scenario?.title || 'Özel Kampanya',
+    scenario: session.campaign.scenario?.title || 'Özel Oturum',
     location: gameState.location || 'Bilinmeyen',
     timeOfDay: gameState.timeOfDay,
     weather: gameState.weather,
@@ -305,7 +305,7 @@ export function validateContext(context: GameContext): boolean {
  */
 export function fillMissingContext(context: GameContext): GameContext {
   return {
-    scenario: context.scenario || 'Özel Kampanya',
+    scenario: context.scenario || 'Özel Oturum',
     location: context.location || 'Bilinmeyen Lokasyon',
     timeOfDay: context.timeOfDay || 'gündüz',
     weather: context.weather || 'açık',

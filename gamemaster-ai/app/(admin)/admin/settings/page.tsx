@@ -21,6 +21,7 @@ interface SystemSettings {
   maintenanceMessage: string;
   aiPrimaryModel: string;
   aiFallbackModel: string;
+  aiSuggestionsModel: string;
   aiRequestsPerMinute: number;
   updatedAt?: string | null;
 }
@@ -44,6 +45,7 @@ const defaultSettings: SystemSettings = {
   maintenanceMessage: "",
   aiPrimaryModel: "",
   aiFallbackModel: "",
+  aiSuggestionsModel: "",
   aiRequestsPerMinute: 30,
   updatedAt: null,
 };
@@ -57,7 +59,7 @@ function formatActionLabel(action: string) {
     case "USER_ROLE_UPDATE":
       return "Rol Güncelleme";
     case "CAMPAIGN_DELETE":
-      return "Kampanya Silme";
+      return "Oturum Silme";
     case "SCENARIO_DELETE":
       return "Senaryo Silme";
     case "SCENARIO_OFFICIAL_TOGGLE":
@@ -84,7 +86,7 @@ function formatActionDetail(entry: AuditLogEntry) {
   }
 
   if (entry.action === "CAMPAIGN_DELETE") {
-    const name = metadata.name ? String(metadata.name) : "Kampanya";
+    const name = metadata.name ? String(metadata.name) : "Oturum";
     const status = metadata.status ? String(metadata.status) : "";
     return `${name}${status ? ` • ${status}` : ""}`;
   }
@@ -142,6 +144,7 @@ export default function AdminSettingsPage() {
           maintenanceMessage: data.maintenanceMessage || "",
           aiPrimaryModel: data.aiPrimaryModel || "",
           aiFallbackModel: data.aiFallbackModel || "",
+          aiSuggestionsModel: data.aiSuggestionsModel || "",
           aiRequestsPerMinute: Number(data.aiRequestsPerMinute) || 0,
           updatedAt: data.updatedAt || null,
         });
@@ -273,6 +276,13 @@ export default function AdminSettingsPage() {
               placeholder="openai/gpt-4-turbo"
             />
           </div>
+          <Input
+            label="Suggestions (Önerilen Aksiyonlar) Model"
+            value={settings.aiSuggestionsModel}
+            onChange={(e) => setSettings((prev) => ({ ...prev, aiSuggestionsModel: e.target.value }))}
+            placeholder="Boş bırakılırsa Primary Model kullanılır"
+            hint="Önerilen aksiyonlar için ayrı bir model kullanabilirsiniz (ör: google/gemini-2.0-flash-001)"
+          />
           <Input
             label="AI İstek Limiti (dakika)"
             type="number"

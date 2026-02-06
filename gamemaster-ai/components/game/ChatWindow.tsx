@@ -82,10 +82,13 @@ export function ChatWindow({
     }
   }, [messages]);
   
-  // En son GM mesajını bul (aksiyon butonları için)
-  const lastGMMessageWithPrompt = [...messages].reverse().find(
-    m => m.senderType === 'GM' && m.gmPrompt && m.gmPrompt.actions && m.gmPrompt.actions.length > 0
-  );
+  // En son GM mesajını bul — sadece o mesajda gmPrompt varsa butonları göster
+  // Böylece yeni bir GM yanıtı (prompt'suz) geldiğinde eski butonlar kaybolur
+  const lastGMMessage = [...messages].reverse().find(m => m.senderType === 'GM');
+  const lastGMMessageWithPrompt = 
+    lastGMMessage?.gmPrompt?.actions && lastGMMessage.gmPrompt.actions.length > 0
+      ? lastGMMessage 
+      : null;
 
   // Empty state
   if (!messages || messages.length === 0) {

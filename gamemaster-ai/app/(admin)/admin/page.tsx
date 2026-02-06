@@ -198,10 +198,21 @@ export default function AdminDashboardPage() {
                 </div>
               </Link>
 
+              {/* Karakter Yönetimi */}
+              <Link href="/admin/characters">
+                <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
+                  <Users className="h-6 w-6 text-warning mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-medium">Karakter Yönetimi</h4>
+                  <p className="text-sm text-foreground-secondary">
+                    Tüm karakterleri görüntüle ve yönet
+                  </p>
+                </div>
+              </Link>
+
               {/* Aktif Oturumlar */}
               <Link href="/admin/active-sessions">
                 <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
-                  <Play className="h-6 w-6 text-warning mb-2 group-hover:scale-110 transition-transform" />
+                  <Play className="h-6 w-6 text-danger mb-2 group-hover:scale-110 transition-transform" />
                   <h4 className="font-medium">Aktif Oturumlar</h4>
                   <p className="text-sm text-foreground-secondary">
                     Canlı oyun oturumlarını izle ve yönet

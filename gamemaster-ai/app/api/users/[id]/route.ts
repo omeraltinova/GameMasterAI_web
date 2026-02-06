@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { checkAchievements, AchievementStats } from '@/lib/achievements';
 
 /**
  * GET /api/users/:id
@@ -137,6 +138,7 @@ export async function GET(
         characters: [],
         campaigns: { created: [], joined: [] },
         scenarios: [],
+        achievements: [],
       });
     }
 
@@ -232,6 +234,71 @@ export async function GET(
         })
       : [];
 
+    // === Başarım kontrolü ve DB kaydı ===
+    let achievementsResponse: { id: string; unlockedAt: string | null }[] = [];
+
+    if (showStat) {
+      const monthsSinceJoin = Math.floor(
+        (Date.now() - new Date(user.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 30)
+      );
+
+      const achievementStats: AchievementStats = {
+        totalCharacters: user._count.characters,
+        totalCampaignsCreated: user._count.campaigns,
+        totalCampaignsJoined: user._count.campaignPlayers,
+        completedCampaigns,
+        activeCampaigns,
+        totalMessages: playerMessageCount,
+        totalDiceRolls,
+        totalScenarios: user._count.scenarios,
+        criticalSuccesses,
+        criticalFailures,
+        avgD20,
+        d20TotalRolls: d20Rolls.length,
+        favoriteRace,
+        highestLevel: highestLevelCharacter?.level || 0,
+        monthsSinceJoin,
+      };
+
+      const checkResults = checkAchievements(achievementStats);
+      const unlockedIds = checkResults.filter((r) => r.unlocked).map((r) => r.id);
+
+      // Mevcut DB kayıtlarını getir
+      const existingAchievements = await prisma.userAchievement.findMany({
+        where: { userId },
+        select: { achievementId: true, unlockedAt: true },
+      });
+
+      const existingMap = new Map(
+        existingAchievements.map((a) => [a.achievementId, a.unlockedAt])
+      );
+
+      // Yeni açılanları DB'ye kaydet
+      const newlyUnlocked = unlockedIds.filter((id) => !existingMap.has(id));
+
+      if (newlyUnlocked.length > 0) {
+        // SQLite createMany desteklemediği için transaction ile tek tek oluştur
+        const newRecords = await prisma.$transaction(
+          newlyUnlocked.map((achievementId) =>
+            prisma.userAchievement.create({
+              data: { userId, achievementId },
+              select: { achievementId: true, unlockedAt: true },
+            })
+          )
+        );
+
+        newRecords.forEach((r) => {
+          existingMap.set(r.achievementId, r.unlockedAt);
+        });
+      }
+
+      // Tüm başarımlar için response oluştur
+      achievementsResponse = checkResults.map((r) => ({
+        id: r.id,
+        unlockedAt: r.unlocked ? (existingMap.get(r.id)?.toISOString() || null) : null,
+      }));
+    }
+
     return NextResponse.json({
       success: true,
       profile: {
@@ -245,10 +312,10 @@ export async function GET(
       },
       privacy: {
         profilePublic: user.profilePublic,
-        showCharacters: showChars,
-        showCampaigns: showCamps,
-        showScenarios: showScens,
-        showStats: showStat,
+        showCharacters: user.showCharacters,
+        showCampaigns: user.showCampaigns,
+        showScenarios: user.showScenarios,
+        showStats: user.showStats,
       },
       stats: showStat ? {
         totalCharacters: user._count.characters,
@@ -274,6 +341,7 @@ export async function GET(
         joined: joinedCampaigns,
       } : { created: [], joined: [] },
       scenarios: parsedScenarios,
+      achievements: achievementsResponse,
     });
   } catch (error) {
     console.error('User profile error:', error);

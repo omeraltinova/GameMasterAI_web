@@ -139,7 +139,7 @@ export default function PlayersPage() {
                   <CardContent className="p-5">
                     <div className="flex items-center gap-4">
                       <Avatar
-                        src={user.avatar}
+                        src={user.avatar ?? undefined}
                         fallback={user.username}
                         size="lg"
                       />

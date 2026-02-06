@@ -37,6 +37,7 @@ model User {
   scenarios       Scenario[]
   campaignPlayers CampaignPlayer[]
   messages        Message[]
+  achievements    UserAchievement[]
   updatedSystemSettings SystemSetting[] @relation("SystemSettingUpdatedBy")
   adminActionLogs      AdminActionLog[] @relation("AdminActionLogAdmin")
 }
@@ -349,4 +350,20 @@ model AdminActionLog {
 
   // İlişkiler
   admin User @relation("AdminActionLogAdmin", fields: [adminId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// UserAchievement - Kullanıcı Başarımları
+// ==========================================
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  // İlişkiler
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
 }

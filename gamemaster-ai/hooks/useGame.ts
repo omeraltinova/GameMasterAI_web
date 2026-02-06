@@ -404,7 +404,6 @@ export function useGM(sessionId: string) {
 
 // Suggestion tipi artık types/index.ts'den geliyor
 export type { Suggestion } from '@/types';
-import type { Suggestion } from '@/types';
 
 interface LocationImageOptions {
   createMessage?: boolean;

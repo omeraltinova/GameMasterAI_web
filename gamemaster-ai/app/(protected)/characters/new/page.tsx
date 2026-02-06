@@ -8,7 +8,7 @@ import { races, classes, backgrounds } from "@/lib/mock-data";
 import { rollAbilityScore, formatModifier, calculateModifier } from "@/lib/utils";
 import { post } from "@/lib/api/client";
 import type { CharacterStats } from "@/types";
-import { ArrowLeft, ArrowRight, Dices, Check, User, Swords, Sparkles, BookOpen, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Dices, Check, User, Swords, Sparkles, BookOpen, Loader2, Wand2, ChevronDown, ChevronUp, X } from "lucide-react";
 
 type WizardStep = "race" | "class" | "stats" | "details";
 
@@ -43,8 +43,62 @@ export default function NewCharacterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // AI oluşturma state'leri
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiRace, setAiRace] = useState("");
+  const [aiClass, setAiClass] = useState("");
+  const [aiConcept, setAiConcept] = useState("");
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const handleGenerateWithAI = async () => {
+    setIsGenerating(true);
+    setAiError(null);
+
+    try {
+      const res = await fetch("/api/gm/generate-character", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          race: aiRace || undefined,
+          characterClass: aiClass || undefined,
+          concept: aiConcept || undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setAiError(data.message || "AI karakter oluşturamadı");
+        return;
+      }
+
+      if (data.success && data.character) {
+        const ch = data.character;
+        setFormData({
+          name: ch.name || "",
+          race: ch.race || "",
+          class: ch.class || "",
+          stats: ch.stats || initialStats,
+          background: ch.background || "",
+          backstory: ch.backstory || "",
+          imageUrl: "",
+        });
+        // Detaylar adımına atla, kullanıcı gözden geçirsin
+        setCurrentStep("details");
+        setShowAIPanel(false);
+      }
+    } catch {
+      setAiError("AI ile bağlantı kurulamadı");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep);
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
+  // AI ile doldurulduysa tüm adımlara tıklanabilir olsun
+  const allStepsReachable = !!(formData.name && formData.race && formData.class);
 
   const canProceed = () => {
     switch (currentStep) {
@@ -143,6 +197,116 @@ export default function NewCharacterPage() {
         </p>
       </div>
 
+      {/* AI ile Oluştur Paneli */}
+      <Card className={showAIPanel ? "border-primary/30" : ""}>
+        <CardContent className="p-4">
+          <button
+            onClick={() => setShowAIPanel(!showAIPanel)}
+            className="w-full flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Wand2 className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-sm">AI ile Oluştur</h3>
+                <p className="text-xs text-foreground-muted">Konseptini anlat, AI karakteri tasarlasın</p>
+              </div>
+            </div>
+            {showAIPanel ? (
+              <ChevronUp className="h-4 w-4 text-foreground-muted" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-foreground-muted" />
+            )}
+          </button>
+
+          {showAIPanel && (
+            <div className="mt-4 pt-4 border-t border-border space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">
+                    Irk Tercihi (Opsiyonel)
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={aiRace}
+                      onChange={(e) => setAiRace(e.target.value)}
+                      className="w-full h-9 px-3 pr-8 rounded-lg appearance-none bg-input border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">AI Seçsin</option>
+                      {races.map((r) => (
+                        <option key={r.name} value={r.name}>{r.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-muted pointer-events-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">
+                    Sınıf Tercihi (Opsiyonel)
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={aiClass}
+                      onChange={(e) => setAiClass(e.target.value)}
+                      className="w-full h-9 px-3 pr-8 rounded-lg appearance-none bg-input border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="">AI Seçsin</option>
+                      {classes.map((c) => (
+                        <option key={c.name} value={c.name}>{c.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-muted pointer-events-none" />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">
+                  Karakter Konsepti (Opsiyonel)
+                </label>
+                <input
+                  type="text"
+                  value={aiConcept}
+                  onChange={(e) => setAiConcept(e.target.value)}
+                  placeholder="ör: Gizemli bir geçmişe sahip yaşlı büyücü, lanetlenmiş bir şövalye..."
+                  className="w-full h-9 px-3 rounded-lg bg-input border border-border text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+
+              {aiError && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs">
+                  <X className="h-3.5 w-3.5 shrink-0" />
+                  <span>{aiError}</span>
+                </div>
+              )}
+
+              <Button
+                onClick={handleGenerateWithAI}
+                disabled={isGenerating}
+                className="w-full gap-2"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    AI Karakter Oluşturuyor...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Karakter Oluştur
+                  </>
+                )}
+              </Button>
+
+              <p className="text-xs text-foreground-muted text-center">
+                AI karakteri oluşturacak, ardından detayları gözden geçirip düzenleyebilirsiniz.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Progress */}
       <div className="space-y-4">
         <Progress value={progress} max={100} size="md" />
@@ -154,10 +318,10 @@ export default function NewCharacterPage() {
             return (
               <button
                 key={step.id}
-                onClick={() => i <= currentStepIndex && setCurrentStep(step.id)}
-                disabled={i > currentStepIndex}
+                onClick={() => (i <= currentStepIndex || allStepsReachable) && setCurrentStep(step.id)}
+                disabled={i > currentStepIndex && !allStepsReachable}
                 className={`flex flex-col items-center gap-1 transition-colors ${
-                  isCompleted
+                  isCompleted || (allStepsReachable && !isCurrent)
                     ? "text-primary cursor-pointer"
                     : isCurrent
                     ? "text-foreground"
@@ -166,7 +330,7 @@ export default function NewCharacterPage() {
               >
                 <div
                   className={`p-2 rounded-full ${
-                    isCompleted || isCurrent
+                    isCompleted || isCurrent || allStepsReachable
                       ? "bg-primary/20"
                       : "bg-background-elevated"
                   }`}
@@ -292,6 +456,14 @@ export default function NewCharacterPage() {
               <CardHeader className="p-0">
                 <CardTitle>Karakter Detayları</CardTitle>
               </CardHeader>
+
+              {/* AI ile oluşturulmuş bilgi notu */}
+              {formData.name && formData.race && formData.class && formData.backstory && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary text-xs">
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                  <span>AI tarafından oluşturuldu - alanları dilediğiniz gibi düzenleyebilirsiniz.</span>
+                </div>
+              )}
               <div className="space-y-4">
                 <Input
                   label="Karakter Adı"

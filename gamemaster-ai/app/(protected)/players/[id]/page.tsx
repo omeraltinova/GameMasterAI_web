@@ -48,8 +48,21 @@ import {
   ChevronUp,
   EyeOff,
   Lock,
+  Settings,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  ACHIEVEMENT_DEFINITIONS,
+  type AchievementCategory,
+} from "@/lib/achievements";
+
+// icon adı -> Lucide bileşeni eşlemesi
+const ICON_MAP: Record<string, LucideIcon> = {
+  Footprints, CalendarDays, Eye, User, Users, Gamepad2, Trophy, Star, Crown,
+  Dices, Sparkles, Zap, Skull, Flame, MessageSquare, BookOpen, Drama, Swords,
+  HandMetal, Scroll, Compass, Shield, Gem, Mountain, Target,
+};
 
 interface ProfileData {
   id: string;
@@ -122,10 +135,11 @@ interface Achievement {
   id: string;
   label: string;
   description: string;
-  icon: React.ElementType;
+  icon: LucideIcon;
   unlocked: boolean;
   color: string;
-  category: "general" | "combat" | "social" | "exploration";
+  category: AchievementCategory;
+  unlockedAt: string | null;
 }
 
 function getStatusLabel(status: string) {
@@ -161,6 +175,18 @@ function timeAgo(dateStr: string) {
   return `${years} yıldan fazladır üye`;
 }
 
+function formatUnlockedDate(dateStr: string) {
+  const date = new Date(dateStr);
+  const day = date.getDate();
+  const months = [
+    "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
+    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık",
+  ];
+  const month = months[date.getMonth()];
+  const year = date.getFullYear();
+  return `${day} ${month} ${year}`;
+}
+
 function memberSince(dateStr: string) {
   const now = new Date();
   const date = new Date(dateStr);
@@ -188,6 +214,7 @@ export default function PlayerProfilePage() {
   }>({ created: [], joined: [] });
   const [scenarios, setScenarios] = useState<ScenarioData[]>([]);
   const [privacySettings, setPrivacySettings] = useState<PrivacyData | null>(null);
+  const [apiAchievements, setApiAchievements] = useState<{ id: string; unlockedAt: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -212,6 +239,7 @@ export default function PlayerProfilePage() {
           setCampaigns(data.campaigns || { created: [], joined: [] });
           setScenarios(data.scenarios || []);
           setPrivacySettings(data.privacy || null);
+          setApiAchievements(data.achievements || []);
         }
       } catch {
         setError("Sunucu hatası");
@@ -223,286 +251,25 @@ export default function PlayerProfilePage() {
     if (userId) fetchProfile();
   }, [userId]);
 
-  // Başarımları hesapla
-  const achievements: Achievement[] = useMemo(() => {
-    if (!stats || !profile) return [];
+  // API'den gelen başarım verisini tanımlarla birleştir
+  const finalAchievements: Achievement[] = useMemo(() => {
+    if (apiAchievements.length === 0) return [];
 
-    const monthsSinceJoin = Math.floor(
-      (Date.now() - new Date(profile.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 30)
+    const apiMap = new Map(
+      apiAchievements.map((a) => [a.id, a.unlockedAt])
     );
 
-    const totalCampaigns = stats.totalCampaignsCreated + stats.totalCampaignsJoined;
-
-    return [
-      // === Genel ===
-      {
-        id: "newcomer",
-        label: "Yeni Maceraperest",
-        description: "Hesap oluşturdu",
-        icon: Footprints,
-        unlocked: true,
-        color: "text-lime-400",
-        category: "general" as const,
-      },
-      {
-        id: "veteran",
-        label: "Veteran",
-        description: "6+ aydır üye",
-        icon: CalendarDays,
-        unlocked: monthsSinceJoin >= 6,
-        color: "text-amber-400",
-        category: "general" as const,
-      },
-      {
-        id: "ancient",
-        label: "Kadim Ruh",
-        description: "1+ yıldır üye",
-        icon: Eye,
-        unlocked: monthsSinceJoin >= 12,
-        color: "text-violet-400",
-        category: "general" as const,
-      },
-      {
-        id: "first_character",
-        label: "İlk Adım",
-        description: "İlk karakterini oluşturdu",
-        icon: User,
-        unlocked: stats.totalCharacters >= 1,
-        color: "text-sky-400",
-        category: "general" as const,
-      },
-      {
-        id: "character_collector",
-        label: "Karakter Koleksiyoncusu",
-        description: "5+ karakter oluşturdu",
-        icon: Users,
-        unlocked: stats.totalCharacters >= 5,
-        color: "text-indigo-400",
-        category: "general" as const,
-      },
-      {
-        id: "experienced",
-        label: "Deneyimli Oyuncu",
-        description: "10+ oturuma katıldı",
-        icon: Gamepad2,
-        unlocked: totalCampaigns >= 10,
-        color: "text-purple-400",
-        category: "general" as const,
-      },
-      {
-        id: "completionist",
-        label: "Tamamlayıcı",
-        description: "5+ oturumu tamamladı",
-        icon: Trophy,
-        unlocked: stats.completedCampaigns >= 5,
-        color: "text-orange-400",
-        category: "general" as const,
-      },
-      {
-        id: "legend",
-        label: "Efsane Kahraman",
-        description: "10+ seviye karakter",
-        icon: Star,
-        unlocked: stats.highestLevel >= 10,
-        color: "text-yellow-400",
-        category: "general" as const,
-      },
-      {
-        id: "mythic",
-        label: "Efsanevi",
-        description: "20. seviye karakter",
-        icon: Crown,
-        unlocked: stats.highestLevel >= 20,
-        color: "text-amber-500",
-        category: "general" as const,
-      },
-
-      // === Savaş & Zar ===
-      {
-        id: "first_roll",
-        label: "İlk Zar",
-        description: "İlk zar atışını yaptı",
-        icon: Dices,
-        unlocked: stats.totalDiceRolls >= 1,
-        color: "text-teal-400",
-        category: "combat" as const,
-      },
-      {
-        id: "dice_master",
-        label: "Zar Ustası",
-        description: "100+ zar atışı",
-        icon: Dices,
-        unlocked: stats.totalDiceRolls >= 100,
-        color: "text-green-400",
-        category: "combat" as const,
-      },
-      {
-        id: "dice_addict",
-        label: "Zar Bağımlısı",
-        description: "500+ zar atışı",
-        icon: Dices,
-        unlocked: stats.totalDiceRolls >= 500,
-        color: "text-emerald-500",
-        category: "combat" as const,
-      },
-      {
-        id: "lucky",
-        label: "Şanslı",
-        description: "10+ kritik başarı (nat 20)",
-        icon: Sparkles,
-        unlocked: stats.criticalSuccesses >= 10,
-        color: "text-pink-400",
-        category: "combat" as const,
-      },
-      {
-        id: "blessed",
-        label: "Tanrıların Gözdesi",
-        description: "50+ kritik başarı",
-        icon: Zap,
-        unlocked: stats.criticalSuccesses >= 50,
-        color: "text-yellow-300",
-        category: "combat" as const,
-      },
-      {
-        id: "cursed",
-        label: "Lanetli",
-        description: "10+ kritik başarısızlık (nat 1)",
-        icon: Skull,
-        unlocked: stats.criticalFailures >= 10,
-        color: "text-red-400",
-        category: "combat" as const,
-      },
-      {
-        id: "hot_streak",
-        label: "Ateş Çemberinde",
-        description: "d20 ortalaması 12+",
-        icon: Flame,
-        unlocked: stats.avgD20 >= 12 && stats.d20TotalRolls >= 20,
-        color: "text-orange-500",
-        category: "combat" as const,
-      },
-
-      // === Sosyal & Hikaye ===
-      {
-        id: "first_words",
-        label: "İlk Sözler",
-        description: "10+ mesaj gönderdi",
-        icon: MessageSquare,
-        unlocked: stats.totalMessages >= 10,
-        color: "text-sky-300",
-        category: "social" as const,
-      },
-      {
-        id: "chatterbox",
-        label: "Geveze",
-        description: "100+ mesaj gönderdi",
-        icon: MessageSquare,
-        unlocked: stats.totalMessages >= 100,
-        color: "text-blue-300",
-        category: "social" as const,
-      },
-      {
-        id: "storyteller",
-        label: "Hikaye Anlatıcısı",
-        description: "500+ mesaj gönderdi",
-        icon: BookOpen,
-        unlocked: stats.totalMessages >= 500,
-        color: "text-blue-400",
-        category: "social" as const,
-      },
-      {
-        id: "bard",
-        label: "Efsane Ozan",
-        description: "1000+ mesaj gönderdi",
-        icon: Drama,
-        unlocked: stats.totalMessages >= 1000,
-        color: "text-fuchsia-400",
-        category: "social" as const,
-      },
-      {
-        id: "first_campaign",
-        label: "Macera Başlasın",
-        description: "İlk oturuma katıldı",
-        icon: Swords,
-        unlocked: totalCampaigns >= 1,
-        color: "text-rose-400",
-        category: "social" as const,
-      },
-      {
-        id: "party_animal",
-        label: "Parti Hayvanı",
-        description: "5+ çok oyunculu oturum",
-        icon: HandMetal,
-        unlocked: stats.totalCampaignsJoined >= 5,
-        color: "text-pink-500",
-        category: "social" as const,
-      },
-
-      // === Keşif & Yaratıcılık ===
-      {
-        id: "creator",
-        label: "Dünya Yaratıcısı",
-        description: "3+ senaryo oluşturdu",
-        icon: Scroll,
-        unlocked: stats.totalScenarios >= 3,
-        color: "text-cyan-400",
-        category: "exploration" as const,
-      },
-      {
-        id: "campaign_leader",
-        label: "Lider",
-        description: "3+ oturum oluşturdu",
-        icon: Compass,
-        unlocked: stats.totalCampaignsCreated >= 3,
-        color: "text-emerald-400",
-        category: "exploration" as const,
-      },
-      {
-        id: "warlord",
-        label: "Savaş Lordu",
-        description: "10+ oturum oluşturdu",
-        icon: Shield,
-        unlocked: stats.totalCampaignsCreated >= 10,
-        color: "text-red-500",
-        category: "exploration" as const,
-      },
-      {
-        id: "treasure_hunter",
-        label: "Hazine Avcısı",
-        description: "Tüm ırkları denedi",
-        icon: Gem,
-        unlocked: stats.favoriteRace !== null && stats.totalCharacters >= 5,
-        color: "text-amber-300",
-        category: "exploration" as const,
-      },
-      {
-        id: "mountaineer",
-        label: "Dağ Kaşifi",
-        description: "10+ aktif oturum",
-        icon: Mountain,
-        unlocked: stats.activeCampaigns >= 10,
-        color: "text-stone-400",
-        category: "exploration" as const,
-      },
-      {
-        id: "perfectionist",
-        label: "Mükemmeliyetçi",
-        description: "15+ başarımın kilidini aç",
-        icon: Target,
-        unlocked: false, // Bu aşağıda hesaplanacak
-        color: "text-rose-500",
-        category: "exploration" as const,
-      },
-    ];
-  }, [stats, profile]);
-
-  // "Mükemmeliyetçi" başarımını hesapla (diğerlerine bağlı)
-  const finalAchievements = useMemo(() => {
-    const unlockedCount = achievements.filter((a) => a.id !== "perfectionist" && a.unlocked).length;
-    return achievements.map((a) =>
-      a.id === "perfectionist" ? { ...a, unlocked: unlockedCount >= 15 } : a
-    );
-  }, [achievements]);
+    return ACHIEVEMENT_DEFINITIONS.map((def) => ({
+      id: def.id,
+      label: def.label,
+      description: def.description,
+      icon: ICON_MAP[def.iconName] || Star,
+      color: def.color,
+      category: def.category,
+      unlocked: apiMap.get(def.id) !== null && apiMap.get(def.id) !== undefined,
+      unlockedAt: apiMap.get(def.id) ?? null,
+    }));
+  }, [apiAchievements]);
 
   const [showAllAchievements, setShowAllAchievements] = useState(false);
 
@@ -540,7 +307,7 @@ export default function PlayerProfilePage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-              <Avatar src={profile.avatar} fallback={profile.username} size="xl" />
+              <Avatar src={profile.avatar ?? undefined} fallback={profile.username} size="xl" />
               <div className="flex-1 text-center sm:text-left">
                 <h2 className="text-2xl font-bold">{profile.username}</h2>
                 <p className="text-foreground-secondary flex items-center justify-center sm:justify-start gap-2 mt-2">
@@ -579,29 +346,42 @@ export default function PlayerProfilePage() {
         <h1 className="text-2xl font-bold">Oyuncu Profili</h1>
       </div>
 
+      {/* Kendi profil gizlilik uyarısı */}
+      {profile.isOwnProfile && privacySettings && !privacySettings.profilePublic && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-warning/10 border border-warning/20">
+          <Lock className="h-5 w-5 text-warning shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-warning">Profiliniz gizli</p>
+            <p className="text-xs text-warning/70">Profiliniz başkaları tarafından görüntülenemiyor. Bu sayfayı sadece siz görebiliyorsunuz.</p>
+          </div>
+        </div>
+      )}
+
       {/* Profile Card */}
       <Card>
         <CardContent className="p-6">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
             <Avatar
-              src={profile.avatar}
+              src={profile.avatar ?? undefined}
               fallback={profile.username}
               size="xl"
             />
             <div className="flex-1 text-center sm:text-left">
-              <div className="flex flex-col sm:flex-row items-center gap-3 mb-2">
+              <div className="flex flex-col sm:flex-row items-center gap-3 mb-1">
                 <h2 className="text-2xl font-bold">{profile.username}</h2>
-                {profile.role === "ADMIN" && (
-                  <Badge variant="danger" className="gap-1">
-                    <Shield className="h-3 w-3" />
-                    Admin
-                  </Badge>
-                )}
-                {profile.isOwnProfile && (
-                  <Badge variant="primary" className="gap-1">Sen</Badge>
-                )}
+                <div className="flex items-center gap-2">
+                  {profile.role === "ADMIN" && (
+                    <Badge variant="danger" className="gap-1">
+                      <Shield className="h-3 w-3" />
+                      Admin
+                    </Badge>
+                  )}
+                  {profile.isOwnProfile && (
+                    <Badge variant="primary" className="gap-1">Sen</Badge>
+                  )}
+                </div>
               </div>
-              <p className="text-foreground-secondary flex items-center justify-center sm:justify-start gap-2">
+              <p className="text-foreground-secondary flex items-center justify-center sm:justify-start gap-2 mt-1">
                 <CalendarDays className="h-4 w-4" />
                 {memberSince(profile.createdAt)}
               </p>
@@ -627,7 +407,25 @@ export default function PlayerProfilePage() {
                 )}
               </div>
             </div>
+            {profile.isOwnProfile && (
+              <Link
+                href="/profile"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-foreground-secondary hover:text-foreground shrink-0 self-start"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                Profili Düzenle
+              </Link>
+            )}
           </div>
+          {profile.isOwnProfile && (
+            <Link
+              href="/profile"
+              className="sm:hidden inline-flex items-center justify-center gap-1.5 mt-4 w-full px-3 py-2 rounded-lg text-xs font-medium border border-border hover:border-primary/50 hover:bg-primary/5 transition-all text-foreground-secondary hover:text-foreground"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Profili Düzenle
+            </Link>
+          )}
         </CardContent>
       </Card>
 
@@ -656,6 +454,11 @@ export default function PlayerProfilePage() {
       {/* Stats hidden message */}
       {!stats && !profile.isOwnProfile && (
         <HiddenSection icon={EyeOff} message="Bu kullanıcı istatistiklerini gizli tutuyor" />
+      )}
+
+      {/* Kendi profilde istatistik gizli uyarısı */}
+      {profile.isOwnProfile && privacySettings && !privacySettings.showStats && (
+        <OwnHiddenBanner message="İstatistikleriniz başkaları için gizli" />
       )}
 
       {/* Dice Statistics */}
@@ -743,10 +546,16 @@ export default function PlayerProfilePage() {
                       <div
                         key={achievement.id}
                         className="p-3 rounded-lg border bg-background-elevated border-border-hover text-center transition-all hover:scale-[1.03]"
+                        title={achievement.unlockedAt ? `${formatUnlockedDate(achievement.unlockedAt)} tarihinde açıldı` : undefined}
                       >
                         <Icon className={cn("h-6 w-6 mx-auto mb-2", achievement.color)} />
                         <p className="text-sm font-medium">{achievement.label}</p>
                         <p className="text-xs text-foreground-muted mt-0.5">{achievement.description}</p>
+                        {achievement.unlockedAt && (
+                          <p className="text-[10px] text-foreground-muted/60 mt-1">
+                            {formatUnlockedDate(achievement.unlockedAt)}
+                          </p>
+                        )}
                       </div>
                     );
                   })}
@@ -792,6 +601,7 @@ export default function PlayerProfilePage() {
                                 ? "bg-background-elevated border-border-hover hover:scale-[1.03]"
                                 : "bg-background-secondary/30 border-border/50 opacity-50 grayscale"
                             )}
+                            title={achievement.unlockedAt ? `${formatUnlockedDate(achievement.unlockedAt)} tarihinde açıldı` : undefined}
                           >
                             <Icon
                               className={cn(
@@ -801,6 +611,11 @@ export default function PlayerProfilePage() {
                             />
                             <p className="text-sm font-medium">{achievement.label}</p>
                             <p className="text-xs text-foreground-muted mt-0.5">{achievement.description}</p>
+                            {achievement.unlocked && achievement.unlockedAt && (
+                              <p className="text-[10px] text-foreground-muted/60 mt-1">
+                                {formatUnlockedDate(achievement.unlockedAt)}
+                              </p>
+                            )}
                           </div>
                         );
                       })}
@@ -814,123 +629,119 @@ export default function PlayerProfilePage() {
       </Card>
 
       {/* Characters & Campaigns grid */}
-      {(privacySettings?.showCharacters || privacySettings?.showCampaigns) ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Characters */}
-          {privacySettings?.showCharacters ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5 text-primary" />
-                  Karakterler
-                  <Badge variant="outline" size="sm">{characters.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {characters.length === 0 ? (
-                  <p className="text-foreground-muted text-center py-6">Henüz karakter yok</p>
-                ) : (
-                  <div className="space-y-3">
-                    {characters.slice(0, 6).map((char) => (
-                      <div
-                        key={char.id}
-                        className="flex items-center gap-3 p-3 rounded-lg bg-background-elevated"
-                      >
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
-                          {char.level}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{char.name}</p>
-                          <p className="text-xs text-foreground-secondary">
-                            {char.race} {char.class}
-                          </p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <div className="flex items-center gap-1 text-xs text-foreground-muted">
-                            <Heart className="h-3 w-3 text-danger" />
-                            {char.hp}/{char.maxHp}
-                          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Characters */}
+        {(privacySettings?.showCharacters || profile.isOwnProfile) ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                Karakterler
+                <Badge variant="outline" size="sm">{characters.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {profile.isOwnProfile && privacySettings && !privacySettings.showCharacters && (
+                <OwnHiddenBanner message="Karakterleriniz başkaları için gizli" />
+              )}
+              {characters.length === 0 ? (
+                <p className="text-foreground-muted text-center py-6">Henüz karakter yok</p>
+              ) : (
+                <div className="space-y-3">
+                  {characters.slice(0, 6).map((char) => (
+                    <div
+                      key={char.id}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-background-elevated"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">
+                        {char.level}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium truncate">{char.name}</p>
+                        <p className="text-xs text-foreground-secondary">
+                          {char.race} {char.class}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="flex items-center gap-1 text-xs text-foreground-muted">
+                          <Heart className="h-3 w-3 text-danger" />
+                          {char.hp}/{char.maxHp}
                         </div>
                       </div>
-                    ))}
-                    {characters.length > 6 && (
-                      <p className="text-center text-sm text-foreground-muted">
-                        +{characters.length - 6} karakter daha
-                      </p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            !profile.isOwnProfile && (
-              <HiddenSection icon={EyeOff} message="Karakterler gizli" />
-            )
-          )}
+                    </div>
+                  ))}
+                  {characters.length > 6 && (
+                    <p className="text-center text-sm text-foreground-muted">
+                      +{characters.length - 6} karakter daha
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <HiddenSection icon={EyeOff} message="Karakterler gizli" />
+        )}
 
-          {/* Campaigns */}
-          {privacySettings?.showCampaigns ? (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Swords className="h-5 w-5 text-secondary" />
-                  Oturumlar
-                  <Badge variant="outline" size="sm">{allCampaigns.length}</Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {allCampaigns.length === 0 ? (
-                  <p className="text-foreground-muted text-center py-6">Henüz oturum yok</p>
-                ) : (
-                  <div className="space-y-3">
-                    {allCampaigns.slice(0, 6).map((camp) => {
-                      const isCreator = campaigns.created.some((c) => c.id === camp.id);
-                      return (
-                        <Link
-                          key={camp.id}
-                          href={`/campaigns/${camp.id}`}
-                          className="flex items-center gap-3 p-3 rounded-lg bg-background-elevated hover:bg-background-elevated/80 transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium truncate">{camp.name}</p>
-                              {isCreator && (
-                                <Crown className="h-3.5 w-3.5 text-warning shrink-0" />
-                              )}
-                            </div>
-                            <p className="text-xs text-foreground-muted">
-                              {camp.isMultiplayer ? "Çok Oyunculu" : "Solo"}
-                            </p>
+        {/* Campaigns */}
+        {(privacySettings?.showCampaigns || profile.isOwnProfile) ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Swords className="h-5 w-5 text-secondary" />
+                Oturumlar
+                <Badge variant="outline" size="sm">{allCampaigns.length}</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {profile.isOwnProfile && privacySettings && !privacySettings.showCampaigns && (
+                <OwnHiddenBanner message="Oturumlarınız başkaları için gizli" />
+              )}
+              {allCampaigns.length === 0 ? (
+                <p className="text-foreground-muted text-center py-6">Henüz oturum yok</p>
+              ) : (
+                <div className="space-y-3">
+                  {allCampaigns.slice(0, 6).map((camp) => {
+                    const isCreator = campaigns.created.some((c) => c.id === camp.id);
+                    return (
+                      <Link
+                        key={camp.id}
+                        href={`/campaigns/${camp.id}`}
+                        className="flex items-center gap-3 p-3 rounded-lg bg-background-elevated hover:bg-background-elevated/80 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium truncate">{camp.name}</p>
+                            {isCreator && (
+                              <Crown className="h-3.5 w-3.5 text-warning shrink-0" />
+                            )}
                           </div>
-                          <Badge variant={getStatusVariant(camp.status)} size="sm">
-                            {getStatusLabel(camp.status)}
-                          </Badge>
-                        </Link>
-                      );
-                    })}
-                    {allCampaigns.length > 6 && (
-                      <p className="text-center text-sm text-foreground-muted">
-                        +{allCampaigns.length - 6} oturum daha
-                      </p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            !profile.isOwnProfile && (
-              <HiddenSection icon={EyeOff} message="Oturumlar gizli" />
-            )
-          )}
-        </div>
-      ) : (
-        !profile.isOwnProfile && (
-          <HiddenSection icon={EyeOff} message="Karakterler ve oturumlar gizli" />
-        )
-      )}
+                          <p className="text-xs text-foreground-muted">
+                            {camp.isMultiplayer ? "Çok Oyunculu" : "Solo"}
+                          </p>
+                        </div>
+                        <Badge variant={getStatusVariant(camp.status)} size="sm">
+                          {getStatusLabel(camp.status)}
+                        </Badge>
+                      </Link>
+                    );
+                  })}
+                  {allCampaigns.length > 6 && (
+                    <p className="text-center text-sm text-foreground-muted">
+                      +{allCampaigns.length - 6} oturum daha
+                    </p>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <HiddenSection icon={EyeOff} message="Oturumlar gizli" />
+        )}
+      </div>
 
       {/* Scenarios */}
-      {privacySettings?.showScenarios ? (
+      {(privacySettings?.showScenarios || profile.isOwnProfile) ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -939,7 +750,10 @@ export default function PlayerProfilePage() {
               <Badge variant="outline" size="sm">{scenarios.length}</Badge>
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
+            {profile.isOwnProfile && privacySettings && !privacySettings.showScenarios && (
+              <OwnHiddenBanner message="Senaryolarınız başkaları için gizli" />
+            )}
             {scenarios.length === 0 ? (
               <p className="text-foreground-muted text-center py-6">Henüz senaryo yok</p>
             ) : (
@@ -990,9 +804,7 @@ export default function PlayerProfilePage() {
           </CardContent>
         </Card>
       ) : (
-        !profile.isOwnProfile && (
-          <HiddenSection icon={EyeOff} message="Senaryolar gizli" />
-        )
+        <HiddenSection icon={EyeOff} message="Senaryolar gizli" />
       )}
     </div>
   );
@@ -1009,5 +821,15 @@ function HiddenSection({ icon: Icon, message }: { icon: React.ElementType; messa
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+// Kendi profildeki gizli bölüm uyarı banner'ı
+function OwnHiddenBanner({ message }: { message: string }) {
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-warning/10 border border-warning/20 text-warning text-xs">
+      <EyeOff className="h-3.5 w-3.5 shrink-0" />
+      <span>{message}</span>
+    </div>
   );
 }

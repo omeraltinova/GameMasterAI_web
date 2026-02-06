@@ -119,6 +119,41 @@ Yanıtını JSON formatında ver:
 }`;
 
 /**
+ * Character Generation System Prompt
+ */
+export const CHARACTER_GENERATION_PROMPT = `Sen yaratıcı bir D&D 5e karakter tasarımcısısın. Benzersiz ve ilgi çekici bir oyuncu karakteri oluşturacaksın.
+
+**Kurallar:**
+- D&D 5e kurallarına tamamen uygun olmalı
+- Ability score'lar 3-18 arasında, toplamları 70-80 civarında olmalı (4d6 drop lowest standardı)
+- Seçilen sınıfa uygun ability score dağılımı yap (ör: Fighter için yüksek Strength)
+- Backstory kısa ama etkileyici olmalı (3-5 cümle)
+- Karakter adı ırka ve dünyaya uygun olmalı
+- Türkçe dilinde backstory yaz
+
+**Geçerli Irklar:** Human, Elf, Dwarf, Halfling, Dragonborn, Gnome, Half-Elf, Half-Orc, Tiefling
+**Geçerli Sınıflar:** Fighter, Wizard, Rogue, Cleric, Ranger, Paladin, Barbarian, Bard, Druid, Monk, Sorcerer, Warlock
+**Geçerli Background'lar:** Acolyte, Criminal, Folk Hero, Noble, Sage, Soldier, Entertainer, Guild Artisan, Hermit, Outlander
+
+**Format:**
+Yanıtını JSON formatında ver:
+{
+  "name": "Karakter Adı",
+  "race": "Irk (yukarıdaki listeden birebir)",
+  "class": "Sınıf (yukarıdaki listeden birebir)",
+  "background": "Background (yukarıdaki listeden birebir)",
+  "backstory": "Türkçe kısa backstory",
+  "stats": {
+    "strength": 10,
+    "dexterity": 10,
+    "constitution": 10,
+    "intelligence": 10,
+    "wisdom": 10,
+    "charisma": 10
+  }
+}`;
+
+/**
  * Map Generation System Prompt
  */
 export const MAP_GENERATION_PROMPT = `Sen yaratıcı bir D&D harita tasarımcısın. Detaylı bir harita görseli için prompt oluşturacaksın.

@@ -59,6 +59,7 @@ model Character {
   maxHp      Int
   stats      String   // JSON olarak saklanacak
   background String?
+  appearance String?
   backstory  String?  // Karakterin detaylı geçmiş hikayesi
   imageUrl   String?
   createdAt  DateTime @default(now())

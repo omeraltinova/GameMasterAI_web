@@ -19,6 +19,7 @@ export const characterCreateSchema = z.object({
   maxHp: z.number().int().min(1).optional(),
   stats: characterStatsSchema.optional(),
   background: z.string().optional().nullable(),
+  appearance: z.string().optional().nullable(),
   backstory: z.string().optional().nullable(),
   imageUrl: z.string().optional().nullable(),
 });

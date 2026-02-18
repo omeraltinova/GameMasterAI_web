@@ -142,6 +142,7 @@ Yanıtını JSON formatında ver:
   "race": "Irk (yukarıdaki listeden birebir)",
   "class": "Sınıf (yukarıdaki listeden birebir)",
   "background": "Background (yukarıdaki listeden birebir)",
+  "appearance": "Karakterin görünüşü (cinsiyet, yaş, yüz, saç, zırh/kıyafet, duruş/atmosfer)",
   "backstory": "Türkçe kısa backstory",
   "stats": {
     "strength": 10,

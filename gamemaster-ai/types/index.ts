@@ -65,6 +65,7 @@ export interface Character {
   maxHp: number;
   stats: CharacterStats;
   background?: string;
+  appearance?: string;
   backstory?: string;
   imageUrl?: string;
   createdAt: string;

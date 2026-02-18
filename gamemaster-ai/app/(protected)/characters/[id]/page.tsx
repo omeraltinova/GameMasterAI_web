@@ -3,7 +3,7 @@
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar, Progress, ConfirmDialog } from "@/components/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar, Progress, ConfirmDialog, Modal } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { formatModifier, calculateModifier, getProficiencyBonus } from "@/lib/utils";
 import { get, put, del } from "@/lib/api/client";
@@ -76,6 +76,7 @@ const [isLevelingUp, setIsLevelingUp] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
 
   // Item tipi emojileri
   const getItemEmoji = (type: string): string => {
@@ -108,9 +109,18 @@ const [isLevelingUp, setIsLevelingUp] = useState(false);
       setIsLoading(true);
       setLoadError(null);
       try {
-        const characterResponse = await get<{ success: boolean; characters: Character[] }>("/characters");
-        const foundCharacter =
-          characterResponse?.characters?.find((item) => item.id === characterId) || null;
+        let foundCharacter: Character | null = null;
+
+        const singleResponse = await get<{ success: boolean; character: Character }>(
+          `/characters/${characterId}`
+        );
+
+        if (singleResponse?.success && singleResponse.character) {
+          foundCharacter = singleResponse.character;
+        } else {
+          const listResponse = await get<{ success: boolean; characters: Character[] }>("/characters");
+          foundCharacter = listResponse?.characters?.find((item) => item.id === characterId) || null;
+        }
 
         if (!isMounted) return;
 
@@ -207,65 +217,9 @@ const [isLevelingUp, setIsLevelingUp] = useState(false);
   const experience = character.experience || 0;
   const nextLevelProgress = 1000 - (experience % 1000);
   const canLevelUp = character.level < 20 && experience >= character.level * 1000;
-
-  const hasItems = equippedItems.length > 0 || inventoryItems.length > 0;
-
-  const getItemProperties = (item: InventoryItemData): ItemProperties | undefined => {
-    if (!item.properties) return undefined;
-    if (typeof item.properties === "string") {
-      try {
-        return JSON.parse(item.properties) as ItemProperties;
-      } catch (error) {
-        return undefined;
-      }
-    }
-    return item.properties;
-  };
-
-  const renderItem = (item: InventoryItemData) => {
-    const properties = getItemProperties(item);
-    return (
-      <div
-        key={item.id}
-        className="flex items-start gap-4 p-4 rounded-lg bg-background-elevated"
-      >
-        <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-medium">{item.name}</h4>
-            {item.quantity > 1 && (
-              <Badge variant="outline" size="sm">
-                x{item.quantity}
-              </Badge>
-            )}
-            {item.equipped && (
-              <Badge variant="success" size="sm">
-                Kuşanıldı
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-foreground-secondary">{item.type}</p>
-          {item.description && (
-            <p className="text-xs text-foreground-muted mt-1">
-              {item.description}
-            </p>
-          )}
-        </div>
-        <div className="text-right text-xs text-foreground-muted">
-          {properties?.damage && (
-            <p className="text-primary font-mono text-sm">
-              {properties.damage}
-            </p>
-          )}
-          {properties?.armorClass && (
-            <p className="text-primary font-mono text-sm">
-              AC +{properties.armorClass}
-            </p>
-          )}
-          {item.weight > 0 && <p>{item.weight} lb</p>}
-        </div>
-      </div>
-    );
-  };
+  const hasHistoryContent = Boolean(
+    character.background || character.appearance || character.backstory
+  );
 
   const handleHpUpdate = async () => {
     if (!character) return;
@@ -363,12 +317,22 @@ const [isLevelingUp, setIsLevelingUp] = useState(false);
           <div className="flex flex-col md:flex-row gap-6">
             {/* Avatar */}
             <div className="flex-shrink-0">
-              <Avatar
-                src={character.imageUrl}
-                fallback={character.name}
-                size="xl"
-                className="w-32 h-32"
-              />
+              <button
+                type="button"
+                onClick={() => character.imageUrl && setIsImagePreviewOpen(true)}
+                disabled={!character.imageUrl}
+                className={character.imageUrl ? "cursor-zoom-in" : "cursor-default"}
+              >
+                <Avatar
+                  src={character.imageUrl}
+                  fallback={character.name}
+                  size="xl"
+                  className="w-32 h-32"
+                />
+              </button>
+              {character.imageUrl && (
+                <p className="mt-2 text-[10px] text-foreground-muted text-center">Büyütmek için tıkla</p>
+              )}
             </div>
 
             {/* Info */}
@@ -406,6 +370,9 @@ const [isLevelingUp, setIsLevelingUp] = useState(false);
                     Sil
                   </Button>
                 </div>
+                {deleteError && (
+                  <p className="mt-2 text-xs text-danger">{deleteError}</p>
+                )}
               </div>
 
               {/* Quick Stats */}
@@ -734,7 +701,7 @@ const [isLevelingUp, setIsLevelingUp] = useState(false);
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {character.backstory ? (
+              {hasHistoryContent ? (
                 <div className="space-y-4">
                   {character.background && (
                     <div>
@@ -743,9 +710,22 @@ const [isLevelingUp, setIsLevelingUp] = useState(false);
                       </Badge>
                     </div>
                   )}
-                  <p className="text-foreground-secondary leading-relaxed whitespace-pre-wrap">
-                    {character.backstory}
-                  </p>
+                  {character.appearance && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-foreground-muted mb-1">Görünüş</p>
+                      <p className="text-foreground-secondary leading-relaxed whitespace-pre-wrap">
+                        {character.appearance}
+                      </p>
+                    </div>
+                  )}
+                  {character.backstory && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-foreground-muted mb-1">Geçmiş</p>
+                      <p className="text-foreground-secondary leading-relaxed whitespace-pre-wrap">
+                        {character.backstory}
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="py-12 text-center">
@@ -759,6 +739,24 @@ const [isLevelingUp, setIsLevelingUp] = useState(false);
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Modal
+        open={isImagePreviewOpen}
+        onOpenChange={setIsImagePreviewOpen}
+        title={`${character.name} - Portre`}
+        size="full"
+      >
+        {character.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={character.imageUrl}
+            alt={`${character.name} portresi`}
+            className="max-h-[75vh] w-full rounded-lg object-contain"
+          />
+        ) : (
+          <p className="text-sm text-foreground-muted">Önizlenecek görsel bulunamadı.</p>
+        )}
+      </Modal>
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

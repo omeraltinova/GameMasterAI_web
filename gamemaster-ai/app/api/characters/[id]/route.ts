@@ -15,7 +15,7 @@ const parseStats = (stats: string | null) => {
   if (!stats) return defaultStats;
   try {
     return JSON.parse(stats);
-  } catch (error) {
+  } catch {
     return defaultStats;
   }
 };
@@ -61,6 +61,9 @@ export async function GET(
       );
     }
 
+    const characterAppearance =
+      (character as unknown as { appearance?: string | null }).appearance ?? null;
+
     return NextResponse.json({
       success: true,
       character: {
@@ -74,6 +77,8 @@ export async function GET(
         maxHp: character.maxHp,
         stats: parseStats(character.stats),
         background: character.background,
+        appearance: characterAppearance,
+        backstory: character.backstory,
         imageUrl: character.imageUrl,
         campaignId: character.campaignId,
         campaign: character.campaign,
@@ -130,6 +135,8 @@ export async function PUT(
       class: characterClass,
       stats,
       background,
+      appearance,
+      backstory,
       imageUrl,
       hp,
       maxHp,
@@ -155,6 +162,18 @@ export async function PUT(
       data.background = null;
     } else if (typeof background === "string") {
       data.background = background;
+    }
+
+    if (appearance === null) {
+      data.appearance = null;
+    } else if (typeof appearance === "string") {
+      data.appearance = appearance;
+    }
+
+    if (backstory === null) {
+      data.backstory = null;
+    } else if (typeof backstory === "string") {
+      data.backstory = backstory;
     }
 
     if (imageUrl === null) {
@@ -195,6 +214,9 @@ export async function PUT(
       data,
     });
 
+    const updatedAppearance =
+      (updatedCharacter as unknown as { appearance?: string | null }).appearance ?? null;
+
     return NextResponse.json({
       success: true,
       character: {
@@ -208,6 +230,8 @@ export async function PUT(
         maxHp: updatedCharacter.maxHp,
         stats: parseStats(updatedCharacter.stats),
         background: updatedCharacter.background,
+        appearance: updatedAppearance,
+        backstory: updatedCharacter.backstory,
         imageUrl: updatedCharacter.imageUrl,
         campaignId: updatedCharacter.campaignId,
         createdAt: updatedCharacter.createdAt,

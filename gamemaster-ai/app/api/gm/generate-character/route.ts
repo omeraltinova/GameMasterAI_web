@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { race, characterClass, concept } = body;
+    const { race, characterClass, concept, appearance: requestedAppearance } = body;
 
     // User prompt oluştur
     let userPrompt = `Yeni bir D&D 5e karakter oluştur.\n`;
@@ -47,6 +47,10 @@ export async function POST(req: NextRequest) {
 
     if (concept) {
       userPrompt += `**Karakter konsepti:** ${concept}\n`;
+    }
+
+    if (requestedAppearance) {
+      userPrompt += `**Görünüş:** ${requestedAppearance}\n`;
     }
 
     if (!race && !characterClass && !concept) {
@@ -108,6 +112,7 @@ export async function POST(req: NextRequest) {
         race: charRace,
         class: charClass,
         background: charBg,
+        appearance: typeof characterData.appearance === 'string' ? characterData.appearance : '',
         backstory: characterData.backstory || '',
         stats,
       },

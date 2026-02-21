@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
 import { characterCreateSchema } from '@/lib/validators/characters';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/characters
@@ -16,6 +17,9 @@ export async function GET() {
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "GET:/api/characters", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     // Kullanıcının karakterlerini al
     const characters = await prisma.character.findMany({
@@ -85,6 +89,9 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/characters", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const body = await req.json();
     const parsed = characterCreateSchema.safeParse(body);

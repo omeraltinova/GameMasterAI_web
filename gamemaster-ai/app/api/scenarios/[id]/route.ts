@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { rateLimitResponse, getClientIp, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 interface RouteParams {
   params: Promise<{
@@ -14,6 +15,10 @@ interface RouteParams {
 // Get scenario detail
 export async function GET(req: Request, { params }: RouteParams) {
   try {
+    const ip = getClientIp(req);
+    const limited = rateLimitResponse(ip, "GET:/api/scenarios/[id]", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
+
     const { id } = await params;
     const scenario = await prisma.scenario.findUnique({
       where: { id },
@@ -50,6 +55,9 @@ export async function PUT(req: Request, { params }: RouteParams) {
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const limited = rateLimitResponse(session.user.email, "PUT:/api/scenarios/[id]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const body = await req.json();
     const { title, description, genre, difficulty, startingPrompt, tags, worldSettings } = body;
@@ -106,6 +114,9 @@ export async function DELETE(req: Request, { params }: RouteParams) {
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const limited = rateLimitResponse(session.user.email, "DELETE:/api/scenarios/[id]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const scenario = await prisma.scenario.findUnique({
       where: { id },

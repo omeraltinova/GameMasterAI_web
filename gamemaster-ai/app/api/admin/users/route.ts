@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
 import { logAdminAction } from "@/lib/admin/audit";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 // KULLANICILARI LİSTELE
 export async function GET(req: Request) {
@@ -11,6 +12,9 @@ export async function GET(req: Request) {
     if (session?.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
+
+    const limited = rateLimitResponse(session.user.id, "GET:/api/admin/users", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
@@ -69,6 +73,9 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
+    const limited = rateLimitResponse(session.user.id, "PATCH:/api/admin/users", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
+
     const { userId, role } = await req.json();
 
     if (!userId || typeof userId !== "string") {
@@ -124,6 +131,9 @@ export async function DELETE(req: Request) {
     if (session?.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
+
+    const limited = rateLimitResponse(session.user.id, "DELETE:/api/admin/users", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const { searchParams } = new URL(req.url);
     const userId = searchParams.get("id");

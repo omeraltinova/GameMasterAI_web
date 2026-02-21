@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { getSystemSettings, upsertSystemSettings } from "@/lib/admin/systemSettings";
 import { logAdminAction } from "@/lib/admin/audit";
 import { DEFAULT_AI_REQUESTS_PER_MINUTE } from "@/lib/security/aiRateLimit";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 export async function GET() {
   try {
@@ -11,6 +12,9 @@ export async function GET() {
     if (session?.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
+
+    const limited = rateLimitResponse(session.user.id, "GET:/api/admin/settings", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const settings = await getSystemSettings();
 
@@ -39,6 +43,9 @@ export async function PATCH(req: Request) {
     if (session?.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
+
+    const limited = rateLimitResponse(session.user.id, "PATCH:/api/admin/settings", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const body = await req.json();
     const aiRequestsPerMinute = Math.max(0, Number(body.aiRequestsPerMinute) || 0);

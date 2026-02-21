@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
 import { generateOpeningNarration } from '@/lib/ai/gamemaster';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 export async function GET(
   req: NextRequest,
@@ -11,6 +12,11 @@ export async function GET(
   const { id: campaignId } = await params;
 
   try {
+    if (userId) {
+      const limited = rateLimitResponse(userId, "GET:/api/campaigns/[id]/active-session", RATE_LIMIT_TIERS.WRITE);
+      if (limited) return limited;
+    }
+
     // 1. Oturumu al
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },

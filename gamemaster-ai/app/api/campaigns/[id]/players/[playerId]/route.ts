@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 // DELETE /api/campaigns/:id/players/:playerId - Oyuncuyu at
 export async function DELETE(
@@ -15,6 +16,9 @@ export async function DELETE(
                 { status: 401 }
             );
         }
+
+        const limited = rateLimitResponse(userId, "DELETE:/api/campaigns/[id]/players", RATE_LIMIT_TIERS.WRITE);
+        if (limited) return limited;
 
         const { id: campaignId, playerId } = await params;
 

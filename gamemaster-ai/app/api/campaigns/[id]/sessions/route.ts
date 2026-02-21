@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/campaigns/:id/sessions
@@ -18,6 +19,9 @@ export async function GET(
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "GET:/api/campaigns/[id]/sessions", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     const { id: campaignId } = await params;
     
@@ -95,6 +99,9 @@ export async function POST(
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/sessions", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id: campaignId } = await params;
     

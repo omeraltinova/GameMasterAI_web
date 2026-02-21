@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
 import { logAdminAction } from "@/lib/admin/audit";
 import { normalizeScenarioIds } from "@/lib/admin/utils";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 export async function GET() {
   try {
@@ -11,6 +12,9 @@ export async function GET() {
     if (session?.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
+
+    const limited = rateLimitResponse(session.user.id, "GET:/api/admin/collections", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const collections = await prisma.scenarioCollection.findMany({
       orderBy: { updatedAt: "desc" },
@@ -47,6 +51,9 @@ export async function POST(req: Request) {
     if (session?.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
+
+    const limited = rateLimitResponse(session.user.id, "POST:/api/admin/collections", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const body = await req.json();
     const { name, description, scenarioIds } = body ?? {};

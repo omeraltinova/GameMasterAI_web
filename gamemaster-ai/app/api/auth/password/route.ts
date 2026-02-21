@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
 import { passwordChangeSchema } from "@/lib/validators/auth";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 export async function POST(req: Request) {
   try {
@@ -10,6 +11,9 @@ export async function POST(req: Request) {
     if (!userId) {
       return NextResponse.json({ message: "Oturum acmaniz gerekiyor" }, { status: 401 });
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/auth/password", RATE_LIMIT_TIERS.AUTH_SENSITIVE);
+    if (limited) return limited;
 
     const payload = await req.json();
     const parsed = passwordChangeSchema.safeParse(payload);

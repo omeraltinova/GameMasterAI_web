@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 export async function GET(req: Request) {
   try {
@@ -9,6 +10,9 @@ export async function GET(req: Request) {
     if (session?.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
+
+    const limited = rateLimitResponse(session.user.id, "GET:/api/admin/audit", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const { searchParams } = new URL(req.url);
     const limitParam = parseInt(searchParams.get("limit") || "25");

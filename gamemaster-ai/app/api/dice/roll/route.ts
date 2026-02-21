@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * POST /api/dice/roll
@@ -16,6 +17,9 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/dice/roll", RATE_LIMIT_TIERS.GAME_ACTION);
+    if (limited) return limited;
 
     const body = await req.json();
     const { sessionId, characterId, diceType, count, modifier, purpose, advantage, disadvantage } = body;

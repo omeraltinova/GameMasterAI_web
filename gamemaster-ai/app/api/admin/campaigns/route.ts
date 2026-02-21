@@ -3,11 +3,15 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
 import { logAdminAction } from "@/lib/admin/audit";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
+
+    const limited = rateLimitResponse(session.user.id, "GET:/api/admin/campaigns", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const { searchParams } = new URL(req.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
@@ -56,6 +60,9 @@ export async function DELETE(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
+
+    const limited = rateLimitResponse(session.user.id, "DELETE:/api/admin/campaigns", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get("id");

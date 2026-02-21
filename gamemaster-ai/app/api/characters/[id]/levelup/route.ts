@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
 import { classes } from "@/lib/mock-data";
 import { calculateModifier } from "@/lib/utils";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 const parseStats = (stats: string | null) => {
   if (!stats) {
@@ -38,6 +39,9 @@ export async function PUT(
     if (!userId) {
       return NextResponse.json({ message: "Oturum acmaniz gerekiyor" }, { status: 401 });
     }
+
+    const limited = rateLimitResponse(userId, "PUT:/api/characters/[id]/levelup", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id } = await params;
     const character = await prisma.character.findUnique({

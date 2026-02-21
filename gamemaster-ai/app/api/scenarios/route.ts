@@ -3,11 +3,16 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { rateLimitResponse, getClientIp, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 // GET /api/scenarios
 // List scenarios with filters (search, genre)
 export async function GET(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const limited = rateLimitResponse(ip, "GET:/api/scenarios", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
+
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("query");
     const genre = searchParams.get("genre");
@@ -76,6 +81,9 @@ export async function POST(req: Request) {
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const limited = rateLimitResponse(session.user.email, "POST:/api/scenarios", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const body = await req.json();
     const { title, description, genre, difficulty, startingPrompt, tags, isAIGenerated, worldSettings } = body;

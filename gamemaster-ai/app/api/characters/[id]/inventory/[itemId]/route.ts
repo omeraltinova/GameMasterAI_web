@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/characters/:id/inventory/:itemId
@@ -18,6 +19,9 @@ export async function GET(
                 { status: 401 }
             );
         }
+
+        const limited = rateLimitResponse(userId, "GET:/api/characters/[id]/inventory/[itemId]", RATE_LIMIT_TIERS.READ);
+        if (limited) return limited;
 
         const { id: characterId, itemId } = await params;
 
@@ -77,6 +81,9 @@ export async function PUT(
                 { status: 401 }
             );
         }
+
+        const limited = rateLimitResponse(userId, "PUT:/api/characters/[id]/inventory/[itemId]", RATE_LIMIT_TIERS.WRITE);
+        if (limited) return limited;
 
         const { id: characterId, itemId } = await params;
         const body = await req.json();
@@ -156,6 +163,9 @@ export async function DELETE(
                 { status: 401 }
             );
         }
+
+        const limited = rateLimitResponse(userId, "DELETE:/api/characters/[id]/inventory/[itemId]", RATE_LIMIT_TIERS.WRITE);
+        if (limited) return limited;
 
         const { id: characterId, itemId } = await params;
 

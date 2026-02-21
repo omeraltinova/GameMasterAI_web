@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
 import { randomBytes } from 'crypto';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 // POST /api/campaigns/:id/invite - Yeni davet kodu oluştur
 export async function POST(
@@ -16,6 +17,9 @@ export async function POST(
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/invite", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id: campaignId } = await params;
 

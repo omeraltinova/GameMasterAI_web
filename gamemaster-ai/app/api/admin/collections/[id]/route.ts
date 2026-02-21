@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
 import { logAdminAction } from "@/lib/admin/audit";
 import { normalizeScenarioIds } from "@/lib/admin/utils";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 export async function PATCH(
   req: Request,
@@ -14,6 +15,9 @@ export async function PATCH(
     if (session?.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
+
+    const limited = rateLimitResponse(session.user.id, "PATCH:/api/admin/collections/[id]", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const { id } = await params;
     const body = await req.json();
@@ -108,6 +112,9 @@ export async function DELETE(
     if (session?.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
+
+    const limited = rateLimitResponse(session.user.id, "DELETE:/api/admin/collections/[id]", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const { id } = await params;
     const existing = await prisma.scenarioCollection.findUnique({

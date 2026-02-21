@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 // POST /api/campaigns/join - Davet kodu ile oturumu bul
 export async function POST(req: NextRequest) {
@@ -12,6 +13,9 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/campaigns/join", RATE_LIMIT_TIERS.AUTH_SENSITIVE);
+    if (limited) return limited;
 
     const body = await req.json();
     const { inviteCode } = body;

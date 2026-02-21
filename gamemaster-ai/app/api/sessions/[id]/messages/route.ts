@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/sessions/:id/messages
@@ -21,6 +22,9 @@ export async function GET(
     if (!userId) {
       return unauthorizedResponse();
     }
+
+    const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/messages", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     // Session'ı kontrol et
     const session = await prisma.gameSession.findUnique({
@@ -142,6 +146,9 @@ export async function POST(
     if (!userId) {
       return unauthorizedResponse();
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/sessions/[id]/messages", RATE_LIMIT_TIERS.GAME_ACTION);
+    if (limited) return limited;
 
     // Session'ı kontrol et (karakter bilgisi için players'ı dahil et)
     const session = await prisma.gameSession.findUnique({

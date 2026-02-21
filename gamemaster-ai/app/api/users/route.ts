@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/users?search=keyword&page=1&limit=20
@@ -15,6 +16,9 @@ export async function GET(req: NextRequest) {
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(currentUserId, "GET:/api/users", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     const { searchParams } = new URL(req.url);
     const search = searchParams.get('search')?.trim() || '';

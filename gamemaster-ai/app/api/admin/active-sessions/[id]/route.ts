@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
 import { logAdminAction } from "@/lib/admin/audit";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 export async function PATCH(
   req: NextRequest,
@@ -13,6 +14,9 @@ export async function PATCH(
     if (session?.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
+
+    const limited = rateLimitResponse(session.user.id, "PATCH:/api/admin/active-sessions/[id]", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const { id: sessionId } = await params;
     const body = await req.json();

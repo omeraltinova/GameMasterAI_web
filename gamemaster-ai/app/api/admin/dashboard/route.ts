@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 function toDateKey(date: Date) {
   return date.toISOString().slice(0, 10);
@@ -25,6 +26,9 @@ export async function GET() {
     if (!session || session.user.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
+
+    const limited = rateLimitResponse(session.user.id, "GET:/api/admin/dashboard", RATE_LIMIT_TIERS.ADMIN);
+    if (limited) return limited;
 
     const now = new Date();
     const today = new Date(now);

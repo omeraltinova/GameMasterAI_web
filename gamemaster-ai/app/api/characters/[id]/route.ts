@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 const defaultStats = {
   strength: 10,
@@ -32,6 +33,9 @@ export async function GET(
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "GET:/api/characters/[id]", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     const { id } = await params;
     const character = await prisma.character.findUnique({
@@ -107,6 +111,9 @@ export async function PUT(
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "PUT:/api/characters/[id]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id } = await params;
     const character = await prisma.character.findUnique({
@@ -259,6 +266,9 @@ export async function DELETE(
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "DELETE:/api/characters/[id]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id } = await params;
     const character = await prisma.character.findUnique({

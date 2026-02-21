@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
 import { characterHpUpdateSchema } from "@/lib/validators/characters";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 export async function PUT(
   req: NextRequest,
@@ -12,6 +13,9 @@ export async function PUT(
     if (!userId) {
       return NextResponse.json({ message: "Oturum acmaniz gerekiyor" }, { status: 401 });
     }
+
+    const limited = rateLimitResponse(userId, "PUT:/api/characters/[id]/hp", RATE_LIMIT_TIERS.GAME_ACTION);
+    if (limited) return limited;
 
     const { id } = await params;
     const character = await prisma.character.findUnique({

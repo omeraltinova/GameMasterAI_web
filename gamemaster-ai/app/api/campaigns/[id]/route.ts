@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 // GET /api/campaigns/:id - Get campaign details
 export async function GET(
@@ -12,6 +13,9 @@ export async function GET(
     if (!userId) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
+
+    const limited = rateLimitResponse(userId, "GET:/api/campaigns/[id]", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     const { id } = await params;
 
@@ -115,6 +119,9 @@ export async function PUT(
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const limited = rateLimitResponse(userId, "PUT:/api/campaigns/[id]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
     const { id } = await params;
     const body = await req.json();
 
@@ -199,6 +206,9 @@ export async function DELETE(
     if (!userId) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
+
+    const limited = rateLimitResponse(userId, "DELETE:/api/campaigns/[id]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id } = await params;
 

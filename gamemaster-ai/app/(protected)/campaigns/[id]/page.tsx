@@ -42,6 +42,7 @@ export default function CampaignLobbyPage() {
   const [availableCharacters, setAvailableCharacters] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+  const [pendingCharacterId, setPendingCharacterId] = useState<string | null>(null);
   const [isJoining, setIsJoining] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [myPlayer, setMyPlayer] = useState<any>(null);
@@ -107,6 +108,26 @@ export default function CampaignLobbyPage() {
     fetchCampaignData();
   }, [params.id, currentUserId]);
 
+  // Refetch helper - replaces window.location.reload()
+  const refetchCampaign = async () => {
+    if (!params.id) return;
+    try {
+      const response = await get(`/campaigns/${params.id}`) as { success: boolean; campaign: any };
+      if (response?.success && response.campaign) {
+        setCampaign(response.campaign);
+        if (response.campaign.scenario) setScenario(response.campaign.scenario);
+        if (response.campaign.players) {
+          setPlayers(response.campaign.players);
+          const myP = response.campaign.players.find((p: any) => p.userId === currentUserId);
+          setMyPlayer(myP || null);
+          if (myP?.characterId) setSelectedCharacterId(myP.characterId);
+        }
+      }
+    } catch (error) {
+      console.error('Refetch hatası:', error);
+    }
+  };
+
   // Fetch active session for this campaign
   useEffect(() => {
     const fetchActiveSession = async () => {
@@ -162,8 +183,8 @@ export default function CampaignLobbyPage() {
       );
       if (response && response.success) {
         setSelectedCharacterId(characterId);
-        // Sayfayı yenile
-        window.location.reload();
+        setPendingCharacterId(null);
+        await refetchCampaign();
       }
     } catch (error) {
       console.error('Lobiye katılma hatası:', error);
@@ -397,7 +418,7 @@ export default function CampaignLobbyPage() {
                   try {
                     // Oturum durumunu ACTIVE yap
                     await post(`/campaigns/${campaign.id}/pause`); // Bu endpoint ACTIVE'e de çevirebilir
-                    window.location.reload();
+                    await refetchCampaign();
                   } catch (err) {
                     console.error('Başlatma hatası:', err);
                   }
@@ -416,7 +437,7 @@ export default function CampaignLobbyPage() {
                 onClick={async () => {
                   try {
                     await post(`/campaigns/${campaign.id}/pause`);
-                    window.location.reload();
+                    await refetchCampaign();
                   } catch (err) {
                     console.error('Pause hatası:', err);
                   }
@@ -450,7 +471,7 @@ export default function CampaignLobbyPage() {
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-                    {/* Scenario Info */}
+          {/* Scenario Info */}
           {(scenario || canChangeScenario) && (
             <Card>
               <CardHeader>
@@ -785,14 +806,20 @@ export default function CampaignLobbyPage() {
                 <div className="space-y-2">
                   {availableCharacters.map((char: any) => {
                     const isSelected = selectedCharacterId === char.id;
+                    const isPending = pendingCharacterId === char.id;
                     return (
                       <button
                         key={char.id}
-                        onClick={() => handleJoinWithCharacter(char.id)}
+                        onClick={() => {
+                          if (isSelected) return;
+                          setPendingCharacterId(isPending ? null : char.id);
+                        }}
                         disabled={isJoining || isSelected}
                         className={`w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left ${
                           isSelected
                             ? 'border-primary bg-primary/10'
+                            : isPending
+                            ? 'border-secondary bg-secondary/10'
                             : 'border-border hover:border-primary/50 hover:bg-background-elevated'
                         } ${isJoining ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
@@ -809,9 +836,28 @@ export default function CampaignLobbyPage() {
                             Seçili
                           </Badge>
                         )}
+                        {isPending && (
+                          <Badge variant="secondary" size="sm">
+                            Seçiliyor
+                          </Badge>
+                        )}
                       </button>
                     );
                   })}
+                  {pendingCharacterId && (
+                    <Button
+                      className="w-full gap-2 mt-2"
+                      onClick={() => handleJoinWithCharacter(pendingCharacterId)}
+                      disabled={isJoining}
+                    >
+                      {isJoining ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Check className="h-4 w-4" />
+                      )}
+                      Karakteri Onayla
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="text-center py-4">
@@ -842,7 +888,7 @@ export default function CampaignLobbyPage() {
         onOpenChange={setIsScenarioModalOpen}
         title="Senaryo Seç"
         description="Lobi başlatılmadan önce senaryoyu değiştirebilirsin."
-        size="full"
+        size="lg"
       >
         <div className="space-y-4">
           <div className="relative">

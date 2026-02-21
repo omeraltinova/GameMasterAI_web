@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Button,
   Card,
@@ -10,17 +10,25 @@ import {
   Input,
   Avatar,
   Badge,
-  useToast, // Toast yerine useToast import ettik
+  useToast,
   ConfirmDialog,
-  ThemeSelector,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+  Modal,
+  Textarea,
 } from "@/components/ui";
+import { ProfileSidebar, SecurityTab, PrivacyTab, AchievementsSection, ActivityFeed } from "@/components/profile";
 import { useSession, signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
-import { themeConfig, type ThemeColor } from "@/components/providers/ThemeProvider";
+import {
+  themeConfig,
+  type ThemeColor,
+} from "@/components/providers/ThemeProvider";
 import {
   User,
   Mail,
-  Calendar,
   Shield,
   Save,
   Lock,
@@ -28,32 +36,89 @@ import {
   Check,
   Eye,
   EyeOff,
-  Globe,
   Swords,
   Scroll,
-  BarChart3,
   Users,
-  Loader2,
+  Trophy,
+  Star,
+  Dices,
+  MessageSquare,
+  Compass,
+  Flame,
+  Skull,
+  Zap,
+  BookOpen,
+  Drama,
+  HandMetal,
+  Footprints,
+  CalendarDays,
+  Gamepad2,
+  Gem,
+  Mountain,
+  Target,
+  Sparkles,
+  type LucideIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import {
+  ACHIEVEMENT_DEFINITIONS,
+  type AchievementCategory,
+} from "@/lib/achievements";
+
+// icon adı -> Lucide bileşeni eşlemesi
+const ICON_MAP: Record<string, LucideIcon> = {
+  Footprints, CalendarDays, Eye, User, Users, Gamepad2, Trophy, Star,
+  Dices, Sparkles, Zap, Skull, Flame, MessageSquare, BookOpen, Drama, Swords,
+  HandMetal, Scroll, Compass, Shield, Gem, Mountain, Target,
+};
+
+interface StatsData {
+  totalCharacters: number;
+  totalCampaignsCreated: number;
+  totalCampaignsJoined: number;
+  completedCampaigns: number;
+  activeCampaigns: number;
+  totalMessages: number;
+  totalDiceRolls: number;
+  totalScenarios: number;
+  criticalSuccesses: number;
+  criticalFailures: number;
+  avgD20: number;
+  d20TotalRolls: number;
+  favoriteRace: string | null;
+  favoriteClass: string | null;
+  highestLevel: number;
+}
+
+interface ActivityItem {
+  type: "character_created" | "campaign_created" | "campaign_joined" | "session_activity";
+  label: string;
+  entityName: string;
+  date: string;
+}
+
+interface Achievement {
+  id: string;
+  label: string;
+  description: string;
+  icon: LucideIcon;
+  unlocked: boolean;
+  color: string;
+  category: AchievementCategory;
+  unlockedAt: string | null;
+}
 
 export default function ProfilePage() {
   const { data: session, update } = useSession();
   const router = useRouter();
-  const { addToast } = useToast(); // Hook'u başlattık
+  const { addToast } = useToast();
   const user = session?.user;
 
   const [formData, setFormData] = useState({
     name: "",
     email: "",
   });
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-  });
-
   const [privacy, setPrivacy] = useState({
     profilePublic: true,
     showCharacters: true,
@@ -62,12 +127,20 @@ export default function ProfilePage() {
     showStats: true,
   });
   const [privacyLoaded, setPrivacyLoaded] = useState(false);
+  const [profileData, setProfileData] = useState<any>(null);
   const [isSavingPrivacy, setIsSavingPrivacy] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  // Yeni state'ler
+  const [bio, setBio] = useState("");
+  const [stats, setStats] = useState<StatsData | null>(null);
+  const [apiAchievements, setApiAchievements] = useState<{ id: string; unlockedAt: string | null }[]>([]);
+  const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   // Session yüklendiğinde formu doldur
   useEffect(() => {
@@ -79,14 +152,16 @@ export default function ProfilePage() {
     }
   }, [session]);
 
-  // Gizlilik ayarlarını yükle
+  // Profil verilerini yükle
   useEffect(() => {
-    const loadPrivacy = async () => {
+    const loadProfile = async () => {
       try {
         const res = await fetch("/api/profile");
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.user) {
+            setProfileData(data.user);
+            setBio(data.user.bio || "");
             setPrivacy({
               profilePublic: data.user.profilePublic ?? true,
               showCharacters: data.user.showCharacters ?? true,
@@ -94,13 +169,57 @@ export default function ProfilePage() {
               showScenarios: data.user.showScenarios ?? true,
               showStats: data.user.showStats ?? true,
             });
+            if (data.stats) setStats(data.stats);
+            if (data.achievements) setApiAchievements(data.achievements);
+            if (data.recentActivity) setRecentActivity(data.recentActivity);
           }
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
       setPrivacyLoaded(true);
     };
-    loadPrivacy();
+    loadProfile();
   }, []);
+
+  // Başarım tanımlarını API verisiyle birleştir
+  const finalAchievements: Achievement[] = useMemo(() => {
+    if (apiAchievements.length === 0) return [];
+
+    const apiMap = new Map(
+      apiAchievements.map((a) => [a.id, a.unlockedAt])
+    );
+
+    return ACHIEVEMENT_DEFINITIONS.map((def) => ({
+      id: def.id,
+      label: def.label,
+      description: def.description,
+      icon: ICON_MAP[def.iconName] || Star,
+      color: def.color,
+      category: def.category,
+      unlocked: apiMap.get(def.id) !== null && apiMap.get(def.id) !== undefined,
+      unlockedAt: apiMap.get(def.id) ?? null,
+    }));
+  }, [apiAchievements]);
+
+  const unlockedAchievements = finalAchievements.filter((a) => a.unlocked);
+
+  // Profil tamamlama yüzdesi
+  const profileCompletion = useMemo(() => {
+    const criteria = [
+      { label: "Avatar yükle", done: !!user?.image },
+      { label: "Biyografi yaz", done: bio.trim().length > 0 },
+      { label: "Karakter oluştur", done: (stats?.totalCharacters ?? profileData?._count?.characters ?? 0) > 0 },
+      { label: "Oturum başlat", done: (stats?.totalCampaignsCreated ?? profileData?._count?.campaigns ?? 0) > 0 },
+      { label: "Başarım kazan", done: unlockedAchievements.length > 0 },
+    ];
+    const doneCount = criteria.filter((c) => c.done).length;
+    return {
+      percentage: Math.round((doneCount / criteria.length) * 100),
+      criteria,
+      missing: criteria.filter((c) => !c.done),
+    };
+  }, [user, bio, stats, profileData, unlockedAchievements]);
 
   const showToast = (message: string, type: "success" | "error") => {
     addToast({
@@ -118,7 +237,7 @@ export default function ProfilePage() {
       const res = await fetch("/api/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: formData.name }),
+        body: JSON.stringify({ name: formData.name, bio }),
       });
 
       const data = await res.json();
@@ -127,7 +246,6 @@ export default function ProfilePage() {
         throw new Error(data.error || "Güncelleme başarısız");
       }
 
-      // Session'ı güncelle (arayüzdeki ismin hemen değişmesi için)
       await update({
         ...session,
         user: { ...session?.user, name: formData.name },
@@ -138,39 +256,6 @@ export default function ProfilePage() {
       showToast(error.message, "error");
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
-      showToast("Lutfen tum sifre alanlarini doldurun.", "error");
-      return;
-    }
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      showToast("Yeni sifreler eslesmiyor.", "error");
-      return;
-    }
-
-    setIsChangingPassword(true);
-    try {
-      const res = await fetch("/api/auth/password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(passwordForm),
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data?.message || "Sifre degistirme basarisiz");
-      }
-
-      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
-      showToast("Sifre basariyla guncellendi", "success");
-    } catch (error: any) {
-      showToast(error.message, "error");
-    } finally {
-      setIsChangingPassword(false);
     }
   };
 
@@ -204,14 +289,63 @@ export default function ProfilePage() {
         throw new Error(data.error || "Hesap silinemedi");
       }
 
-      // Çıkış yap ve anasayfaya yönlendir
       await signOut({ callbackUrl: "/" });
     } catch (error: any) {
       showToast(error.message, "error");
       setIsDeleting(false);
       setShowDeleteConfirm(false);
     }
-};
+  };
+
+  const handleAvatarChange = async (imageData: string) => {
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ avatar: imageData }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Avatar güncellenemedi");
+      await update({
+        ...session,
+        user: { ...session?.user, image: imageData },
+      });
+      showToast("Profil fotoğrafı güncellendi", "success");
+    } catch (error: any) {
+      showToast(error.message, "error");
+    }
+  };
+
+  const handlePasswordFromTab = async (form: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }) => {
+    if (!form.currentPassword || !form.newPassword || !form.confirmPassword) {
+      showToast("Lütfen tüm şifre alanlarını doldurun.", "error");
+      return;
+    }
+    if (form.newPassword !== form.confirmPassword) {
+      showToast("Yeni şifreler eşleşmiyor.", "error");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const res = await fetch("/api/auth/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.message || "Şifre değiştirme başarısız");
+      showToast("Şifre başarıyla güncellendi", "success");
+    } catch (error: any) {
+      showToast(error.message, "error");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   if (!user) return null;
 
@@ -232,7 +366,10 @@ export default function ProfilePage() {
       );
     }
 
-    const themes = Object.entries(themeConfig) as [ThemeColor, typeof themeConfig[ThemeColor]][];
+    const themes = Object.entries(themeConfig) as [
+      ThemeColor,
+      (typeof themeConfig)[ThemeColor],
+    ][];
     const currentTheme = themeConfig[theme as ThemeColor] || themeConfig.arcane;
 
     return (
@@ -254,7 +391,7 @@ export default function ProfilePage() {
                 "hover:scale-[1.02] active:scale-[0.98]",
                 theme === key
                   ? "border-primary bg-primary/10"
-                  : "border-border hover:border-border-hover bg-background-tertiary"
+                  : "border-border hover:border-border-hover bg-background-tertiary",
               )}
             >
               <div className="flex flex-col items-center gap-2">
@@ -262,18 +399,20 @@ export default function ProfilePage() {
                   className={cn(
                     "w-8 h-8 rounded-full flex items-center justify-center",
                     "ring-2 ring-offset-2 ring-offset-background-elevated",
-                    theme === key ? "ring-primary" : "ring-transparent"
+                    theme === key ? "ring-primary" : "ring-transparent",
                   )}
                   style={{ backgroundColor: config.color }}
                 >
-                  {theme === key && (
-                    <Check className="h-4 w-4 text-white" />
-                  )}
+                  {theme === key && <Check className="h-4 w-4 text-white" />}
                 </div>
-                <span className={cn(
-                  "text-sm font-medium",
-                  theme === key ? "text-primary" : "text-foreground-secondary"
-                )}>
+                <span
+                  className={cn(
+                    "text-sm font-medium",
+                    theme === key
+                      ? "text-primary"
+                      : "text-foreground-secondary",
+                  )}
+                >
                   {config.label}
                 </span>
               </div>
@@ -285,272 +424,223 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in pb-10">
-      {/* Toast componenti buradan kaldırıldı çünkü ToastProvider global olarak yönetecek */}
-
+    <div className="container max-w-6xl mx-auto animate-fade-in pb-10 md:pb-0">
       {/* Header */}
-      <div>
+      <div className="mb-6">
         <h1 className="text-3xl font-bold">Profil</h1>
         <p className="text-foreground-secondary">Hesap ayarlarını yönet</p>
       </div>
 
-      {/* Profile Card */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row items-center gap-6">
-            <Avatar
-              src={user.image || undefined}
-              fallback={user.name || "U"}
-              size="xl"
-              className="w-24 h-24"
-            />
-            <div className="flex-1 text-center sm:text-left">
-              <h2 className="text-2xl font-bold">{user.name}</h2>
-              <p className="text-foreground-secondary">{user.email}</p>
-              <div className="flex flex-wrap gap-2 mt-2 justify-center sm:justify-start">
-                <Badge variant={user.role === "ADMIN" ? "danger" : "primary"}>
-                  {user.role === "ADMIN" ? "YÖNETİCİ" : "ÜYE"}
-                </Badge>
-                <Badge variant="outline">
-                  <Calendar className="h-3 w-3 mr-1" />
-                  Aktif Hesap
-                </Badge>
-              </div>
-            </div>
-            <Button variant="outline" size="sm" disabled>
-              Fotoğraf Değiştir
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col md:flex-row gap-6 min-h-[calc(100vh-12rem)] md:h-[calc(100vh-12rem)]">
+        {/* Sol Panel: Profil Özeti + Banner */}
+        <ProfileSidebar
+          user={user}
+          bio={bio}
+          stats={stats}
+          profileData={profileData}
+          profileCompletion={profileCompletion}
+          onAvatarChange={handleAvatarChange}
+        />
 
-      {/* Edit Profile Form */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5 text-primary" />
-            Profil Bilgileri
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSave} className="space-y-4">
-            <Input
-              label="Kullanıcı Adı"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              leftIcon={<User className="h-4 w-4" />}
-              placeholder="Kullanıcı adınız"
-            />
-            <Input
-              label="E-posta"
-              type="email"
-              value={formData.email}
-              readOnly
-              className="opacity-70 cursor-not-allowed"
-              leftIcon={<Mail className="h-4 w-4" />}
-              hint="E-posta adresi değiştirilemez."
-            />
-            <Button type="submit" isLoading={isSaving} className="gap-2">
-              <Save className="h-4 w-4" />
-              Değişiklikleri Kaydet
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {/* Security */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Lock className="h-5 w-5 text-primary" />
-            Güvenlik
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <form onSubmit={handlePasswordChange} className="space-y-4 p-4 rounded-lg bg-background-elevated">
-            <div>
-              <h4 className="font-medium mb-1">Sifre Degistir</h4>
-              <p className="text-sm text-foreground-muted">
-                Mevcut sifren ile yeni sifreni dogrula
-              </p>
-            </div>
-            <Input
-              label="Mevcut Sifre"
-              type="password"
-              value={passwordForm.currentPassword}
-              onChange={(e) => setPasswordForm((prev) => ({ ...prev, currentPassword: e.target.value }))}
-              placeholder="Mevcut sifren"
-            />
-            <Input
-              label="Yeni Sifre"
-              type="password"
-              value={passwordForm.newPassword}
-              onChange={(e) => setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }))}
-              placeholder="Yeni sifre"
-            />
-            <Input
-              label="Yeni Sifre (Tekrar)"
-              type="password"
-              value={passwordForm.confirmPassword}
-              onChange={(e) => setPasswordForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
-              placeholder="Yeni sifreyi tekrar gir"
-            />
-            <Button type="submit" isLoading={isChangingPassword} className="gap-2">
-              <Save className="h-4 w-4" />
-              Sifreyi Guncelle
-            </Button>
-          </form>
-
-          <div className="flex items-center justify-between p-4 rounded-lg bg-background-elevated">
-            <div>
-              <h4 className="font-medium">Iki Faktorlu Dogrulama</h4>
-              <p className="text-sm text-foreground-muted">
-                Girislerde ek guvenlik katmani
-              </p>
-            </div>
-            <Badge variant="outline">Yakinda</Badge>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Privacy Settings */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Eye className="h-5 w-5 text-primary" />
-            Profil Gizliliği
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!privacyLoaded ? (
-            <div className="flex justify-center py-4">
-              <Loader2 className="h-5 w-5 animate-spin text-foreground-muted" />
-            </div>
-          ) : (
-            <>
-              <p className="text-sm text-foreground-muted">
-                Profilinin diğer oyunculara nasıl göründüğünü kontrol et.
-              </p>
-
-              {/* Ana toggle: Profil herkese açık mı */}
-              <PrivacyToggle
-                icon={Globe}
-                label="Profil Herkese Açık"
-                description="Kapatırsan profilin sadece sana görünür"
-                checked={privacy.profilePublic}
-                onChange={(v) => setPrivacy((p) => ({ ...p, profilePublic: v }))}
-              />
-
-              <div className={cn(
-                "space-y-3 pl-4 border-l-2 border-border transition-opacity",
-                !privacy.profilePublic && "opacity-40 pointer-events-none"
-              )}>
-                <PrivacyToggle
-                  icon={Users}
-                  label="Karakterleri Göster"
-                  description="Karakter listenin profilinde gözükmesi"
-                  checked={privacy.showCharacters}
-                  onChange={(v) => setPrivacy((p) => ({ ...p, showCharacters: v }))}
-                />
-                <PrivacyToggle
-                  icon={Swords}
-                  label="Oturumları Göster"
-                  description="Oturum listenin profilinde gözükmesi"
-                  checked={privacy.showCampaigns}
-                  onChange={(v) => setPrivacy((p) => ({ ...p, showCampaigns: v }))}
-                />
-                <PrivacyToggle
-                  icon={Scroll}
-                  label="Senaryoları Göster"
-                  description="Oluşturduğun senaryoların profilinde gözükmesi"
-                  checked={privacy.showScenarios}
-                  onChange={(v) => setPrivacy((p) => ({ ...p, showScenarios: v }))}
-                />
-                <PrivacyToggle
-                  icon={BarChart3}
-                  label="İstatistikleri Göster"
-                  description="Zar, mesaj ve başarım istatistiklerinin gözükmesi"
-                  checked={privacy.showStats}
-                  onChange={(v) => setPrivacy((p) => ({ ...p, showStats: v }))}
-                />
-              </div>
-
-              <Button
-                onClick={handlePrivacySave}
-                isLoading={isSavingPrivacy}
-                className="gap-2"
+        {/* Sağ Panel: Sekmeler */}
+        <div className="flex-1 flex flex-col h-full rounded-xl border border-border bg-background-secondary/20 p-4 md:p-6 shadow-sm overflow-hidden min-h-[500px]">
+          <Tabs
+            defaultValue="general"
+            className="flex flex-col h-full overflow-hidden"
+          >
+            <TabsList className="grid grid-cols-2 md:grid-cols-5 w-full h-auto gap-2 bg-transparent p-0 mb-6 flex-shrink-0">
+              <TabsTrigger
+                value="general"
+                className="data-[state=active]:bg-background data-[state=active]:shadow-md py-2 overflow-hidden text-ellipsis px-1 sm:px-3"
               >
-                <Save className="h-4 w-4" />
-                Gizlilik Ayarlarını Kaydet
-              </Button>
-            </>
-          )}
-        </CardContent>
-      </Card>
+                <User className="h-4 w-4 mr-1 sm:mr-2 shrink-0" />
+                <span className="truncate">Genel</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="security"
+                className="data-[state=active]:bg-background data-[state=active]:shadow-md py-2 overflow-hidden text-ellipsis px-1 sm:px-3"
+              >
+                <Shield className="h-4 w-4 mr-1 sm:mr-2 shrink-0" />
+                <span className="truncate">Güvenlik</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="privacy"
+                className="data-[state=active]:bg-background data-[state=active]:shadow-md py-2 overflow-hidden text-ellipsis px-1 sm:px-3"
+              >
+                <Eye className="h-4 w-4 mr-1 sm:mr-2 shrink-0" />
+                <span className="truncate">Gizlilik</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="preferences"
+                className="data-[state=active]:bg-background data-[state=active]:shadow-md py-2 overflow-hidden text-ellipsis px-1 sm:px-3"
+              >
+                <Palette className="h-4 w-4 mr-1 sm:mr-2 shrink-0" />
+                <span className="truncate">Tercihler</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="danger"
+                className="col-span-2 md:col-span-1 data-[state=active]:bg-danger/10 data-[state=active]:text-danger py-2 overflow-hidden text-ellipsis px-1 sm:px-3 hover:bg-danger/5 transition-colors"
+              >
+                <Lock className="h-4 w-4 mr-1 sm:mr-2 shrink-0" />
+                <span className="truncate">Tehlike</span>
+              </TabsTrigger>
+            </TabsList>
 
-      {/* Preferences */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5 text-primary" />
-            Tercihler
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ThemePreference />
-          <div className="flex items-center justify-between p-4 rounded-lg bg-background-elevated">
-            <div>
-              <h4 className="font-medium">Dil</h4>
-              <p className="text-sm text-foreground-muted">Tercih edilen dil</p>
-            </div>
-            <Badge variant="outline">Türkçe</Badge>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+              <TabsContent value="general" className="mt-0 h-full">
+                <Card className="border-none shadow-none bg-transparent">
+                  <CardHeader className="px-0 pt-0">
+                    <CardTitle className="flex items-center gap-2">
+                      <User className="h-5 w-5 text-primary" />
+                      Profil Bilgileri
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-0">
+                    <form onSubmit={handleSave} className="space-y-4">
+                      <Input
+                        label="Kullanıcı Adı"
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
+                        leftIcon={<User className="h-4 w-4" />}
+                        placeholder="Kullanıcı adınız"
+                      />
+                      <Input
+                        label="E-posta"
+                        type="email"
+                        value={formData.email}
+                        readOnly
+                        className="opacity-70 cursor-not-allowed"
+                        leftIcon={<Mail className="h-4 w-4" />}
+                        hint="E-posta adresi değiştirilemez."
+                      />
 
-      {/* Danger Zone */}
-      <Card variant="outline" className="border-danger/30">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-danger">
-            <Shield className="h-5 w-5" />
-            Tehlikeli Bölge
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-lg bg-danger/10">
-            <div>
-              <h4 className="font-medium">Çıkış Yap</h4>
-              <p className="text-sm text-foreground-muted">
-                Bu cihazdan çıkış yap
-              </p>
+                      {/* Feature 6: Biyografi alanı */}
+                      <div>
+                        <Textarea
+                          label="Biyografi"
+                          value={bio}
+                          onChange={(e) => setBio(e.target.value.slice(0, 500))}
+                          placeholder="Kendinizden kısaca bahsedin..."
+                          rows={3}
+                          hint={`${bio.length}/500`}
+                        />
+                      </div>
+
+                      <Button
+                        type="submit"
+                        isLoading={isSaving}
+                        className="gap-2 mt-2"
+                      >
+                        <Save className="h-4 w-4" />
+                        Değişiklikleri Kaydet
+                      </Button>
+                    </form>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="security" className="mt-0 h-full">
+                <SecurityTab
+                  onPasswordChange={handlePasswordFromTab}
+                  isChangingPassword={isChangingPassword}
+                />
+              </TabsContent>
+
+              <TabsContent value="privacy" className="mt-0 h-full">
+                <PrivacyTab
+                  privacy={privacy}
+                  privacyLoaded={privacyLoaded}
+                  isSavingPrivacy={isSavingPrivacy}
+                  onPrivacyChange={setPrivacy}
+                  onSave={handlePrivacySave}
+                  onPreview={() => setShowPreviewModal(true)}
+                />
+              </TabsContent>
+
+              <TabsContent value="preferences" className="mt-0 h-full">
+                <Card className="border-none shadow-none bg-transparent">
+                  <CardHeader className="px-0 pt-0">
+                    <CardTitle className="flex items-center gap-2">
+                      <Palette className="h-5 w-5 text-primary" />
+                      Tercihler
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="px-0 space-y-6">
+                    <ThemePreference />
+                    <div className="flex flex-col sm:flex-row items-center justify-between p-5 rounded-xl bg-background-elevated border border-border/50 gap-4">
+                      <div className="text-center sm:text-left">
+                        <h4 className="font-semibold text-lg mb-1">Dil</h4>
+                        <p className="text-sm text-foreground-muted">
+                          Tercih edilen arayüz dili
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="px-4 py-1.5 shrink-0">
+                        Türkçe
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="danger" className="mt-0 h-full">
+                <Card className="border border-danger/30 shadow-sm bg-danger/5 xl:h-auto">
+                  <CardHeader className="pb-4 border-b border-danger/10">
+                    <CardTitle className="flex items-center gap-2 text-danger">
+                      <Shield className="h-5 w-5" />
+                      Tehlikeli Bölge
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row items-center justify-between p-5 rounded-xl bg-background-elevated/50 border border-danger/20 gap-4">
+                      <div className="text-center sm:text-left">
+                        <h4 className="font-semibold text-lg mb-1">Çıkış Yap</h4>
+                        <p className="text-sm text-foreground-muted">
+                          Bu cihazdan güvenli bir şekilde çıkış yap
+                        </p>
+                      </div>
+                      <Button
+                        variant="danger"
+                        className="w-full sm:w-auto shrink-0"
+                        onClick={() => signOut({ callbackUrl: "/" })}
+                      >
+                        Oturumu Kapat
+                      </Button>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-center justify-between p-5 rounded-xl bg-danger/10 border border-danger/30 gap-4">
+                      <div className="text-center sm:text-left">
+                        <h4 className="font-semibold text-lg text-danger mb-1">
+                          Hesabı Sil
+                        </h4>
+                        <p className="text-sm text-foreground-muted">
+                          Hesabını ve tüm verilerini kalıcı olarak sil
+                        </p>
+                      </div>
+                      <Button
+                        variant="danger"
+                        className="w-full sm:w-auto shrink-0"
+                        onClick={() => setShowDeleteConfirm(true)}
+                      >
+                        Hesabı Sil
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
             </div>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => signOut({ callbackUrl: "/" })}
-            >
-              Çıkış Yap
-            </Button>
-          </div>
-          <div className="flex items-center justify-between p-4 rounded-lg bg-danger/10">
-            <div>
-              <h4 className="font-medium text-danger">Hesabı Sil</h4>
-              <p className="text-sm text-foreground-muted">
-                Hesabını ve tüm verilerini kalıcı olarak sil
-              </p>
-            </div>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
-              Hesabı Sil
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </Tabs>
+        </div>
+      </div>
+
+      {/* Başarım Rozetleri */}
+      <AchievementsSection
+        achievements={finalAchievements}
+        unlockedAchievements={unlockedAchievements}
+      />
+
+      {/* Aktivite Akışı */}
+      <ActivityFeed activities={recentActivity} />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
@@ -564,50 +654,104 @@ export default function ProfilePage() {
         variant="danger"
         isLoading={isDeleting}
       />
+
+      {/* Feature 7: Herkese Açık Profil Önizlemesi */}
+      <Modal
+        open={showPreviewModal}
+        onOpenChange={setShowPreviewModal}
+        title="Herkese Açık Profil Önizlemesi"
+        size="xl"
+      >
+        <div className="space-y-6">
+          {!privacy.profilePublic ? (
+            <div className="flex flex-col items-center text-center space-y-3 py-8">
+              <Lock className="h-12 w-12 text-foreground-muted" />
+              <h3 className="text-lg font-semibold">Bu profil gizli</h3>
+              <p className="text-foreground-muted max-w-md">
+                Profiliniz gizli olarak ayarlanmış. Diğer oyuncular karakter, oturum ve istatistik bilgilerinizi görüntüleyemiyor.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Profil bilgileri */}
+              <div className="flex items-center gap-4">
+                <Avatar
+                  src={user.image || undefined}
+                  fallback={user.name || "U"}
+                  size="lg"
+                />
+                <div>
+                  <h3 className="text-xl font-bold">{user.name}</h3>
+                  {bio.trim() && (
+                    <p className="text-sm text-foreground-muted mt-1 line-clamp-2">{bio}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Gizlilik durumlarına göre bölümler */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <PreviewSection
+                  label="İstatistikler"
+                  visible={privacy.showStats}
+                  value={stats ? `${stats.totalCharacters} karakter, ${stats.totalDiceRolls} zar atışı` : undefined}
+                />
+                <PreviewSection
+                  label="Karakterler"
+                  visible={privacy.showCharacters}
+                  value={stats ? `${stats.totalCharacters} karakter` : undefined}
+                />
+                <PreviewSection
+                  label="Oturumlar"
+                  visible={privacy.showCampaigns}
+                  value={stats ? `${stats.totalCampaignsCreated + stats.totalCampaignsJoined} oturum` : undefined}
+                />
+                <PreviewSection
+                  label="Senaryolar"
+                  visible={privacy.showScenarios}
+                  value={stats ? `${stats.totalScenarios} senaryo` : undefined}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
 
-// Toggle bileşeni
-function PrivacyToggle({
-  icon: Icon,
+// Önizleme bölüm kartı
+function PreviewSection({
   label,
-  description,
-  checked,
-  onChange,
+  visible,
+  value,
 }: {
-  icon: React.ElementType;
   label: string;
-  description: string;
-  checked: boolean;
-  onChange: (value: boolean) => void;
+  visible: boolean;
+  value?: string;
 }) {
   return (
-    <div className="flex items-center justify-between p-4 rounded-lg bg-background-elevated">
-      <div className="flex items-center gap-3">
-        <Icon className="h-4 w-4 text-foreground-secondary shrink-0" />
-        <div>
-          <h4 className="font-medium text-sm">{label}</h4>
-          <p className="text-xs text-foreground-muted">{description}</p>
-        </div>
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={cn(
-          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200",
-          checked ? "bg-primary" : "bg-foreground-muted/30"
+    <div className={cn(
+      "p-4 rounded-lg border",
+      visible ? "bg-background-elevated border-border" : "bg-background-secondary/30 border-border/50"
+    )}>
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium">{label}</span>
+        {visible ? (
+          <Badge variant="success" size="sm" className="gap-1">
+            <Eye className="h-3 w-3" />
+            Görünür
+          </Badge>
+        ) : (
+          <Badge variant="outline" size="sm" className="gap-1 text-foreground-muted">
+            <EyeOff className="h-3 w-3" />
+            Gizli
+          </Badge>
         )}
-      >
-        <span
-          className={cn(
-            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200",
-            checked ? "translate-x-5" : "translate-x-0"
-          )}
-        />
-      </button>
+      </div>
+      {visible && value && (
+        <p className="text-xs text-foreground-muted mt-2">{value}</p>
+      )}
     </div>
   );
 }
+

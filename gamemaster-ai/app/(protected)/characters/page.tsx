@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Button, Card, CardContent, Badge } from "@/components/ui";
 import { CharacterCard } from "@/components/character";
 import {
@@ -13,9 +13,11 @@ import {
   ArrowUpDown,
   X,
   ChevronDown,
+  Check,
 } from "lucide-react";
 import { get } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 import type { Character } from "@/types";
 
 const RACE_OPTIONS = [
@@ -61,6 +63,71 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
   { value: "level-desc", label: "Seviye (Yüksek)" },
   { value: "level-asc", label: "Seviye (Düşük)" },
 ];
+
+function SortDropdown({ sortBy, onSortChange }: { sortBy: SortKey; onSortChange: (key: SortKey) => void }) {
+  const [open, setOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const currentLabel = SORT_OPTIONS.find((o) => o.value === sortBy)?.label || "Sırala";
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "inline-flex items-center gap-2 h-10 px-3 pr-8 rounded-lg border text-sm font-medium transition-all",
+          open
+            ? "border-primary/50 bg-primary/10 text-primary"
+            : "border-border bg-input text-foreground-secondary hover:border-primary/30 hover:text-foreground"
+        )}
+      >
+        <ArrowUpDown className="h-4 w-4" />
+        {currentLabel}
+        <ChevronDown className={cn("absolute right-2 h-3.5 w-3.5 transition-transform", open && "rotate-180")} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.15 }}
+            className="absolute right-0 top-full mt-1 z-50 min-w-[160px] rounded-lg border border-border bg-background shadow-lg overflow-hidden"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => {
+                  onSortChange(opt.value);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "w-full flex items-center justify-between px-3 py-2 text-sm transition-colors",
+                  sortBy === opt.value
+                    ? "bg-primary/10 text-primary"
+                    : "text-foreground-secondary hover:bg-background-elevated hover:text-foreground"
+                )}
+              >
+                {opt.label}
+                {sortBy === opt.value && <Check className="h-3.5 w-3.5" />}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export default function CharactersPage() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -198,25 +265,21 @@ export default function CharactersPage() {
             )}
           </button>
 
-          {/* Sıralama */}
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortKey)}
-              className="h-10 pl-9 pr-8 rounded-lg appearance-none bg-input border border-border text-sm text-foreground-secondary hover:text-foreground hover:border-primary/30 transition-all focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
-            >
-              {SORT_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-            <ArrowUpDown className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground-muted pointer-events-none" />
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-muted pointer-events-none" />
-          </div>
+          {/* Sıralama - Custom Dropdown */}
+          <SortDropdown sortBy={sortBy} onSortChange={setSortBy} />
         </div>
       </div>
 
       {/* Filter Panel */}
+      <AnimatePresence>
       {showFilters && (
+        <motion.div
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.2, ease: "easeInOut" }}
+          className="overflow-hidden"
+        >
         <Card>
           <CardContent className="p-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -313,7 +376,9 @@ export default function CharactersPage() {
             )}
           </CardContent>
         </Card>
+        </motion.div>
       )}
+      </AnimatePresence>
 
       {/* Sonuç bilgisi */}
       {!isLoading && characters.length > 0 && (searchQuery || activeFilterCount > 0) && (

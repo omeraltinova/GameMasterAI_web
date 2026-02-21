@@ -114,7 +114,7 @@ export default function CampaignsPage() {
               <Loader2 className="h-8 w-8 animate-spin text-foreground-muted" />
             </div>
           ) : filterCampaigns(myCampaigns).length > 0 ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filterCampaigns(myCampaigns).map((campaign: any) => (
                 <CampaignCard key={campaign.id} campaign={campaign} />
               ))}
@@ -149,13 +149,17 @@ export default function CampaignsPage() {
 
         {/* Joined Campaigns */}
         <TabsContent value="joined">
-          {filterCampaigns(joinedCampaigns).length > 0 ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-foreground-muted" />
+            </div>
+          ) : filterCampaigns(joinedCampaigns).length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filterCampaigns(joinedCampaigns).map((campaign: any) => (
                 <CampaignCard key={campaign.id} campaign={campaign} />
               ))}
             </div>
-          ) : (
+          ) : joinedCampaigns.length === 0 ? (
             <Card>
               <CardContent className="py-16 text-center">
                 <Users className="h-16 w-16 text-foreground-muted mx-auto mb-4" />
@@ -171,6 +175,13 @@ export default function CampaignsPage() {
                     Davet Koduyla Katıl
                   </Button>
                 </Link>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Search className="h-12 w-12 text-foreground-muted mx-auto mb-4" />
+                <p className="text-foreground-secondary">Sonuç bulunamadı</p>
               </CardContent>
             </Card>
           )}

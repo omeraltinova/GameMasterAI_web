@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
+import { checkAchievements, type AchievementStats } from "@/lib/achievements";
 
-// KULLANICI BİLGİLERİ (GET) — gizlilik ayarları dahil
+// KULLANICI BİLGİLERİ (GET) — gizlilik ayarları + stats + achievements + activity
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -12,13 +13,16 @@ export async function GET() {
       return NextResponse.json({ error: "Oturum açılmamış" }, { status: 401 });
     }
 
+    const userId = session.user.id;
+
     const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
+      where: { id: userId },
       select: {
         id: true,
         username: true,
         email: true,
         avatar: true,
+        bio: true,
         role: true,
         createdAt: true,
         profilePublic: true,
@@ -26,6 +30,49 @@ export async function GET() {
         showCampaigns: true,
         showScenarios: true,
         showStats: true,
+        characters: {
+          select: {
+            id: true,
+            name: true,
+            race: true,
+            class: true,
+            level: true,
+            createdAt: true,
+          },
+          orderBy: { level: "desc" },
+        },
+        campaigns: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+        },
+        campaignPlayers: {
+          select: {
+            campaign: {
+              select: {
+                id: true,
+                name: true,
+                status: true,
+                createdAt: true,
+              },
+            },
+            joinedAt: true,
+          },
+          orderBy: { joinedAt: "desc" },
+        },
+        _count: {
+          select: {
+            characters: true,
+            campaigns: true,
+            campaignPlayers: true,
+            messages: true,
+            scenarios: true,
+          },
+        },
       },
     });
 
@@ -33,9 +80,197 @@ export async function GET() {
       return NextResponse.json({ error: "Kullanıcı bulunamadı" }, { status: 404 });
     }
 
+    // --- Stats hesaplama ---
+    const playerMessageCount = await prisma.message.count({
+      where: { senderId: userId, senderType: "PLAYER" },
+    });
+
+    const diceRolls = await prisma.diceRoll.findMany({
+      where: { character: { userId } },
+      select: { diceType: true, total: true, results: true },
+    });
+
+    let totalDiceRolls = diceRolls.length;
+    const d20Rolls: number[] = [];
+    let criticalSuccesses = 0;
+    let criticalFailures = 0;
+
+    diceRolls.forEach((roll) => {
+      if (roll.diceType === "d20") {
+        try {
+          const results = JSON.parse(roll.results);
+          if (Array.isArray(results)) {
+            results.forEach((r: number) => {
+              d20Rolls.push(r);
+              if (r === 20) criticalSuccesses++;
+              if (r === 1) criticalFailures++;
+            });
+          }
+        } catch { /* ignore */ }
+      }
+    });
+
+    const avgD20 =
+      d20Rolls.length > 0
+        ? Math.round(
+            (d20Rolls.reduce((a, b) => a + b, 0) / d20Rolls.length) * 10
+          ) / 10
+        : 0;
+
+    // Favori ırk ve sınıf
+    const raceCounts: Record<string, number> = {};
+    const classCounts: Record<string, number> = {};
+    user.characters.forEach((c) => {
+      raceCounts[c.race] = (raceCounts[c.race] || 0) + 1;
+      classCounts[c.class] = (classCounts[c.class] || 0) + 1;
+    });
+
+    const favoriteRace =
+      Object.entries(raceCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+    const favoriteClass =
+      Object.entries(classCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+
+    const highestLevel = user.characters[0]?.level || 0;
+    const completedCampaigns = user.campaigns.filter(
+      (c) => c.status === "COMPLETED"
+    ).length;
+    const activeCampaigns = user.campaigns.filter(
+      (c) => c.status === "ACTIVE"
+    ).length;
+
+    const stats = {
+      totalCharacters: user._count.characters,
+      totalCampaignsCreated: user._count.campaigns,
+      totalCampaignsJoined: user._count.campaignPlayers,
+      completedCampaigns,
+      activeCampaigns,
+      totalMessages: playerMessageCount,
+      totalDiceRolls,
+      totalScenarios: user._count.scenarios,
+      criticalSuccesses,
+      criticalFailures,
+      avgD20,
+      d20TotalRolls: d20Rolls.length,
+      favoriteRace,
+      favoriteClass,
+      highestLevel,
+    };
+
+    // --- Başarım kontrolü ---
+    const monthsSinceJoin = Math.floor(
+      (Date.now() - new Date(user.createdAt).getTime()) /
+        (1000 * 60 * 60 * 24 * 30)
+    );
+
+    const achievementStats: AchievementStats = {
+      totalCharacters: stats.totalCharacters,
+      totalCampaignsCreated: stats.totalCampaignsCreated,
+      totalCampaignsJoined: stats.totalCampaignsJoined,
+      completedCampaigns,
+      activeCampaigns,
+      totalMessages: playerMessageCount,
+      totalDiceRolls,
+      totalScenarios: stats.totalScenarios,
+      criticalSuccesses,
+      criticalFailures,
+      avgD20,
+      d20TotalRolls: d20Rolls.length,
+      favoriteRace,
+      highestLevel,
+      monthsSinceJoin,
+    };
+
+    const checkResults = checkAchievements(achievementStats);
+    const unlockedIds = checkResults.filter((r) => r.unlocked).map((r) => r.id);
+
+    // Mevcut DB kayıtları
+    const existingAchievements = await prisma.userAchievement.findMany({
+      where: { userId },
+      select: { achievementId: true, unlockedAt: true },
+    });
+
+    const existingMap = new Map(
+      existingAchievements.map((a) => [a.achievementId, a.unlockedAt])
+    );
+
+    // Yeni açılanları kaydet
+    const newlyUnlocked = unlockedIds.filter((id) => !existingMap.has(id));
+    if (newlyUnlocked.length > 0) {
+      const newRecords = await prisma.$transaction(
+        newlyUnlocked.map((achievementId) =>
+          prisma.userAchievement.create({
+            data: { userId, achievementId },
+            select: { achievementId: true, unlockedAt: true },
+          })
+        )
+      );
+      newRecords.forEach((r) => {
+        existingMap.set(r.achievementId, r.unlockedAt);
+      });
+    }
+
+    const achievements = checkResults.map((r) => ({
+      id: r.id,
+      unlockedAt: r.unlocked
+        ? existingMap.get(r.id)?.toISOString() || null
+        : null,
+    }));
+
+    // --- Son aktiviteler ---
+    const recentCharacters = user.characters.slice(0, 5).map((c) => ({
+      type: "character_created" as const,
+      label: "Yeni karakter oluşturuldu",
+      entityName: c.name,
+      date: c.createdAt.toISOString(),
+    }));
+
+    const recentCampaigns = user.campaigns.slice(0, 5).map((c) => ({
+      type: "campaign_created" as const,
+      label: "Yeni oturum oluşturuldu",
+      entityName: c.name,
+      date: c.createdAt.toISOString(),
+    }));
+
+    const recentJoined = user.campaignPlayers
+      .filter(
+        (cp) => !user.campaigns.some((c) => c.id === cp.campaign.id)
+      )
+      .slice(0, 5)
+      .map((cp) => ({
+        type: "campaign_joined" as const,
+        label: "Oturuma katıldı",
+        entityName: cp.campaign.name,
+        date: cp.joinedAt.toISOString(),
+      }));
+
+    const recentActivity = [
+      ...recentCharacters,
+      ...recentCampaigns,
+      ...recentJoined,
+    ]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, 8);
+
     return NextResponse.json({
       success: true,
-      user,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        bio: user.bio,
+        role: user.role,
+        createdAt: user.createdAt,
+        profilePublic: user.profilePublic,
+        showCharacters: user.showCharacters,
+        showCampaigns: user.showCampaigns,
+        showScenarios: user.showScenarios,
+        showStats: user.showStats,
+        _count: user._count,
+      },
+      stats,
+      achievements,
+      recentActivity,
     });
   } catch (error) {
     console.error("Profil bilgileri hatası:", error);
@@ -46,7 +281,7 @@ export async function GET() {
   }
 }
 
-// KULLANICI GÜNCELLEME (PATCH) — gizlilik ayarları dahil
+// KULLANICI GÜNCELLEME (PATCH) — gizlilik ayarları + bio dahil
 export async function PATCH(req: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -56,7 +291,7 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json();
-    const { name, privacy } = body;
+    const { name, privacy, bio } = body;
     const data: Record<string, unknown> = {};
 
     if (typeof name === "string") {
@@ -82,6 +317,17 @@ export async function PATCH(req: Request) {
       }
 
       data.username = name;
+    }
+
+    // Bio alanı
+    if (typeof bio === "string") {
+      if (bio.length > 500) {
+        return NextResponse.json(
+          { error: "Biyografi en fazla 500 karakter olabilir." },
+          { status: 400 }
+        );
+      }
+      data.bio = bio;
     }
 
     // Gizlilik ayarları
@@ -115,6 +361,7 @@ export async function PATCH(req: Request) {
       select: {
         username: true,
         email: true,
+        bio: true,
         profilePublic: true,
         showCharacters: true,
         showCampaigns: true,
@@ -128,6 +375,7 @@ export async function PATCH(req: Request) {
       user: {
         name: updatedUser.username,
         email: updatedUser.email,
+        bio: updatedUser.bio,
         privacy: {
           profilePublic: updatedUser.profilePublic,
           showCharacters: updatedUser.showCharacters,

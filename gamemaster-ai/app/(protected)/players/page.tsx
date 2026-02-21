@@ -88,7 +88,7 @@ export default function PlayersPage() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+        <h1 className="text-3xl font-bold flex items-center gap-2">
           <Users className="h-6 w-6 text-primary" />
           Oyuncular
         </h1>
@@ -98,14 +98,14 @@ export default function PlayersPage() {
       </div>
 
       {/* Search */}
-      <div className="relative">
+      <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground-muted" />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Kullanıcı adı ile ara..."
-          className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-background-elevated border border-border focus:border-primary focus:ring-1 focus:ring-primary/30 outline-none transition-all text-foreground placeholder:text-foreground-muted"
+          className="w-full h-10 pl-10 pr-4 rounded-lg bg-input border border-border text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
 
@@ -162,6 +162,11 @@ export default function PlayersPage() {
                             {user.campaignCount}
                           </span>
                         </div>
+                        {user.createdAt && (
+                          <p className="text-[11px] text-foreground-muted/60 mt-1">
+                            Katılım: {new Date(user.createdAt).toLocaleDateString("tr-TR", { month: "short", year: "numeric" })}
+                          </p>
+                        )}
                       </div>
                     </div>
                   </CardContent>

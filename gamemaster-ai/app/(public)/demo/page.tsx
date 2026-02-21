@@ -3,7 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button, Badge } from "@/components/ui";
-import { Dice6, Swords, ArrowRight, Bot, User, Eye, Sparkles, RotateCcw } from "lucide-react";
+import { 
+  Dice6, Swords, ArrowRight, Bot, User, Eye, Sparkles, RotateCcw,
+  BookOpen, Brain, Users, Map, Scroll, MessageSquare, Wand2,
+  Crown, Flame, Zap
+} from "lucide-react";
 
 type MessageType = "gm" | "player" | "dice";
 
@@ -324,6 +328,161 @@ export default function DemoPage() {
             ))}
           </div>
         </div>
+
+        {/* Quick Highlights Strip */}
+        <section className="mt-20 mb-16">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+            {[
+              { icon: Brain, label: "Yapay Zeka GM", sub: "Adaptif hikaye" },
+              { icon: Dice6, label: "D&D 5e Uyumlu", sub: "Tam kural desteği" },
+              { icon: Scroll, label: "Sınırsız Senaryo", sub: "AI tarafından üretilir" },
+              { icon: Zap, label: "Anında Başla", sub: "Kurulum gerektirmez" },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-3 p-4 rounded-xl bg-background-elevated/40 border border-border/30 hover:border-primary/20 transition-all duration-300">
+                <div className="w-9 h-9 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+                  <item.icon className="w-4.5 h-4.5 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold font-serif leading-tight truncate">{item.label}</div>
+                  <div className="text-xs text-foreground-muted truncate">{item.sub}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Features Section */}
+        <section className="mb-24">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary/10 border border-primary/20 mb-6">
+              <Wand2 className="w-5 h-5 text-primary" />
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4 font-serif">
+              Sistem <span className="text-primary">Özellikleri</span>
+            </h2>
+            <p className="text-foreground-secondary max-w-xl mx-auto">
+              GameMaster AI&apos;ı benzersiz kılan özellikler
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto">
+            {[
+              {
+                icon: Brain,
+                title: "Akıllı AI Game Master",
+                desc: "Yapay zeka destekli GM, kararlarınıza ve oyun tarzınıza adapte olur. Her oturum benzersiz bir deneyim sunar.",
+                iconWrap: "bg-primary/10 border-primary/20",
+                iconColor: "text-primary",
+              },
+              {
+                icon: Dice6,
+                title: "Entegre Zar Sistemi",
+                desc: "D&D 5e kurallarına uygun otomatik zar atışları, yetenek kontrolleri ve savaş mekaniği. Tüm hesaplamalar otomatik.",
+                iconWrap: "bg-secondary/10 border-secondary/20",
+                iconColor: "text-secondary",
+              },
+              {
+                icon: BookOpen,
+                title: "Dinamik Hikaye Anlatımı",
+                desc: "Seçimleriniz hikayeyi şekillendirir. Dallanma senaryoları, sürpriz olaylar ve kişiye özel anlatım.",
+                iconWrap: "bg-accent/10 border-accent/20",
+                iconColor: "text-accent",
+              },
+              {
+                icon: Users,
+                title: "Çoklu Karakter Desteği",
+                desc: "Birden fazla karakter oluşturun, farklı kampanyalarda farklı kahramanlarla oynayın.",
+                iconWrap: "bg-primary/10 border-primary/20",
+                iconColor: "text-primary",
+              },
+              {
+                icon: Map,
+                title: "Zengin Senaryolar",
+                desc: "Hazır senaryo kütüphanesi veya AI tarafından anında oluşturulan tamamen özgün maceralar.",
+                iconWrap: "bg-secondary/10 border-secondary/20",
+                iconColor: "text-secondary",
+              },
+              {
+                icon: MessageSquare,
+                title: "Doğal Dil Etkileşimi",
+                desc: "Komut ezberlemek yok. Ne yapmak istediğinizi yazın, AI anlasın ve hikayeyi ilerletsin.",
+                iconWrap: "bg-accent/10 border-accent/20",
+                iconColor: "text-accent",
+              },
+              {
+                icon: Crown,
+                title: "Kampanya Yönetimi",
+                desc: "Uzun soluklu kampanyalar oluşturun. Hikaye ilerleyişi, karakter gelişimi ve oturum geçmişi kayıt altında.",
+                iconWrap: "bg-primary/10 border-primary/20",
+                iconColor: "text-primary",
+              },
+              {
+                icon: Flame,
+                title: "Savaş Sistemi",
+                desc: "Sıra tabanlı taktiksel savaşlar, yetenek kullanımı, büyü sistemi ve detaylı hasar hesaplaması.",
+                iconWrap: "bg-secondary/10 border-secondary/20",
+                iconColor: "text-secondary",
+              },
+              {
+                icon: Zap,
+                title: "Anlık Oturumlar",
+                desc: "Kurulum gerektirmez. Hesabınızı oluşturun ve dakikalar içinde ilk maceranıza başlayın.",
+                iconWrap: "bg-accent/10 border-accent/20",
+                iconColor: "text-accent",
+              },
+            ].map((feature, i) => (
+              <div
+                key={i}
+                className="group bg-background-elevated/40 rounded-xl border border-border/30 p-5 hover:border-primary/20 hover:bg-background-elevated/60 transition-all duration-300"
+              >
+                <div className="flex items-start gap-4">
+                  <div className={`w-10 h-10 rounded-lg ${feature.iconWrap} border flex items-center justify-center shrink-0`}>
+                    <feature.icon className={`w-5 h-5 ${feature.iconColor}`} />
+                  </div>
+                  <div>
+                    <h3 className="font-bold mb-1.5 font-serif text-sm">{feature.title}</h3>
+                    <p className="text-xs text-foreground-secondary leading-relaxed">{feature.desc}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section className="mb-16">
+          <div className="max-w-3xl mx-auto relative">
+            <div className="absolute -top-4 -left-4 w-8 h-8 border-l-2 border-t-2 border-primary/30" />
+            <div className="absolute -bottom-4 -right-4 w-8 h-8 border-r-2 border-b-2 border-primary/30" />
+            
+            <div className="bg-gradient-to-b from-background-elevated to-background-tertiary rounded-xl border border-border/50 p-10 lg:p-14 text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
+              
+              <div className="relative z-10">
+                <h2 className="text-3xl lg:text-4xl font-bold mb-4 font-serif">
+                  Kendi Efsaneni Yaz
+                </h2>
+                <p className="text-foreground-secondary mb-8 max-w-lg mx-auto text-lg">
+                  Hesabını oluştur, karakterini yarat ve ilk oturumunu dakikalar içinde başlat.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Link href="/register">
+                    <Button size="lg" className="h-14 px-12 text-base font-semibold gap-2">
+                      Ücretsiz Başla
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                  <Link href="/rules">
+                    <Button size="lg" variant="outline" className="h-14 px-10 text-base border-primary/30 hover:bg-primary/5 hover:border-primary/50 transition-all gap-2">
+                      <BookOpen className="h-4 w-4" />
+                      Kuralları İncele
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -86,6 +86,13 @@ export default function AdminDashboardPage() {
     );
   }
 
+  const colorMap: Record<string, { bg: string; text: string }> = {
+    primary: { bg: "bg-primary/10", text: "text-primary" },
+    secondary: { bg: "bg-secondary/10", text: "text-secondary" },
+    success: { bg: "bg-success/10", text: "text-success" },
+    info: { bg: "bg-info/10", text: "text-info" },
+  };
+
   const stats = [
     {
       title: "Toplam Kullanıcı",
@@ -144,8 +151,8 @@ export default function AdminDashboardPage() {
                     </p>
                     <p className="text-3xl font-bold">{stat.value}</p>
                   </div>
-                  <div className={`p-3 rounded-xl bg-${stat.color}/10`}>
-                    <Icon className={`h-6 w-6 text-${stat.color}`} />
+                  <div className={`p-3 rounded-xl ${colorMap[stat.color]?.bg}`}>
+                    <Icon className={`h-6 w-6 ${colorMap[stat.color]?.text}`} />
                   </div>
                 </div>
               </CardContent>

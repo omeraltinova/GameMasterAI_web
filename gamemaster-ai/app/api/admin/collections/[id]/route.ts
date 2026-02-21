@@ -3,16 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
 import { logAdminAction } from "@/lib/admin/audit";
-
-function normalizeScenarioIds(ids?: unknown) {
-  if (ids === undefined) return undefined;
-  if (!Array.isArray(ids)) return null;
-  return Array.from(
-    new Set(
-      ids.map((id) => String(id).trim()).filter(Boolean)
-    )
-  );
-}
+import { normalizeScenarioIds } from "@/lib/admin/utils";
 
 export async function PATCH(
   req: Request,

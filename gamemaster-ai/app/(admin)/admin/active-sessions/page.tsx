@@ -270,7 +270,7 @@ export default function ActiveSessionsPage() {
         <div className="space-y-6">
           <div>
             <h3 className="text-sm font-semibold text-foreground-secondary mb-2">AI Context</h3>
-            <div className="rounded-lg border border-border bg-background-secondary p-4 text-sm whitespace-pre-wrap">
+            <div className="rounded-lg border border-border bg-background-secondary p-4 text-sm whitespace-pre-wrap max-h-64 overflow-y-auto custom-scrollbar">
               {selectedSession?.session?.aiContext || "AI context bulunamadı."}
             </div>
           </div>

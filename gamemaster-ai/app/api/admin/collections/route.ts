@@ -3,16 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
 import { logAdminAction } from "@/lib/admin/audit";
-
-function normalizeScenarioIds(ids?: unknown) {
-  if (!ids) return [];
-  if (!Array.isArray(ids)) return null;
-  return Array.from(
-    new Set(
-      ids.map((id) => String(id).trim()).filter(Boolean)
-    )
-  );
-}
+import { normalizeScenarioIds } from "@/lib/admin/utils";
 
 export async function GET() {
   try {
@@ -68,13 +59,14 @@ export async function POST(req: Request) {
     if (normalizedIds === null) {
       return NextResponse.json({ error: "scenarioIds formatı geçersiz" }, { status: 400 });
     }
+    const ids = normalizedIds ?? [];
 
     const collection = await prisma.scenarioCollection.create({
       data: {
         name: name.trim(),
         description: typeof description === "string" && description.trim() ? description.trim() : null,
         items: {
-          create: normalizedIds.map((scenarioId, index) => ({
+          create: ids.map((scenarioId, index) => ({
             scenarioId,
             position: index,
           })),

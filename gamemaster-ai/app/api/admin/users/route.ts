@@ -5,28 +5,57 @@ import { prisma } from "@/lib/db/prisma";
 import { logAdminAction } from "@/lib/admin/audit";
 
 // KULLANICILARI LİSTELE
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user?.role !== "ADMIN") {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const users = await prisma.user.findMany({
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        role: true,
-        createdAt: true,
-        _count: {
-          select: { characters: true, campaigns: true },
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+    const skip = (page - 1) * limit;
+    const search = searchParams.get("search") || "";
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { username: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+      ];
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          role: true,
+          createdAt: true,
+          _count: {
+            select: { characters: true, campaigns: true },
+          },
         },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      users,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: skip + limit < total,
       },
     });
-
-    return NextResponse.json(users);
   } catch (error) {
     return NextResponse.json({ error: "Kullanıcılar alınamadı" }, { status: 500 });
   }
@@ -41,6 +70,15 @@ export async function PATCH(req: Request) {
     }
 
     const { userId, role } = await req.json();
+
+    if (!userId || typeof userId !== "string") {
+      return NextResponse.json({ error: "userId gerekli" }, { status: 400 });
+    }
+
+    const VALID_ROLES = ["ADMIN", "MEMBER"] as const;
+    if (!VALID_ROLES.includes(role)) {
+      return NextResponse.json({ error: "Geçersiz rol değeri" }, { status: 400 });
+    }
 
     const existingUser = await prisma.user.findUnique({
       where: { id: userId },
@@ -100,11 +138,15 @@ export async function DELETE(req: Request) {
 
     const userToDelete = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, username: true, email: true },
+      select: { id: true, username: true, email: true, role: true },
     });
 
     if (!userToDelete) {
       return NextResponse.json({ error: "Kullanıcı bulunamadı" }, { status: 404 });
+    }
+
+    if (userToDelete.role === "ADMIN") {
+      return NextResponse.json({ error: "Başka bir admin silinemez." }, { status: 403 });
     }
 
     // İlişkileri temizle (Transaction)

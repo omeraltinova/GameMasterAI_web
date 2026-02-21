@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -11,7 +11,7 @@ import {
   useToast,
   ConfirmDialog,
 } from "@/components/ui";
-import { Search, Trash2, Swords } from "lucide-react";
+import { Search, Trash2, Swords, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface Campaign {
   id: string;
@@ -22,25 +22,56 @@ interface Campaign {
   _count: { players: number; sessions: number };
 }
 
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
 export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1, limit: 20, total: 0, totalPages: 0, hasMore: false,
+  });
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const { addToast } = useToast();
 
   useEffect(() => {
-    fetchCampaigns();
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPagination((p) => ({ ...p, page: 1 }));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  const fetchCampaigns = async () => {
+  const fetchCampaigns = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/campaigns");
-      if (res.ok) setCampaigns(await res.json());
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+      });
+      if (debouncedSearch) params.append("search", debouncedSearch);
+
+      const res = await fetch(`/api/admin/campaigns?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setCampaigns(data.campaigns);
+        setPagination(data.pagination);
+      }
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, debouncedSearch]);
+
+  useEffect(() => {
+    fetchCampaigns();
+  }, [fetchCampaigns]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -57,11 +88,7 @@ export default function CampaignsPage() {
     }
   };
 
-  const filtered = campaigns.filter((c) =>
-    c.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  if (loading) return <div className="flex justify-center p-10"><Spinner size="lg" /></div>;
+  if (loading && campaigns.length === 0) return <div className="flex justify-center p-10"><Spinner size="lg" /></div>;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -69,7 +96,7 @@ export default function CampaignsPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold">Oturumlar</h1>
-          <p className="text-foreground-secondary">Oyun odalarını yönet</p>
+          <p className="text-foreground-secondary">Oyun odalarını yönet ({pagination.total} toplam)</p>
         </div>
         <div className="w-full sm:w-auto">
           <Input
@@ -96,7 +123,7 @@ export default function CampaignsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((campaign) => (
+                {campaigns.map((campaign) => (
                   <tr key={campaign.id} className="border-b border-border hover:bg-background-elevated/50">
                     <td className="py-3 px-4 font-medium flex items-center gap-2">
                       <Swords className="h-4 w-4 text-primary" />
@@ -127,9 +154,42 @@ export default function CampaignsPage() {
                     </td>
                   </tr>
                 ))}
+                {campaigns.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-foreground-muted">
+                      Oturum bulunamadı.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
+
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+              <div className="text-sm text-foreground-muted">
+                Sayfa {pagination.page} / {pagination.totalPages}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
+                  disabled={pagination.page <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
+                  disabled={!pagination.hasMore}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

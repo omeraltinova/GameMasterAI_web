@@ -4,20 +4,49 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
 import { logAdminAction } from "@/lib/admin/audit";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
 
-    const campaigns = await prisma.campaign.findMany({
-      orderBy: { createdAt: "desc" },
-      include: {
-        creator: { select: { username: true, email: true } },
-        _count: { select: { players: true, sessions: true } },
+    const { searchParams } = new URL(req.url);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") || "20")));
+    const skip = (page - 1) * limit;
+    const search = searchParams.get("search") || "";
+
+    const where: any = {};
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { creator: { username: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
+    const [campaigns, total] = await Promise.all([
+      prisma.campaign.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit,
+        include: {
+          creator: { select: { username: true, email: true } },
+          _count: { select: { players: true, sessions: true } },
+        },
+      }),
+      prisma.campaign.count({ where }),
+    ]);
+
+    return NextResponse.json({
+      campaigns,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasMore: skip + limit < total,
       },
     });
-
-    return NextResponse.json(campaigns);
   } catch (error) {
     return NextResponse.json({ error: "Oturumlar alınamadı" }, { status: 500 });
   }

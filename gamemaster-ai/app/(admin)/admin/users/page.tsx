@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -13,7 +13,7 @@ import {
   useToast,
   ConfirmDialog,
 } from "@/components/ui";
-import { Search, Trash2, Shield, User as UserIcon, ShieldAlert } from "lucide-react";
+import { Search, Trash2, Shield, User as UserIcon, ShieldAlert, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface User {
   id: string;
@@ -27,30 +27,62 @@ interface User {
   };
 }
 
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1, limit: 20, total: 0, totalPages: 0, hasMore: false,
+  });
   const { addToast } = useToast();
 
   // Modal State
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [roleChangeId, setRoleChangeId] = useState<string | null>(null);
 
+  // Debounce search
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setPagination((p) => ({ ...p, page: 1 }));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/users");
-      if (res.ok) setUsers(await res.json());
+      setLoading(true);
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString(),
+      });
+      if (debouncedSearch) params.append("search", debouncedSearch);
+
+      const res = await fetch(`/api/admin/users?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setUsers(data.users);
+        setPagination(data.pagination);
+      }
     } catch (error) {
       console.error("Kullanıcılar yüklenemedi", error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [pagination.page, debouncedSearch]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -95,20 +127,14 @@ export default function UsersPage() {
     }
   };
 
-  const filteredUsers = users.filter(
-    (u) =>
-      u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  if (loading) return <div className="flex justify-center p-10"><Spinner size="lg" /></div>;
+  if (loading && users.length === 0) return <div className="flex justify-center p-10"><Spinner size="lg" /></div>;
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold">Kullanıcılar</h1>
-          <p className="text-foreground-secondary">Sistemdeki üyeleri yönet</p>
+          <p className="text-foreground-secondary">Sistemdeki üyeleri yönet ({pagination.total} toplam)</p>
         </div>
         <div className="w-full sm:w-auto">
           <Input
@@ -134,7 +160,7 @@ export default function UsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.map((user) => (
+                {users.map((user) => (
                   <tr key={user.id} className="border-b border-border hover:bg-background-elevated/50 transition-colors">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
@@ -183,9 +209,43 @@ export default function UsersPage() {
                     </td>
                   </tr>
                 ))}
+                {users.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-foreground-muted">
+                      Kullanıcı bulunamadı.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-border">
+              <div className="text-sm text-foreground-muted">
+                Sayfa {pagination.page} / {pagination.totalPages}
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination((p) => ({ ...p, page: p.page - 1 }))}
+                  disabled={pagination.page <= 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
+                  disabled={!pagination.hasMore}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

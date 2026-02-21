@@ -23,6 +23,7 @@ export async function GET() {
       maintenanceMessage: settings?.maintenanceMessage ?? "",
       aiPrimaryModel: settings?.aiPrimaryModel ?? "",
       aiFallbackModel: settings?.aiFallbackModel ?? "",
+      aiSuggestionsModel: (settings as any)?.aiSuggestionsModel ?? "",
       aiRequestsPerMinute,
       updatedAt: settings?.updatedAt ?? null,
     });
@@ -40,12 +41,15 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json();
+    const aiRequestsPerMinute = Math.max(0, Number(body.aiRequestsPerMinute) || 0);
+
     const settings = await upsertSystemSettings({
       maintenanceMode: Boolean(body.maintenanceMode),
       maintenanceMessage: body.maintenanceMessage ?? "",
       aiPrimaryModel: body.aiPrimaryModel ?? "",
       aiFallbackModel: body.aiFallbackModel ?? "",
-      aiRequestsPerMinute: body.aiRequestsPerMinute,
+      aiSuggestionsModel: body.aiSuggestionsModel ?? "",
+      aiRequestsPerMinute,
       updatedById: session.user.id,
     });
 
@@ -58,6 +62,7 @@ export async function PATCH(req: Request) {
         maintenanceMode: settings.maintenanceMode,
         aiPrimaryModel: settings.aiPrimaryModel,
         aiFallbackModel: settings.aiFallbackModel,
+        aiSuggestionsModel: (settings as any).aiSuggestionsModel,
         aiRequestsPerMinute: settings.aiRequestsPerMinute,
       },
     });

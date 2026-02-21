@@ -45,7 +45,8 @@ export async function GET() {
       recentUsers,
       totalCampaigns,
       completedCampaigns,
-      messagesLast30,
+      messagesLast7,
+      activeUsersLast30Raw,
       campaignUsageLast14,
       topCreatorsRaw,
     ] = await Promise.all([
@@ -68,15 +69,25 @@ export async function GET() {
       }),
       prisma.campaign.count(),
       prisma.campaign.count({ where: { status: "COMPLETED" } }),
+      // Son 7 gün mesajları (günlük aktif kullanıcı grafiği için)
       prisma.message.findMany({
         where: {
           senderId: { not: null },
           senderType: "PLAYER",
-          timestamp: { gte: start30 },
+          timestamp: { gte: start7 },
         },
         select: {
           senderId: true,
           timestamp: true,
+        },
+      }),
+      // Son 30 gün benzersiz aktif kullanıcı sayısı (sadece count)
+      prisma.message.groupBy({
+        by: ["senderId"],
+        where: {
+          senderId: { not: null },
+          senderType: "PLAYER",
+          timestamp: { gte: start30 },
         },
       }),
       prisma.campaign.findMany({
@@ -103,20 +114,15 @@ export async function GET() {
 
     const dailyActiveMap = new Map<string, Set<string>>();
     const activeUsersLast7 = new Set<string>();
-    const activeUsersLast30 = new Set<string>();
 
-    for (const message of messagesLast30) {
+    for (const message of messagesLast7) {
       if (!message.senderId) continue;
       const dateKey = toDateKey(message.timestamp);
-      activeUsersLast30.add(message.senderId);
-
-      if (message.timestamp >= start7) {
-        activeUsersLast7.add(message.senderId);
-        if (!dailyActiveMap.has(dateKey)) {
-          dailyActiveMap.set(dateKey, new Set());
-        }
-        dailyActiveMap.get(dateKey)?.add(message.senderId);
+      activeUsersLast7.add(message.senderId);
+      if (!dailyActiveMap.has(dateKey)) {
+        dailyActiveMap.set(dateKey, new Set());
       }
+      dailyActiveMap.get(dateKey)?.add(message.senderId);
     }
 
     const dailyKeys = buildDateKeys(start7, 7);
@@ -167,7 +173,7 @@ const topCreators = topCreatorsRaw
         activeUsers: {
           today: dailyActiveUsers[dailyActiveUsers.length - 1]?.count || 0,
           last7Days: activeUsersLast7.size,
-          last30Days: activeUsersLast30.size,
+          last30Days: activeUsersLast30Raw.length,
         },
         dailyActiveUsers,
         campaignCompletion: {

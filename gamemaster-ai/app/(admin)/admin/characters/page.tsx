@@ -60,6 +60,7 @@ export default function CharactersPage() {
   // Modal State
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleteCharacterName, setDeleteCharacterName] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     fetchCharacters();
@@ -105,6 +106,7 @@ export default function CharactersPage() {
 
   const handleDelete = async () => {
     if (!deleteId) return;
+    setIsDeleting(true);
     try {
       const res = await fetch(`/api/admin/characters?id=${deleteId}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Silme başarısız");
@@ -116,6 +118,7 @@ export default function CharactersPage() {
     } finally {
       setDeleteId(null);
       setDeleteCharacterName("");
+      setIsDeleting(false);
     }
   };
 
@@ -307,7 +310,7 @@ export default function CharactersPage() {
         description={`"${deleteCharacterName}" karakterini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`}
         variant="danger"
         confirmText="Sil"
-        isLoading={loading}
+        isLoading={isDeleting}
       />
     </div>
   );

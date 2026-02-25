@@ -4,6 +4,8 @@ import { callOpenRouterWithTools, OpenRouterMessage } from '@/lib/ai/openrouter'
 import { SYSTEM_PROMPT, getNarrationPrompt } from '@/lib/ai/prompts';
 import { buildSessionContext } from '@/lib/ai/context';
 import { getUserId } from '@/lib/auth/server';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { rateLimitResponse } from '@/lib/api-response';
 import type { GMPrompt, GMAction, LocationChange } from '@/types';
 
 /**
@@ -19,6 +21,12 @@ export async function POST(req: NextRequest) {
         { message: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
+    }
+
+    // Rate Limiting: 20 requests per minute
+    const rateLimit = checkRateLimit(userId, 20, 60000);
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit);
     }
 
     const body = await req.json();

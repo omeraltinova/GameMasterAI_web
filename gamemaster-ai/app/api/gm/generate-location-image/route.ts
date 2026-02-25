@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
+import { checkRateLimit } from '@/lib/rate-limit';
+import { rateLimitResponse } from '@/lib/api-response';
 import { generateLocationImage, getLocationStyleHints } from '@/lib/ai/imageGenerator';
 
 const MAX_DESCRIPTION_LENGTH = 1200;
@@ -122,6 +124,12 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return unauthorizedResponse();
+    }
+
+    // Rate Limiting: 5 requests per minute (image generation is expensive)
+    const rateLimit = checkRateLimit(userId, 5, 60000);
+    if (!rateLimit.success) {
+      return rateLimitResponse(rateLimit);
     }
 
     // Session kontrolü

@@ -1,3 +1,12 @@
+# GameMaster AI (status quicklook)
+
+AI destekli D&D 5e oyun yöneticisi. Bilinen eksiklerin özeti (ayrıntılar için `PHASE_BACKLOG.md`):
+- Combat sistemi ve ilgili API'ler (initiative, turn order, combat log) eksik.
+- Harita sistemi CRUD + galeri yok; AI senaryo/harita üretim arayüzleri eklenmedi.
+- Kampanya akışında start/leave ve invite GET endpointleri planla uyumlu değil.
+- Multiplayer polling döngüsü aktif değil; gerçek zamanlı senkron beklemede.
+- Seed verisi ve proje kurulum dokümantasyonu eksik; README varsayılan Next.js metni.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

@@ -2,11 +2,30 @@
 
 Bu rapor, projenin mevcut durumu (Şubat 2026) üzerinden yapılan kapsamlı teknik inceleme sonucunda hazırlanmıştır. Projenin "üretim ortamına hazır" (production-ready) hale gelmesi için giderilmesi gereken temel eksikler aşağıda kategorize edilmiştir.
 
-## 1. Test Kapsamı ve Kalite Güvencesi (Kritik)
-**Mevcut Durum:** Projede otomatik test altyapısı bulunmamaktadır.
-- **Eksik:** `Vitest` veya `Jest` (Unit/Integration) ve `Playwright` veya `Cypress` (E2E) kurulumları eksik.
-- **Risk:** AI "tool-calling" mekanizması (karakter oluşturma, item verme vb.) çok karmaşık bir mantığa sahip. Yapılan küçük bir kod değişikliği tüm oyun akışını sessizce bozabilir.
-- **Öneri:** Öncelikle `lib/ai/toolExecutor.ts` gibi kritik iş mantığı (business logic) içeren dosyalar için unit test yazılmalıdır.
+## 1. Test Kapsamı ve Kalite Güvencesi
+**Mevcut Durum:** Test altyapısı (Vitest, React Testing Library, Playwright) projeye başarıyla kurulmuş olup temel konfigürasyonları yapılmıştır. Ancak testlerin yazımına henüz başlanmamıştır.
+
+**Oluşturulan Kapsamlı Test Planı:**
+Projeyi production ortamına hazırlamak için aşağıdaki sırayla testler yazılmalıdır:
+
+### 1.1. Kritik İş Mantığı (Unit Tests) - Öncelikli
+- **AI Tool Executor (`lib/ai/toolExecutor.ts`):** AI'dan gelen JSON yanıtlarının (karakter yaratma, hasar, eşya ekleme) doğru parse edilip Prisma'ya iletildiğini doğrulayan izole testler.
+- **Zar Sistemi (`lib/dice` vb.):** Zar formatlarının (`2d6+3`) doğru hesaplandığı, kritik başarı (20) ve başarısızlık (1) durumlarının doğru işlendiği birim testler.
+- **Karakter Sistemi:** Can (HP) hesaplama, stat/modifier dönüşümleri ve level up mekanizması.
+
+### 1.2. Arayüz ve Bileşen (Component Tests)
+- **Oyun İçi UI:** `DiceRoller` (zar etkileşimleri), `ChatWindow` (farklı mesaj tiplerinin render edilmesi), `CharacterCard` (HP bar ve stat gösterimi).
+- Next.js Router ve `matchMedia` gibi bağımlılıklar `vitest.setup.ts` üzerinden mocklanmıştır.
+
+### 1.3. API ve Entegrasyon (Integration Tests)
+- **Prisma Mocking:** Veritabanı testleri için `__tests__/mocks/prisma.ts` oluşturulmuştur.
+- API uç noktaları (`/api/auth`, `/api/campaigns`) için request/response doğrulamaları.
+- RBAC (Role Based Access Control) kontrollerinin, oyuncuların admin API'sine erişimini engellediğinin testi.
+
+### 1.4. Uçtan Uca (E2E Tests - Playwright)
+- **Senaryo A:** Kayıt olma -> Karakter yaratma -> Karakteri kaydetme.
+- **Senaryo B:** Kampanya koduyla odaya katılma -> Karakter seçme -> Lobiye girme.
+- **Senaryo C:** Kampanya içinde mesaj atma -> Zar atma -> Sonuçları gerçek zamanlı (veya polling ile) görme.
 
 ## 2. Mimari ve Performans
 ### 2.1. Gerçek Zamanlı Güncelleme (Real-time)

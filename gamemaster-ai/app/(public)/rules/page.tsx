@@ -48,10 +48,10 @@ export default function RulesPage() {
           </div>
           
           <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-4 font-serif tracking-tight">
-            D&D 5e <span className="text-primary">Kuralları</span>
+            5e SRD <span className="text-primary">Kuralları</span>
           </h1>
           <p className="text-lg text-foreground-secondary max-w-xl mx-auto">
-            Mevcut oyun sistemi D&D 5e SRD temellidir. Temel mekanikler için hızlı referans.
+            Mevcut oyun sistemi 5e SRD temellidir. Temel mekanikler için hızlı referans.
           </p>
         </header>
 

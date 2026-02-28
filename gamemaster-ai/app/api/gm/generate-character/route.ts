@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
     const { race, characterClass, concept, appearance: requestedAppearance } = body;
 
     // User prompt oluştur
-    let userPrompt = `Yeni bir D&D 5e karakter oluştur.\n`;
+    let userPrompt = `Yeni bir 5e SRD karakter oluştur.\n`;
 
     if (race) {
       userPrompt += `**Irk tercihi:** ${race}\n`;

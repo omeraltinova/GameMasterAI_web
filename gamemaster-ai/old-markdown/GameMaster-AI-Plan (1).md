@@ -1,6 +1,6 @@
 # GameMaster AI - Proje Planı
 
-> D&D 5e tabanlı, yapay zeka destekli dijital oyun yöneticisi (Game Master) uygulaması
+> 5e SRD tabanlı, yapay zeka destekli dijital oyun yöneticisi (Game Master) uygulaması
 
 ---
 
@@ -24,16 +24,16 @@
 
 ### 1.1 Amaç
 
-Masa üstü rol yapma oyunlarındaki (TTRPG) Dungeon Master/Game Master rolünü yapay zeka ile dijitalleştirmek. Oyuncular tek başına veya grupça, AI tarafından yönetilen interaktif hikaye deneyimi yaşayabilecek.
+Masa üstü rol yapma oyunlarındaki (TTRPG) Game Master rolünü yapay zeka ile dijitalleştirmek. Oyuncular tek başına veya grupça, AI tarafından yönetilen interaktif hikaye deneyimi yaşayabilecek.
 
 ### 1.2 Temel Özellikler
 
 | Özellik | Açıklama |
 |---------|----------|
 | **AI Game Master** | Hikaye anlatımı, NPC diyalogları, olay yönetimi |
-| **Karakter Sistemi** | D&D 5e tabanlı karakter oluşturma ve yönetimi |
+| **Karakter Sistemi** | 5e SRD tabanlı karakter oluşturma ve yönetimi |
 | **Kampanya Yönetimi** | Tek/çok oyunculu kampanya desteği |
-| **Zar Sistemi** | Tüm D&D zarları (d4, d6, d8, d10, d12, d20, d100) |
+| **Zar Sistemi** | Tüm TTRPG zarları (d4, d6, d8, d10, d12, d20, d100) |
 | **Savaş Sistemi** | Turn-based combat, initiative tracking |
 | **Envanter** | Item yönetimi, equipment sistemi |
 | **Harita Görselleri** | AI ile dinamik harita oluşturma |
@@ -397,7 +397,7 @@ Yetkilendirme, layout seviyesinde middleware ile kontrol edilir. Her protected r
 **participants JSON Yapısı:**
 ```json
 [
-  {"id": "char_1", "type": "player", "name": "Thorin", "initiative": 18, "hp": 45, "maxHp": 45, "ac": 16},
+  {"id": "char_1", "type": "player", "name": "Borin", "initiative": 18, "hp": 45, "maxHp": 45, "ac": 16},
   {"id": "npc_1", "type": "enemy", "name": "Goblin", "initiative": 12, "hp": 7, "maxHp": 7, "ac": 13}
 ]
 ```
@@ -603,7 +603,7 @@ app/
 ├── (public)/                      # Herkese açık sayfalar
 │   ├── page.tsx                   # Landing page
 │   ├── about/page.tsx             # Hakkında
-│   ├── rules/page.tsx             # D&D 5e kuralları
+│   ├── rules/page.tsx             # 5e SRD kuralları
 │   └── demo/page.tsx              # Demo/Tanıtım
 │
 ├── (auth)/                        # Auth sayfaları
@@ -658,7 +658,7 @@ app/
 |-------|----------|
 | **Landing** | Hero section, özellikler, nasıl çalışır, CTA |
 | **About** | Proje hakkında bilgi |
-| **Rules** | D&D 5e temel kuralları özeti |
+| **Rules** | 5e SRD temel kuralları özeti |
 | **Demo** | Etkileşimli demo veya video tanıtım |
 
 #### Auth Sayfalar
@@ -851,7 +851,7 @@ components/
 │                                                                     │
 │  ┌───────────────────────────────────────────────────────────────┐  │
 │  │                    CombatTracker (conditional)                 │  │
-│  │  Round 3  |  Initiative: [Thorin*] → Goblin → Elara → Orc     │  │
+│  │  Round 3  |  Initiative: [Borin*] → Goblin → Elara → Orc     │  │
 │  │  [Attack] [Spell] [Dodge] [Disengage] [End Turn]              │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 │                                                                     │
@@ -899,7 +899,7 @@ components/
 
 #### System Prompt (GM Rolü)
 
-GM'in temel davranışını belirler: D&D 5e kuralları, anlatım tarzı, NPC yönetimi, zar isteme formatı
+GM'in temel davranışını belirler: 5e SRD kuralları, anlatım tarzı, NPC yönetimi, zar isteme formatı
 
 #### Context Prompt
 
@@ -925,7 +925,7 @@ Her istekte gönderilen dinamik bilgiler: mevcut durum, karakter bilgileri, son 
 │  ┌────────────────────────────────────────────────────────┐    │
 │  │                   SYSTEM PROMPT                         │    │
 │  │  - GM rolü tanımı                                       │    │
-│  │  - D&D 5e kuralları özeti                               │    │
+│  │  - 5e SRD kuralları özeti                               │    │
 │  │  - Format kuralları                                     │    │
 │  │  - Davranış sınırları                                   │    │
 │  └────────────────────────────────────────────────────────┘    │
@@ -1251,7 +1251,7 @@ Eğer local'de çalışılacak ve tam real-time isteniyorsa, ayrı bir Socket se
 
 **Çıktılar:**
 - Tam fonksiyonel karakter sistemi
-- D&D 5e uyumlu stat sistemi
+- 5e SRD uyumlu stat sistemi
 
 ### 11.4 Faz 3: Kampanya Sistemi
 
@@ -1503,7 +1503,7 @@ npx prisma db seed
 
 2. **SQLite:** Hafif, dosya tabanlı, development için ideal. Production'da PostgreSQL'e geçilebilir.
 
-3. **D&D 5e SRD:** Açık lisanslı içerik kullanılacak. Tam D&D içeriği telif sorunu yaratabilir.
+3. **5e SRD:** Açık lisanslı içerik (CC-BY-4.0) kullanılacak. SRD dışı içerik telif sorunu yaratabilir.
 
 4. **AI Model Seçimi:** OpenRouter üzerinden farklı modeller test edilebilir. Maliyet/kalite dengesine göre seçim yapılmalı.
 

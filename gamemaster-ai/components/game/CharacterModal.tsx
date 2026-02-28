@@ -45,7 +45,7 @@ export function CharacterModal({ isOpen, onClose, character }: CharacterModalPro
 
   const ac = stats ? 10 + calculateModifier(stats.dexterity ?? 10) : 10;
 
-  // XP thresholds per level (simplified D&D 5e)
+  // XP thresholds per level (simplified 5e SRD)
   const xpForNextLevel = level * 1000;
   const xpProgress = xpForNextLevel > 0 ? Math.min((experience / xpForNextLevel) * 100, 100) : 0;
 

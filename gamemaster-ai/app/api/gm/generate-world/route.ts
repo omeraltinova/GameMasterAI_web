@@ -51,16 +51,16 @@ ${JSON.stringify(currentSettings, null, 2)}
 Bu ayarları daha detaylı ve ilgi çekici hale getir:`;
     } else {
       // Sıfırdan öner
-      userPrompt = `"${campaignName}" adlı bir D&D oturumu için dünya ayarları öner.
+      userPrompt = `"${campaignName}" adlı bir TTRPG oturumu için dünya ayarları öner.
 ${campaignDescription ? `Oturum açıklaması: ${campaignDescription}` : ''}
 ${worldType ? `İstenen dünya tipi: ${worldType}` : ''}
 
 Yaratıcı ve ilgi çekici bir dünya tasarla:`;
     }
 
-    const systemPrompt = `Sen yaratıcı bir D&D Game Master'sın. Görevin oyuncular için ilgi çekici ve sürükleyici dünya ayarları oluşturmak.
+    const systemPrompt = `Sen yaratıcı bir TTRPG Game Master'sın. Görevin oyuncular için ilgi çekici ve sürükleyici dünya ayarları oluşturmak.
 
-GÖREV: Bir D&D oturumu için dünya ayarları oluştur.
+GÖREV: Bir TTRPG oturumu için dünya ayarları oluştur.
 
 ÇIKTI FORMATI: Aşağıdaki JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
 {
@@ -86,7 +86,7 @@ GÖREV: Bir D&D oturumu için dünya ayarları oluştur.
 ÖNEMLİ:
 - Türkçe yaz
 - Yaratıcı ve özgün ol
-- D&D 5e kurallarına uygun ol
+- 5e SRD kurallarına uygun ol
 - Sadece JSON döndür, açıklama ekleme`;
 
     const aiResponse = await getAIResponseWithContext(

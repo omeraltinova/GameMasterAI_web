@@ -357,7 +357,7 @@ export default function DashboardPage() {
             {[
               { href: "/campaigns/join", icon: Users, label: "Oturuma Katıl", desc: "Davet koduyla katıl" },
               { href: "/scenarios", icon: Map, label: "Senaryolar", desc: "Macera senaryolarını keşfet" },
-              { href: "/rules", icon: BookOpen, label: "Kurallar", desc: "D&D 5e kurallarını incele" },
+              { href: "/rules", icon: BookOpen, label: "Kurallar", desc: "5e SRD kurallarını incele" },
               { href: "/profile", icon: User, label: "Profil", desc: "Ayarlarını düzenle" },
             ].map((action, i) => {
               const Icon = action.icon;

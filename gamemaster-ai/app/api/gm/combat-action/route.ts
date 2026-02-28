@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       userPrompt += `Hasar: ${damage}\n`;
     }
 
-    userPrompt += `\nBu savaş aksiyonunu D&D 5e kurallarına uygun olarak betimle.`;
+    userPrompt += `\nBu savaş aksiyonunu 5e SRD kurallarına uygun olarak betimle.`;
     userPrompt += `\nSonuçları açıkla ve hikayeyi ilerlet.`;
 
     // Basit context (oyuncular ve durum)

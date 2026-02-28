@@ -334,7 +334,7 @@ export default function DemoPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
             {[
               { icon: Brain, label: "Yapay Zeka GM", sub: "Adaptif hikaye" },
-              { icon: Dice6, label: "D&D 5e Uyumlu", sub: "Tam kural desteği" },
+              { icon: Dice6, label: "5e SRD Uyumlu", sub: "Tam kural desteği" },
               { icon: Scroll, label: "Sınırsız Senaryo", sub: "AI tarafından üretilir" },
               { icon: Zap, label: "Anında Başla", sub: "Kurulum gerektirmez" },
             ].map((item, i) => (
@@ -377,7 +377,7 @@ export default function DemoPage() {
               {
                 icon: Dice6,
                 title: "Entegre Zar Sistemi",
-                desc: "D&D 5e kurallarına uygun otomatik zar atışları, yetenek kontrolleri ve savaş mekaniği. Tüm hesaplamalar otomatik.",
+                desc: "5e SRD kurallarına uygun otomatik zar atışları, yetenek kontrolleri ve savaş mekaniği. Tüm hesaplamalar otomatik.",
                 iconWrap: "bg-secondary/10 border-secondary/20",
                 iconColor: "text-secondary",
               },

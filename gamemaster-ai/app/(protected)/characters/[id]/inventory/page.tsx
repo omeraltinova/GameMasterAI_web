@@ -193,7 +193,7 @@ export default function InventoryPage() {
         return matchesSearch && matchesFilter;
     });
 
-    // Taşıma kapasitesi hesaplama (D&D 5e: STR * 15)
+    // Taşıma kapasitesi hesaplama (5e SRD: STR * 15)
     const carryingCapacity = character ? (character.stats?.strength || 10) * 15 : 150;
     const weightPercentage = Math.min((totalWeight / carryingCapacity) * 100, 100);
     const isEncumbered = totalWeight > carryingCapacity;

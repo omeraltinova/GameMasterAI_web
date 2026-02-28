@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-GameMaster AI is a D&D 5e-based digital game master application powered by AI. It enables players to experience interactive storytelling either solo or in groups, with an AI-driven Game Master handling narrative, NPCs, and game mechanics.
+GameMaster AI is a 5e SRD-based digital game master application powered by AI. It enables players to experience interactive storytelling either solo or in groups, with an AI-driven Game Master handling narrative, NPCs, and game mechanics.
 
 ## Development Commands
 

@@ -1,5 +1,5 @@
 // GameMaster AI - Prisma Schema
-// D&D 5e tabanlı AI Game Master uygulaması için veritabanı şeması
+// 5e SRD tabanlı AI Game Master uygulaması için veritabanı şeması
 
 generator client {
   provider = "prisma-client-js"

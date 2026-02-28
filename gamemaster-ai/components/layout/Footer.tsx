@@ -7,7 +7,7 @@ const footerLinks = {
     { href: "/demo", label: "Demo" },
   ],
   resources: [
-    { href: "/rules", label: "D&D Kuralları" },
+    { href: "/rules", label: "5e SRD Kuralları" },
     { href: "/scenarios", label: "Senaryolar" },
   ],
   legal: [
@@ -33,7 +33,7 @@ export function Footer() {
               </span>
             </Link>
             <p className="text-sm text-foreground-secondary">
-              AI destekli D&D 5e oyun yöneticisi. Epik maceralar sizi bekliyor!
+              AI destekli 5e SRD oyun yöneticisi. Epik maceralar sizi bekliyor!
             </p>
             <div className="flex gap-3">
               <a
@@ -98,8 +98,44 @@ export function Footer() {
           <p className="text-sm text-foreground-muted">
             © {new Date().getFullYear()} GameMaster AI. Tüm hakları saklıdır.
           </p>
-          <p className="text-xs text-foreground-muted mt-1">
-            D&D ve Dungeons & Dragons, Wizards of the Coast&apos;un tescilli ticari markalarıdır.
+          <p className="text-xs text-foreground-muted mt-1 max-w-2xl mx-auto leading-relaxed">
+            This work includes material taken from the{" "}
+            <a
+              href="https://dnd.wizards.com/resources/systems-reference-document"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground-secondary transition-colors"
+            >
+              System Reference Document 5.1
+            </a>
+            {" "}(&ldquo;SRD 5.1&rdquo;) by Wizards of the Coast LLC and available at{" "}
+            <a
+              href="https://dnd.wizards.com/resources/systems-reference-document"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground-secondary transition-colors"
+            >
+              https://dnd.wizards.com/resources/systems-reference-document
+            </a>
+            . The SRD 5.1 is licensed under the{" "}
+            <a
+              href="https://creativecommons.org/licenses/by/4.0/legalcode"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground-secondary transition-colors"
+            >
+              Creative Commons Attribution 4.0 International License
+            </a>
+            {" "}available at{" "}
+            <a
+              href="https://creativecommons.org/licenses/by/4.0/legalcode"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline hover:text-foreground-secondary transition-colors"
+            >
+              https://creativecommons.org/licenses/by/4.0/legalcode
+            </a>
+            .
           </p>
         </div>
       </div>

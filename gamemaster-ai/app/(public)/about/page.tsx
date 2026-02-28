@@ -8,7 +8,7 @@ export const metadata = {
 const values = [
   {
     icon: Heart,
-    title: "D&D Tutkusu",
+    title: "TTRPG Tutkusu",
     description: "Masa üstü rol yapma oyunlarına olan sevgimiz bu projenin temelini oluşturuyor.",
     color: "secondary",
   },
@@ -201,7 +201,7 @@ export default function AboutPage() {
                     { name: "GPT-4o", highlight: true },
                     { name: "Vector DB" },
                     { name: "Next.js 15" },
-                    { name: "D&D 5e SRD" },
+                    { name: "5e SRD" },
                     { name: "WebGL" },
                   ].map((tech) => (
                     <span

@@ -24,9 +24,9 @@ const libreBaskerville = Libre_Baskerville({
 });
 
 export const metadata: Metadata = {
-  title: "GameMaster AI - AI-Powered D&D Game Master",
-  description: "Experience D&D 5e adventures with an AI-powered Game Master. Create characters, join campaigns, and embark on epic quests.",
-  keywords: ["D&D", "Dungeons & Dragons", "AI Game Master", "TTRPG", "Role Playing Game"],
+  title: "GameMaster AI - AI-Powered TTRPG Game Master",
+  description: "Experience 5e SRD adventures with an AI-powered Game Master. Create characters, join campaigns, and embark on epic quests.",
+  keywords: ["AI Game Master", "TTRPG", "Role Playing Game", "5e SRD", "Tabletop RPG"],
 };
 
 export default function RootLayout({

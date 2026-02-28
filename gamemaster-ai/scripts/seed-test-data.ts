@@ -57,7 +57,7 @@ async function main() {
     create: {
       id: 'char_test_1',
       userId: user.id,
-      name: 'Thorin Kalkan',
+      name: 'Borin Kalkan',
       race: 'Dwarf',
       class: 'Fighter',
       level: 3,
@@ -72,8 +72,8 @@ async function main() {
         wisdom: 13,
         charisma: 8,
       }),
-      background: 'Eski bir asker olan Thorin, şimdi maceraperest bir hayat sürüyor.',
-      imageUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Thorin',
+      background: 'Eski bir asker olan Borin, şimdi maceraperest bir hayat sürüyor.',
+      imageUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Borin',
     },
   });
   console.log('✅ Karakter oluşturuldu:', character.name);
@@ -84,7 +84,7 @@ async function main() {
     update: {},
     create: {
       id: 'campaign_test_1',
-      name: 'Thorin\'in Macerası',
+      name: 'Borin\'in Macerası',
       description: 'Kayıp Tapınak senaryosu ile tek oyunculu macera',
       creatorId: user.id,
       scenarioId: scenario.id,
@@ -188,7 +188,7 @@ async function main() {
       }),
       turnOrder: JSON.stringify([character.id]),
       activePlayer: character.id,
-      aiContext: 'Oyun yeni başladı. Oyuncu Thorin, Kayıp Tapınak\'ın girişinde.',
+      aiContext: 'Oyun yeni başladı. Oyuncu Borin, Kayıp Tapınak\'ın girişinde.',
     },
   });
   console.log('✅ Oyun oturumu oluşturuldu:', session.id);

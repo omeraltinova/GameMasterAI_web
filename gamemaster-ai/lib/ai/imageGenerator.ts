@@ -45,8 +45,8 @@ export async function generateLocationImage(
   const requestId = generateRequestId();
   const startTime = Date.now();
 
-  // D&D tarzı prompt zenginleştirme
-  const enhancedPrompt = `Fantasy RPG location illustration, D&D style, detailed environment art: ${prompt}. High quality digital painting, atmospheric lighting, rich details, suitable for tabletop RPG.`;
+  // Fantasy RPG tarzı prompt zenginleştirme
+  const enhancedPrompt = `Fantasy RPG location illustration, tabletop RPG style, detailed environment art: ${prompt}. High quality digital painting, atmospheric lighting, rich details, suitable for tabletop RPG.`;
 
   console.log(`[ImageGen] Starting image generation - Request ID: ${requestId}`);
   console.log(`[ImageGen] Model: ${model}, Prompt length: ${enhancedPrompt.length}`);

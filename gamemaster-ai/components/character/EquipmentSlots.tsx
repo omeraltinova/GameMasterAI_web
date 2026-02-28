@@ -197,7 +197,7 @@ export function EquipmentSlots({
         );
     }
     
-    // Tam görünüm - D&D tarzı layout
+    // Tam görünüm - Fantezi RPG tarzı layout
     return (
         <div className={cn("p-4 bg-background-elevated/30 rounded-xl", className)}>
             <h4 className="text-sm font-medium text-foreground-muted mb-4 text-center">

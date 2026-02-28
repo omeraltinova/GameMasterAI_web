@@ -150,7 +150,7 @@ export default function HomePage() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="text-lg text-foreground-secondary mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed"
             >
-              Sınırsız hayal gücü, dinamik hikaye anlatımı ve D&D 5e kurallarına tam sadakat.
+              Sınırsız hayal gücü, dinamik hikaye anlatımı ve 5e SRD kurallarına tam sadakat.
               Masaüstü rol yapma oyunlarını yeniden keşfet.
             </motion.p>
 

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     // User prompt oluştur
-    let userPrompt = `Yeni bir D&D 5e senaryosu oluştur:\n`;
+    let userPrompt = `Yeni bir 5e SRD senaryosu oluştur:\n`;
     userPrompt += `**Tür:** ${genre}\n`;
     userPrompt += `**Zorluk:** ${difficulty}\n`;
     

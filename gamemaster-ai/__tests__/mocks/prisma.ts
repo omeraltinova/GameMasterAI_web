@@ -5,7 +5,7 @@ import { vi, beforeEach } from 'vitest'
 // Gerçek Prisma Client'ı mock'luyoruz
 export const prismaMock = mockDeep<PrismaClient>()
 
-vi.mock('@/lib/prisma', () => ({
+vi.mock('@/lib/db/prisma', () => ({
   __esModule: true,
   default: prismaMock,
   prisma: prismaMock

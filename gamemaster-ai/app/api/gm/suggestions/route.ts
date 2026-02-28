@@ -7,13 +7,13 @@ import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 /**
  * Suggestions için özel system prompt - farklı bakış açısı için
  */
-const SUGGESTIONS_SYSTEM_PROMPT = `Sen bir D&D oyun asistanısın. Oyuncuya mevcut duruma göre yaratıcı aksiyon önerileri sunuyorsun.
+const SUGGESTIONS_SYSTEM_PROMPT = `Sen bir TTRPG oyun asistanısın. Oyuncuya mevcut duruma göre yaratıcı aksiyon önerileri sunuyorsun.
 
 **Görevin:**
 - Oyuncunun yapabileceği ilginç ve yaratıcı aksiyonlar öner
 - Her öneri farklı bir oyun tarzını temsil etsin (combat, diplomacy, stealth, exploration, vb.)
 - Öneriler kısa ve anlaşılır olsun
-- D&D 5e kurallarına uygun öneriler sun
+- 5e SRD kurallarına uygun öneriler sun
 
 **Kurallar:**
 - Türkçe yanıt ver

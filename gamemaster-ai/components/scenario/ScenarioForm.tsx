@@ -256,7 +256,7 @@ export function ScenarioForm({ initialData, onSubmit, isLoading, isEdit = false 
                  name="worldName"
                  value={formData.worldName}
                  onChange={handleChange}
-                 placeholder="Forgotten Realms"
+                 placeholder="Eldoria"
                />
                <Select
                   label="Dünya Tipi"
@@ -289,7 +289,7 @@ export function ScenarioForm({ initialData, onSubmit, isLoading, isEdit = false 
                 name="startingLocationName"
                 value={formData.startingLocationName}
                 onChange={handleChange}
-                placeholder="Phandalin Köyü"
+                placeholder="Gri Liman Kasabası"
               />
               <Input
                 label="Mekan Açıklaması (Görsel İçin)"

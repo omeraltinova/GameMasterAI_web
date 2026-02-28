@@ -66,7 +66,7 @@
 ## Guncelleme: Kurallar, Karakter Duzenleme ve Oturum Adlandirma (6 Ocak 2026)
 
 ### Tamamlanan
-- Kurallar sayfasi D&D 5e SRD esasina gore guncellendi (metinler/terimler)
+- Kurallar sayfasi 5e SRD esasina gore guncellendi (metinler/terimler)
 - Karakter duzenleme sayfasi eklendi (`/characters/[id]/edit`) ve karakter guncelleme endpointi eklendi
 - Kampanyalar UI metinleri Oturumlar olarak guncellendi (linkler degismedi)
 

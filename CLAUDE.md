@@ -94,7 +94,7 @@ Currently using mock data in `lib/mock-data.ts` for development. Planned backend
 
 The application is designed to support:
 - AI Game Master with narrative generation
-- D&D 5e character creation and management
+- 5e SRD character creation and management
 - Single and multiplayer campaigns
 - Dice rolling system (d4-d100)
 - Turn-based combat with initiative tracking

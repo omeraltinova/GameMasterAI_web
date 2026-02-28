@@ -1,0 +1,37 @@
+# ===========================================
+# GitGuardian Configuration
+# ===========================================
+# Test ve E2E dosyalarindaki mock/fixture password'leri
+# gercek secret degildir. Bu dosyalar taramadan haric tutulur.
+
+version: 2
+
+secret:
+  # Test dosyalarini taramadan haric tut
+  ignored-paths:
+    # Unit test dizinleri
+    - "**/__tests__/**"
+    - "**/tests/**"
+
+    # E2E test dizinleri
+    - "**/e2e/**"
+
+    # Test dosya desenleri (dizin disinda kalan testler icin)
+    - "**/*.test.ts"
+    - "**/*.test.tsx"
+    - "**/*.test.js"
+    - "**/*.test.jsx"
+    - "**/*.spec.ts"
+    - "**/*.spec.tsx"
+    - "**/*.spec.js"
+    - "**/*.spec.jsx"
+
+    # Test fixture / helper dosyalari
+    - "**/test-utils/**"
+    - "**/fixtures/**"
+    - "**/__mocks__/**"
+
+  # Bilinen false-positive'leri isaretle
+  ignored-matches:
+    - name: "Test fixture passwords"
+      match: "TestP@ss123|PlayP@ss123|HostP@ss123|GuestP@ss123|StrongP@ss1|OldP@ssw0rd|NewP@ssw0rd1|SameP@ssw0rd1|DifferentP@ss2|password123|oldpass123|newpass456"

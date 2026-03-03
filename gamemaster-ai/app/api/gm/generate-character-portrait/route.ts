@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const rateLimit = await checkAIRateLimit(userId);
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { success: false, message: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { success: false, error: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
         { status: 429 }
       );
     }
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     const safeAppearance = normalize(appearance, 900);
     if (!safeAppearance) {
       return NextResponse.json(
-        { success: false, message: 'Önce bir görünüş metni yazmalısınız.' },
+        { success: false, error: 'Önce bir görünüş metni yazmalısınız.' },
         { status: 400 }
       );
     }
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Generate character portrait error:', error);
     return NextResponse.json(
-      { success: false, message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

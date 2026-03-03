@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const rateLimit = await checkAIRateLimit(userId);
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { message: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { success: false, error: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
         { status: 429 }
       );
     }
@@ -34,21 +34,21 @@ export async function POST(req: NextRequest) {
     // Validation
     if (!sessionId) {
       return NextResponse.json(
-        { message: 'Session ID gerekiyor' },
+        { success: false, error: 'Session ID gerekiyor' },
         { status: 400 }
       );
     }
 
     if (!action || typeof action !== 'string') {
       return NextResponse.json(
-        { message: 'Aksiyon gerekiyor' },
+        { success: false, error: 'Aksiyon gerekiyor' },
         { status: 400 }
       );
     }
 
     if (!attacker || typeof attacker !== 'string') {
       return NextResponse.json(
-        { message: 'Saldıran bilgisi gerekiyor' },
+        { success: false, error: 'Saldıran bilgisi gerekiyor' },
         { status: 400 }
       );
     }
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     if (!gameSession) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 
     if (!hasAccess) {
       return NextResponse.json(
-        { message: 'Bu session\'a erişim yetkiniz yok' },
+        { success: false, error: 'Bu session\'a erişim yetkiniz yok' },
         { status: 403 }
       );
     }
@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Combat action error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

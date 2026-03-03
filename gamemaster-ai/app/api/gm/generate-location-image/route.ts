@@ -107,14 +107,14 @@ export async function POST(req: NextRequest) {
     // Validation
     if (!sessionId) {
       return NextResponse.json(
-        { message: 'sessionId gerekli' },
+        { success: false, error: 'sessionId gerekli' },
         { status: 400 }
       );
     }
 
     if (!locationName || !description) {
       return NextResponse.json(
-        { message: 'locationName ve description gerekli' },
+        { success: false, error: 'locationName ve description gerekli' },
         { status: 400 }
       );
     }
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
     const rateLimit = await checkAIRateLimit(userId);
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { message: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { success: false, error: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
         { status: 429 }
       );
     }
@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
 
     if (!session) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -391,7 +391,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Generate location image error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

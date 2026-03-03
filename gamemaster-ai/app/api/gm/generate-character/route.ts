@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const rateLimit = await checkAIRateLimit(userId);
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { message: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { success: false, error: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
         { status: 429 }
       );
     }
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       console.error('JSON parse error:', error);
       return NextResponse.json(
-        { message: 'AI yanıtını işlerken hata oluştu', rawResponse: aiResponse },
+        { success: false, error: 'AI yanıtını işlerken hata oluştu', rawResponse: aiResponse },
         { status: 500 }
       );
     }
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Character generation error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

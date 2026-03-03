@@ -29,7 +29,7 @@ export async function GET(
     const userId = await getUserId(req);
     if (!userId) {
       return NextResponse.json(
-        { success: false, message: "Oturum açmanız gerekiyor" },
+        { success: false, error: "Oturum açmanız gerekiyor" },
         { status: 401 }
       );
     }
@@ -53,14 +53,14 @@ export async function GET(
 
     if (!character) {
       return NextResponse.json(
-        { success: false, message: "Karakter bulunamadı" },
+        { success: false, error: "Karakter bulunamadı" },
         { status: 404 }
       );
     }
 
     if (character.userId !== userId) {
       return NextResponse.json(
-        { success: false, message: "Bu karaktere erişim yetkiniz yok" },
+        { success: false, error: "Bu karaktere erişim yetkiniz yok" },
         { status: 403 }
       );
     }
@@ -93,7 +93,7 @@ export async function GET(
   } catch (error) {
     console.error("Character get error:", error);
     return NextResponse.json(
-      { success: false, message: "Sunucu hatası oluştu" },
+      { success: false, error: "Sunucu hatası oluştu" },
       { status: 500 }
     );
   }
@@ -107,7 +107,7 @@ export async function PUT(
     const userId = await getUserId(req);
     if (!userId) {
       return NextResponse.json(
-        { success: false, message: "Oturum açmanız gerekiyor" },
+        { success: false, error: "Oturum açmanız gerekiyor" },
         { status: 401 }
       );
     }
@@ -123,14 +123,14 @@ export async function PUT(
 
     if (!character) {
       return NextResponse.json(
-        { success: false, message: "Karakter bulunamadı" },
+        { success: false, error: "Karakter bulunamadı" },
         { status: 404 }
       );
     }
 
     if (character.userId !== userId) {
       return NextResponse.json(
-        { success: false, message: "Bu karaktere erişim yetkiniz yok" },
+        { success: false, error: "Bu karaktere erişim yetkiniz yok" },
         { status: 403 }
       );
     }
@@ -211,7 +211,7 @@ export async function PUT(
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
-        { success: false, message: "Güncellenecek veri bulunamadı" },
+        { success: false, error: "Güncellenecek veri bulunamadı" },
         { status: 400 }
       );
     }
@@ -248,7 +248,7 @@ export async function PUT(
   } catch (error) {
     console.error("Character update error:", error);
     return NextResponse.json(
-      { success: false, message: "Sunucu hatası oluştu" },
+      { success: false, error: "Sunucu hatası oluştu" },
       { status: 500 }
     );
   }
@@ -262,7 +262,7 @@ export async function DELETE(
     const userId = await getUserId(req);
     if (!userId) {
       return NextResponse.json(
-        { success: false, message: "Oturum açmanız gerekiyor" },
+        { success: false, error: "Oturum açmanız gerekiyor" },
         { status: 401 }
       );
     }
@@ -278,14 +278,14 @@ export async function DELETE(
 
     if (!character) {
       return NextResponse.json(
-        { success: false, message: "Karakter bulunamadı" },
+        { success: false, error: "Karakter bulunamadı" },
         { status: 404 }
       );
     }
 
     if (character.userId !== userId) {
       return NextResponse.json(
-        { success: false, message: "Bu karaktere erişim yetkiniz yok" },
+        { success: false, error: "Bu karaktere erişim yetkiniz yok" },
         { status: 403 }
       );
     }
@@ -299,7 +299,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Character delete error:", error);
     return NextResponse.json(
-      { success: false, message: "Sunucu hatası oluştu" },
+      { success: false, error: "Sunucu hatası oluştu" },
       { status: 500 }
     );
   }

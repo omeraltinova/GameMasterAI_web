@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Campaigns get error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }
@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     // Validation
     if (!name || typeof name !== 'string') {
       return NextResponse.json(
-        { message: 'Oturum adı gerekiyor' },
+        { success: false, error: 'Oturum adı gerekiyor' },
         { status: 400 }
       );
     }
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Campaign creation error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

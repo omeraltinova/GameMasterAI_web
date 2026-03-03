@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     const rateLimit = await checkAIRateLimit(userId);
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { message: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { success: false, error: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
         { status: 429 }
       );
     }
@@ -145,7 +145,7 @@ GÖREV: Bir TTRPG oturumu için dünya ayarları oluştur.
   } catch (error) {
     console.error('Generate world error:', error);
     return NextResponse.json(
-      { message: 'Dünya oluşturulurken hata oluştu' },
+      { success: false, error: 'Dünya oluşturulurken hata oluştu' },
       { status: 500 }
     );
   }

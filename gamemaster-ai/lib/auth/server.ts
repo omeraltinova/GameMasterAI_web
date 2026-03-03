@@ -36,11 +36,11 @@ export async function getUserId(req?: NextRequest): Promise<string | null> {
  */
 export async function requireAuth(req?: NextRequest): Promise<string> {
   const userId = await getUserId(req);
-  
+
   if (!userId) {
     throw new Error('Oturum açmanız gerekiyor');
   }
-  
+
   return userId;
 }
 
@@ -49,7 +49,7 @@ export async function requireAuth(req?: NextRequest): Promise<string> {
  */
 export function unauthorizedResponse(message: string = 'Oturum açmanız gerekiyor') {
   return NextResponse.json(
-    { message },
+    { success: false, error: message, code: 'UNAUTHORIZED' },
     { status: 401 }
   );
 }
@@ -59,7 +59,7 @@ export function unauthorizedResponse(message: string = 'Oturum açmanız gerekiy
  */
 export function forbiddenResponse(message: string = 'Bu işlem için yetkiniz yok') {
   return NextResponse.json(
-    { message },
+    { success: false, error: message, code: 'FORBIDDEN' },
     { status: 403 }
   );
 }

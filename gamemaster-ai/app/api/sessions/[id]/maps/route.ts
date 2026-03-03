@@ -39,7 +39,7 @@ export async function GET(
 
     if (!session) {
       return NextResponse.json(
-        { success: false, message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -69,7 +69,7 @@ export async function GET(
   } catch (error) {
     console.error('Get session maps error:', error);
     return NextResponse.json(
-      { success: false, message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }
@@ -98,14 +98,14 @@ export async function POST(
     // Validation
     if (!name || typeof name !== 'string') {
       return NextResponse.json(
-        { success: false, message: 'Harita adı gerekli' },
+        { success: false, error: 'Harita adı gerekli' },
         { status: 400 }
       );
     }
 
     if (!imageUrl || typeof imageUrl !== 'string') {
       return NextResponse.json(
-        { success: false, message: 'Görsel URL gerekli' },
+        { success: false, error: 'Görsel URL gerekli' },
         { status: 400 }
       );
     }
@@ -127,7 +127,7 @@ export async function POST(
 
     if (!session) {
       return NextResponse.json(
-        { success: false, message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -168,7 +168,7 @@ export async function POST(
   } catch (error) {
     console.error('Create map error:', error);
     return NextResponse.json(
-      { success: false, message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

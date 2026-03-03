@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   try {
     const userId = await getUserId();
     if (!userId) {
-      return NextResponse.json({ message: "Oturum acmaniz gerekiyor" }, { status: 401 });
+      return NextResponse.json({ success: false, error: "Oturum acmaniz gerekiyor" }, { status: 401 });
     }
 
     const limited = rateLimitResponse(userId, "POST:/api/auth/password", RATE_LIMIT_TIERS.AUTH_SENSITIVE);
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { message: "Gecersiz veri girdiniz.", errors: parsed.error.flatten().fieldErrors },
+        { success: false, error: "Gecersiz veri girdiniz.", errors: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
     if (currentPassword === newPassword) {
       return NextResponse.json(
-        { message: "Yeni sifre mevcut sifreyle ayni olamaz." },
+        { success: false, error: "Yeni sifre mevcut sifreyle ayni olamaz." },
         { status: 400 }
       );
     }
@@ -40,12 +40,12 @@ export async function POST(req: Request) {
     });
 
     if (!user) {
-      return NextResponse.json({ message: "Kullanici bulunamadi" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Kullanici bulunamadi" }, { status: 404 });
     }
 
     const isValid = await bcrypt.compare(currentPassword, user.password);
     if (!isValid) {
-      return NextResponse.json({ message: "Mevcut sifre hatali" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Mevcut sifre hatali" }, { status: 400 });
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -57,6 +57,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, message: "Sifre guncellendi" });
   } catch (error) {
     console.error("Password change error:", error);
-    return NextResponse.json({ message: "Sunucu hatasi olustu." }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Sunucu hatasi olustu." }, { status: 500 });
   }
 }

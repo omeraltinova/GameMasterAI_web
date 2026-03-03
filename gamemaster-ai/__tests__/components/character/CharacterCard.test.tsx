@@ -130,8 +130,9 @@ describe("CharacterCard", () => {
 
   it("displays XP value", () => {
     render(<CharacterCard character={makeCharacter({ experience: 2500 })} />);
-    // toLocaleString in Turkish locale uses '.' as thousands separator → "2.500"
-    expect(screen.getByText("2.500")).toBeDefined();
+    // toLocaleString output depends on the runtime locale
+    const expectedXP = (2500).toLocaleString();
+    expect(screen.getByText(expectedXP)).toBeDefined();
   });
 
   it("displays stat labels", () => {

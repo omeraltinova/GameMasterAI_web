@@ -13,7 +13,7 @@ export async function GET(
 ) {
   try {
     const { id: sessionId } = await params;
- 
+
     // Auth kontrolü (NextAuth session)
     const userId = await getUserId();
     if (!userId) {
@@ -61,9 +61,9 @@ export async function GET(
       },
     });
 
-if (!session) {
+    if (!session) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -137,7 +137,7 @@ if (!session) {
   } catch (error) {
     console.error('Session get error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }
@@ -184,7 +184,7 @@ export async function PUT(
 
     if (!session) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -236,7 +236,7 @@ export async function PUT(
   } catch (error) {
     console.error('Session update error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

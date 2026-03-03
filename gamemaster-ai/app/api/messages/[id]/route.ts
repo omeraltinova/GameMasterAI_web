@@ -40,7 +40,7 @@ async function updateMessage(
 
     if (!message) {
       return NextResponse.json(
-        { message: 'Mesaj bulunamadı' },
+        { success: false, error: 'Mesaj bulunamadı' },
         { status: 404 }
       );
     }
@@ -51,7 +51,7 @@ async function updateMessage(
 
     if (!isCreator && !isSender) {
       return NextResponse.json(
-        { message: 'Bu mesajı güncelleme yetkiniz yok' },
+        { success: false, error: 'Bu mesajı güncelleme yetkiniz yok' },
         { status: 403 }
       );
     }
@@ -73,7 +73,7 @@ async function updateMessage(
   } catch (error) {
     console.error('Update message error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

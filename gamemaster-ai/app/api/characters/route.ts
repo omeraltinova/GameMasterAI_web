@@ -13,7 +13,7 @@ export async function GET() {
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
@@ -70,7 +70,7 @@ export async function GET() {
   } catch (error) {
     console.error('Characters get error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { message: 'Gecersiz karakter verisi', errors: parsed.error.flatten().fieldErrors },
+        { success: false, error: 'Gecersiz karakter verisi', errors: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
@@ -132,13 +132,13 @@ export async function POST(req: NextRequest) {
       stats: typeof stats === 'object'
         ? JSON.stringify(stats)
         : JSON.stringify({
-            strength: 10,
-            dexterity: 10,
-            constitution: 10,
-            intelligence: 10,
-            wisdom: 10,
-            charisma: 10,
-          }),
+          strength: 10,
+          dexterity: 10,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 10,
+        }),
       background,
       backstory,
       imageUrl,
@@ -179,7 +179,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Character creation error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

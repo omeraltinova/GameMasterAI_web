@@ -26,14 +26,14 @@ vi.mock("@/lib/auth/server", () => ({
   unauthorizedResponse: () => {
     const { NextResponse } = require("next/server");
     return NextResponse.json(
-      { message: "Oturum açmanız gerekiyor" },
+      { success: false, error: "Oturum açmanız gerekiyor", code: "UNAUTHORIZED" },
       { status: 401 }
     );
   },
   forbiddenResponse: () => {
     const { NextResponse } = require("next/server");
     return NextResponse.json(
-      { message: "Bu işlem için yetkiniz yok" },
+      { success: false, error: "Bu işlem için yetkiniz yok", code: "FORBIDDEN" },
       { status: 403 }
     );
   },
@@ -115,7 +115,7 @@ describe("POST /api/register", () => {
     expect(res.status).toBe(201);
 
     const data = await res.json();
-    expect(data.message).toBeTruthy();
+    expect(data.success).toBe(true);
   });
 
   it("returns 400 for invalid data (missing email)", async () => {

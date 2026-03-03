@@ -5,12 +5,12 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, ConfirmDialog } from "@/components/ui";
-import { ChatWindow, MessageInput, DiceRoller, CharacterModal, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage, DiceModal, NPCModal } from "@/components/game";
+import { ChatWindow, MessageInput, DiceRoller, CharacterModal, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage, DiceModal, NPCModal, CombatTracker } from "@/components/game";
 import { InventoryModal } from "@/components/character";
 import { MapModal } from "@/components/map";
 import { useGame, useGM, useDice, useSuggestions, useLocationImage, useMaps } from "@/hooks/useGame";
 import { get, post, put } from "@/lib/api/client";
-import type { Message, DiceType, Character, Campaign, GMAction, GMPrompt, LocationChange } from "@/types";
+import type { Message, DiceType, Character, Campaign, GMAction, GMPrompt, LocationChange, Combat } from "@/types";
 import {
   Dice6,
   Backpack,
@@ -77,6 +77,7 @@ export default function PlayPage() {
   const [showMapModal, setShowMapModal] = useState(false);
   const [showCharacterModal, setShowCharacterModal] = useState(false);
   const [worldSettings, setWorldSettings] = useState<WorldSettings | null>(null);
+  const [activeCombat, setActiveCombat] = useState<Combat | null>(null);
 
   // Get campaign ID from URL params
   const campaignId = params.id as string;
@@ -248,11 +249,11 @@ export default function PlayPage() {
 
   // Message polling - auto-refresh every 5 seconds when playing
   const lastPollTime = useRef<number>(Date.now());
-  
+
   useEffect(() => {
     // Only poll when we have a session and are in playing phase
     if (!sessionId || gamePhase !== 'playing') return;
-    
+
     const pollInterval = setInterval(async () => {
       try {
         await fetchUpdates(lastPollTime.current);
@@ -261,7 +262,7 @@ export default function PlayPage() {
         console.error('Polling error:', err);
       }
     }, 5000); // Poll every 5 seconds
-    
+
     return () => clearInterval(pollInterval);
   }, [sessionId, gamePhase, fetchUpdates]);
 
@@ -618,7 +619,7 @@ export default function PlayPage() {
 
     // Zar mesajını API üzerinden kaydet
     const diceContent = `🎲 ${character?.name || playerName}${skillText}${dcText} atışı: [${rollResult.results.join(', ')}]${rollResult.modifier !== 0 ? ` + ${rollResult.modifier}` : ''} = ${rollResult.total}${successText}`;
-    
+
     try {
       // Zar mesajını veritabanına kaydet
       const diceResponse = await post(`/sessions/${sessionId}/messages`, {
@@ -926,6 +927,26 @@ export default function PlayPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Chat Area */}
         <div className="flex-1 flex flex-col">
+          {/* Combat Tracker - Savaş sırasında göster */}
+          {activeCombat && activeCombat.status === "active" && (
+            <div className="px-4 pt-3 pb-1">
+              <CombatTracker
+                combat={activeCombat}
+                isGameMaster={isCreator}
+                onNextTurn={() => {
+                  setActiveCombat(prev => {
+                    if (!prev) return null;
+                    const nextTurn = (prev.currentTurn + 1) % prev.turnOrder.length;
+                    const nextRound = nextTurn === 0 ? prev.round + 1 : prev.round;
+                    return { ...prev, currentTurn: nextTurn, round: nextRound };
+                  });
+                }}
+                onEndCombat={() => {
+                  setActiveCombat(prev => prev ? { ...prev, status: "ended" } : null);
+                }}
+              />
+            </div>
+          )}
           {/* Location Image - Mekan değiştiğinde göster */}
 
           <div className="relative flex-1 flex flex-col min-h-0">
@@ -980,21 +1001,21 @@ export default function PlayPage() {
 
             {/* AI Action Suggestions - Sadece son GM mesajında hazır aksiyon yoksa göster */}
             {!pendingMandatoryAction?.isMandatory &&
-             !lastGMHasActions &&
-             (suggestions.length > 0 || isSuggestionsLoading) && (
-              <ActionSuggestions
-                suggestions={suggestions}
-                isLoading={isSuggestionsLoading}
-                onSelect={(detailedAction) => handleSendMessage(detailedAction)}
-                onRefresh={() => {
-                  const lastGM = [...messages].reverse().find(m => m.senderType === 'GM');
-                  if (lastGM) {
-                    fetchSuggestions(lastGM.content, lastGM.id);
-                  }
-                }}
-                disabled={isGMLoading}
-              />
-            )}
+              !lastGMHasActions &&
+              (suggestions.length > 0 || isSuggestionsLoading) && (
+                <ActionSuggestions
+                  suggestions={suggestions}
+                  isLoading={isSuggestionsLoading}
+                  onSelect={(detailedAction) => handleSendMessage(detailedAction)}
+                  onRefresh={() => {
+                    const lastGM = [...messages].reverse().find(m => m.senderType === 'GM');
+                    if (lastGM) {
+                      fetchSuggestions(lastGM.content, lastGM.id);
+                    }
+                  }}
+                  disabled={isGMLoading}
+                />
+              )}
 
             {(locationImage || isImageLoading) && (
               <div className="absolute inset-0 z-20 px-4 pt-4 pb-4">

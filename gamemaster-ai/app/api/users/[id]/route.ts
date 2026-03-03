@@ -16,7 +16,7 @@ export async function GET(
     const currentUserId = await getUserId();
     if (!currentUserId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
@@ -109,7 +109,7 @@ export async function GET(
 
     if (!user) {
       return NextResponse.json(
-        { message: 'Kullanıcı bulunamadı' },
+        { success: false, error: 'Kullanıcı bulunamadı' },
         { status: 404 }
       );
     }
@@ -346,7 +346,7 @@ export async function GET(
   } catch (error) {
     console.error('User profile error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

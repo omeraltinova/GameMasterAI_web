@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     const currentUserId = await getUserId();
     if (!currentUserId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Users list error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

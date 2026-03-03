@@ -37,7 +37,7 @@ export async function PUT(
   try {
     const userId = await getUserId();
     if (!userId) {
-      return NextResponse.json({ message: "Oturum acmaniz gerekiyor" }, { status: 401 });
+      return NextResponse.json({ success: false, error: "Oturum acmaniz gerekiyor" }, { status: 401 });
     }
 
     const limited = rateLimitResponse(userId, "PUT:/api/characters/[id]/levelup", RATE_LIMIT_TIERS.WRITE);
@@ -59,21 +59,21 @@ export async function PUT(
     });
 
     if (!character) {
-      return NextResponse.json({ message: "Karakter bulunamadi" }, { status: 404 });
+      return NextResponse.json({ success: false, error: "Karakter bulunamadi" }, { status: 404 });
     }
 
     if (character.userId !== userId) {
-      return NextResponse.json({ message: "Bu karaktere erisim yetkiniz yok" }, { status: 403 });
+      return NextResponse.json({ success: false, error: "Bu karaktere erisim yetkiniz yok" }, { status: 403 });
     }
 
     if (character.level >= 20) {
-      return NextResponse.json({ message: "Maksimum seviyedesin" }, { status: 400 });
+      return NextResponse.json({ success: false, error: "Maksimum seviyedesin" }, { status: 400 });
     }
 
     const nextLevelAt = character.level * 1000;
     if (character.experience < nextLevelAt) {
       return NextResponse.json(
-        { message: "Seviye atlamak icin yeterli XP yok", nextLevelAt },
+        { success: false, error: "Seviye atlamak icin yeterli XP yok", nextLevelAt },
         { status: 400 }
       );
     }
@@ -112,6 +112,6 @@ export async function PUT(
     });
   } catch (error) {
     console.error("Level up error:", error);
-    return NextResponse.json({ message: "Sunucu hatasi olustu" }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Sunucu hatasi olustu" }, { status: 500 });
   }
 }

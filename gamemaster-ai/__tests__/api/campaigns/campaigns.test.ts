@@ -23,7 +23,7 @@ vi.mock("@/lib/auth/server", () => ({
   unauthorizedResponse: () => {
     const { NextResponse } = require("next/server");
     return NextResponse.json(
-      { message: "Oturum açmanız gerekiyor" },
+      { success: false, error: "Oturum açmanız gerekiyor", code: "UNAUTHORIZED" },
       { status: 401 }
     );
   },
@@ -132,7 +132,7 @@ describe("POST /api/campaigns", () => {
     expect(res.status).toBe(400);
 
     const data = await res.json();
-    expect(data.message).toBeTruthy();
+    expect(data.error).toBeTruthy();
   });
 
   it("creates campaign successfully", async () => {

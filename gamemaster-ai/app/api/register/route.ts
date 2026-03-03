@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const rateLimitKey = `register:${ip}`;
     const rateLimit = checkRateLimit(rateLimitKey, { windowMs: 60 * 60 * 1000, max: 10 });
     if (!rateLimit.allowed) {
-      return NextResponse.json({ message: "Çok fazla deneme. Lütfen daha sonra tekrar deneyin." }, { status: 429 });
+      return NextResponse.json({ success: false, error: "Çok fazla deneme. Lütfen daha sonra tekrar deneyin." }, { status: 429 });
     }
 
     const payload = await req.json();
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { message: "Gecersiz veri girdiniz.", errors: parsed.error.flatten().fieldErrors },
+        { success: false, error: "Gecersiz veri girdiniz.", errors: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     });
 
     if (existingUser) {
-      return NextResponse.json({ message: "Bu kullanıcı adı veya e-posta zaten kullanımda." }, { status: 409 });
+      return NextResponse.json({ success: false, error: "Bu kullanıcı adı veya e-posta zaten kullanımda." }, { status: 409 });
     }
 
     // Şifreyi şifrele (Hash)
@@ -48,8 +48,8 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ message: "Kayıt başarılı!" }, { status: 201 });
+    return NextResponse.json({ success: true, message: "Kayıt başarılı!" }, { status: 201 });
   } catch (error) {
-    return NextResponse.json({ message: "Sunucu hatası oluştu." }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Sunucu hatası oluştu." }, { status: 500 });
   }
 }

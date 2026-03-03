@@ -27,7 +27,7 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}/api${endpoint}`;
-  
+
   const defaultOptions: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
@@ -39,11 +39,11 @@ async function request<T>(
 
   try {
     const response = await fetch(url, defaultOptions);
-    
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new APIError(
-        errorData.message || 'API request failed',
+        errorData.message || errorData.error || 'API request failed',
         response.status,
         errorData
       );
@@ -102,7 +102,7 @@ export function del<T>(endpoint: string, options?: RequestInit): Promise<T> {
  */
 export function buildQuery(params: Record<string, any>): string {
   const searchParams = new URLSearchParams();
-  
+
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null) {
       searchParams.append(key, String(value));

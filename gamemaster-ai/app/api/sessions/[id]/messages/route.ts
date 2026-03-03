@@ -45,7 +45,7 @@ export async function GET(
 
     if (!session) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -114,7 +114,7 @@ export async function GET(
   } catch (error) {
     console.error('Messages get error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }
@@ -136,7 +136,7 @@ export async function POST(
     // Validation
     if (!content || typeof content !== 'string') {
       return NextResponse.json(
-        { message: 'Mesaj içeriği gerekiyor' },
+        { success: false, error: 'Mesaj içeriği gerekiyor' },
         { status: 400 }
       );
     }
@@ -170,7 +170,7 @@ export async function POST(
 
     if (!session) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -235,7 +235,7 @@ export async function POST(
   } catch (error) {
     console.error('Message send error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

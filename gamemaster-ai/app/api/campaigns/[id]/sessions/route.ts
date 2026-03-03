@@ -15,7 +15,7 @@ export async function GET(
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
@@ -36,7 +36,7 @@ export async function GET(
 
     if (!campaign) {
       return NextResponse.json(
-        { message: 'Oturum bulunamadı' },
+        { success: false, error: 'Oturum bulunamadı' },
         { status: 404 }
       );
     }
@@ -47,7 +47,7 @@ export async function GET(
 
     if (!hasAccess) {
       return NextResponse.json(
-        { message: 'Bu oturuma erişim yetkiniz yok' },
+        { success: false, error: 'Bu oturuma erişim yetkiniz yok' },
         { status: 403 }
       );
     }
@@ -77,7 +77,7 @@ export async function GET(
   } catch (error) {
     console.error('Sessions fetch error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }
@@ -95,7 +95,7 @@ export async function POST(
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
@@ -116,7 +116,7 @@ export async function POST(
 
     if (!campaign) {
       return NextResponse.json(
-        { message: 'Oturum bulunamadı' },
+        { success: false, error: 'Oturum bulunamadı' },
         { status: 404 }
       );
     }
@@ -127,7 +127,7 @@ export async function POST(
 
     if (!hasAccess) {
       return NextResponse.json(
-        { message: 'Bu oturuma erişim yetkiniz yok' },
+        { success: false, error: 'Bu oturuma erişim yetkiniz yok' },
         { status: 403 }
       );
     }
@@ -179,7 +179,7 @@ export async function POST(
   } catch (error) {
     console.error('Session creation error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

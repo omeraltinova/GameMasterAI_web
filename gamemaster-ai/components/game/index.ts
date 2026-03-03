@@ -11,3 +11,5 @@ export { ActionButtons, rollDiceForAction } from "./ActionButtons";
 export { ActionSuggestions } from "./ActionSuggestions";
 export { LocationImage } from './LocationImage';
 export { CharacterModal } from './CharacterModal';
+export { CombatTracker } from './CombatTracker';
+

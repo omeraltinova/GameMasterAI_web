@@ -2,11 +2,35 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getUserId, forbiddenResponse, unauthorizedResponse } from "@/lib/auth/server";
 import { getCampaignActorRole, hasCampaignAccess } from "@/lib/auth/permissions";
+import { rateLimitResponse } from "@/lib/security/rateLimit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const encoder = new TextEncoder();
+const STREAM_OPEN_LIMIT = { windowMs: 60_000, max: 20 };
+const MAX_CONCURRENT_STREAMS_PER_USER_SESSION = 3;
+const streamCountByKey = new Map<string, number>();
+
+function getStreamKey(userId: string, sessionId: string) {
+  return `${userId}:${sessionId}`;
+}
+
+function acquireStreamSlot(streamKey: string) {
+  const current = streamCountByKey.get(streamKey) ?? 0;
+  const next = current + 1;
+  streamCountByKey.set(streamKey, next);
+  return next;
+}
+
+function releaseStreamSlot(streamKey: string) {
+  const current = streamCountByKey.get(streamKey) ?? 0;
+  if (current <= 1) {
+    streamCountByKey.delete(streamKey);
+    return;
+  }
+  streamCountByKey.set(streamKey, current - 1);
+}
 
 function serializeEvent(event: string, payload: unknown) {
   return encoder.encode(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
@@ -58,6 +82,16 @@ export async function GET(
   }
 
   const { id: sessionId } = await params;
+  const openLimited = rateLimitResponse(
+    userId,
+    "GET:/api/sessions/[id]/events",
+    STREAM_OPEN_LIMIT,
+    "Canlı güncelleme isteği limiti aşıldı. Lütfen biraz sonra tekrar deneyin.",
+  );
+  if (openLimited) {
+    return openLimited;
+  }
+
   const sinceParam = req.nextUrl.searchParams.get("since");
   let lastSeenAt = parseSinceParam(sinceParam);
 
@@ -87,10 +121,49 @@ export async function GET(
     return forbiddenResponse("Bu session'a erişim yetkiniz yok");
   }
 
+  const streamKey = getStreamKey(userId, sessionId);
+  const activeStreamCount = acquireStreamSlot(streamKey);
+  if (activeStreamCount > MAX_CONCURRENT_STREAMS_PER_USER_SESSION) {
+    releaseStreamSlot(streamKey);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Bu oturum için çok fazla eşzamanlı canlı bağlantı açıldı.",
+      }),
+      {
+        status: 429,
+        headers: {
+          "Content-Type": "application/json",
+          "Retry-After": "15",
+        },
+      },
+    );
+  }
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       let isClosed = false;
       let heartbeatCounter = 0;
+      let pollDelayMs = 2_500;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      let slotReleased = false;
+
+      const releaseSlot = () => {
+        if (slotReleased) {
+          return;
+        }
+        slotReleased = true;
+        releaseStreamSlot(streamKey);
+      };
+
+      const scheduleNextTick = () => {
+        if (isClosed) {
+          return;
+        }
+        timeoutId = setTimeout(() => {
+          void tick();
+        }, pollDelayMs);
+      };
 
       const sendInitialReady = () => {
         controller.enqueue(
@@ -131,6 +204,7 @@ export async function GET(
               }),
             );
             isClosed = true;
+            releaseSlot();
             controller.close();
             return;
           }
@@ -177,6 +251,7 @@ export async function GET(
             );
 
             heartbeatCounter = 0;
+            pollDelayMs = 2_500;
             return;
           }
 
@@ -190,6 +265,7 @@ export async function GET(
               }),
             );
           }
+          pollDelayMs = Math.min(10_000, pollDelayMs + 750);
         } catch {
           controller.enqueue(
             serializeEvent("error", {
@@ -197,17 +273,21 @@ export async function GET(
               error: "Gerçek zamanlı akışta hata oluştu",
             }),
           );
+          pollDelayMs = Math.min(10_000, pollDelayMs + 1_000);
+        } finally {
+          scheduleNextTick();
         }
       };
 
       sendInitialReady();
-      const intervalId = setInterval(() => {
-        void tick();
-      }, 2_500);
+      scheduleNextTick();
 
       req.signal.addEventListener("abort", () => {
         isClosed = true;
-        clearInterval(intervalId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        releaseSlot();
         try {
           controller.close();
         } catch {
@@ -222,6 +302,7 @@ export async function GET(
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     },
   });
 }

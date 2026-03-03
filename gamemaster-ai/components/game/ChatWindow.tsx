@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { normalizeImageUrl } from "@/lib/security/imageUrl";
 import type { Message, GMAction } from "@/types";
 import { Bot, User, Dice6, Swords, AlertCircle, RotateCcw, MoreVertical, RefreshCw, MapPin } from "lucide-react";
 import { ActionButtons } from "./ActionButtons";
@@ -74,6 +75,7 @@ export function ChatWindow({
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [expandedImage, setExpandedImage] = useState<{ url: string; name: string } | null>(null);
+  const safeExpandedImageUrl = expandedImage ? normalizeImageUrl(expandedImage.url) : null;
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -114,7 +116,8 @@ export function ChatWindow({
       className="flex-1 overflow-y-auto p-4 space-y-4"
     >
       {messages.map((message, index) => {
-        const isImageSystemMessage = message.senderType === 'SYSTEM' && !!message.locationImageUrl;
+        const safeLocationImageUrl = normalizeImageUrl(message.locationImageUrl);
+        const isImageSystemMessage = message.senderType === 'SYSTEM' && !!safeLocationImageUrl;
         const senderType = isImageSystemMessage ? 'GM' : message.senderType;
         const config = senderConfig[senderType];
         const Icon = config.icon;
@@ -231,10 +234,10 @@ export function ChatWindow({
               </div>
               
               {/* Mekan Görseli - GM mesajlarında */}
-              {message.locationImageUrl && (
+              {safeLocationImageUrl && (
                 <div 
                   className="mt-2 rounded-lg overflow-hidden border border-border cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setExpandedImage({ url: message.locationImageUrl!, name: message.locationName || 'Mekan Görseli' })}
+                  onClick={() => setExpandedImage({ url: safeLocationImageUrl, name: message.locationName || 'Mekan Görseli' })}
                 >
                   <div className="flex items-center gap-2 px-3 py-2 bg-background-secondary border-b border-border">
                     <MapPin className="h-3 w-3 text-primary" />
@@ -244,7 +247,7 @@ export function ChatWindow({
                   </div>
                   <div className="relative aspect-[16/9] w-full">
                     <img
-                      src={message.locationImageUrl}
+                      src={safeLocationImageUrl}
                       alt={message.locationName || "Mekan görseli"}
                       className="w-full h-full object-cover"
                     />
@@ -284,14 +287,14 @@ export function ChatWindow({
       <div ref={messagesEndRef} />
       
       {/* Full Screen Image Modal */}
-      {expandedImage && (
+      {expandedImage && safeExpandedImageUrl && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
           onClick={() => setExpandedImage(null)}
         >
           <div className="relative w-full h-full flex items-center justify-center">
             <img
-              src={expandedImage.url}
+              src={safeExpandedImageUrl}
               alt={expandedImage.name}
               className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
@@ -319,5 +322,4 @@ export function ChatWindow({
     </div>
   );
 }
-
 

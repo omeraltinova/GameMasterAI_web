@@ -7,14 +7,19 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await getUserId();
   const { id: campaignId } = await params;
 
   try {
-    if (userId) {
-      const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/pause", RATE_LIMIT_TIERS.WRITE);
-      if (limited) return limited;
+    const userId = await getUserId();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Oturum açmanız gerekiyor' },
+        { status: 401 }
+      );
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/pause", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     // Verify ownership
     const campaign = await prisma.campaign.findUnique({

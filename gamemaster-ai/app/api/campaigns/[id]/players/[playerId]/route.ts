@@ -55,6 +55,14 @@ export async function DELETE(
             );
         }
 
+        // Player kaydı bu campaign'e ait mi?
+        if (player.campaignId !== campaignId) {
+            return NextResponse.json(
+                { success: false, error: 'Oyuncu bulunamadı' },
+                { status: 404 }
+            );
+        }
+
         // Oturum kurucusunu atamazsın
         if (player.userId === campaign.creatorId) {
             return NextResponse.json(

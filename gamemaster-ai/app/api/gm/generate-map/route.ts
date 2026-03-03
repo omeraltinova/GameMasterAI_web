@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db/prisma';
 import { generateLocationImage } from '@/lib/ai/imageGenerator';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
 import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
+import { normalizeImageUrl } from '@/lib/security/imageUrl';
 
 // Harita stili prompt ekleri
 const MAP_STYLE_PROMPTS: Record<string, string> = {
@@ -183,6 +184,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const normalizedImageUrl = normalizeImageUrl(result.imageUrl);
+    if (!normalizedImageUrl) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Üretilen harita görsel URL’i güvenlik kurallarını karşılamıyor',
+        },
+        { status: 502 }
+      );
+    }
+
     // Stil etiketi
     const styleLabels: Record<string, string> = {
       topdown: 'Tepeden Bakış',
@@ -198,7 +210,7 @@ export async function POST(req: NextRequest) {
         sessionId,
         name: locationName,
         description: `${styleLabels[selectedMapStyle] || 'Harita'} - ${locationType}${atmosphere ? ` (${atmosphere})` : ''}`,
-        imageUrl: result.imageUrl,
+        imageUrl: normalizedImageUrl,
         isAIGenerated: true,
         prompt: fullPrompt,
       },

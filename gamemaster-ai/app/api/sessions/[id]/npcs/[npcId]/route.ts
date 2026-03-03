@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
+import { normalizeImageUrl } from '@/lib/security/imageUrl';
 
 /**
  * GET /api/sessions/:id/npcs/:npcId
@@ -18,6 +20,9 @@ export async function GET(
                 { status: 401 }
             );
         }
+
+        const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/npcs/[npcId]", RATE_LIMIT_TIERS.READ);
+        if (limited) return limited;
 
         const { id: sessionId, npcId } = await params;
 
@@ -91,6 +96,9 @@ export async function PUT(
             );
         }
 
+        const limited = rateLimitResponse(userId, "PUT:/api/sessions/[id]/npcs/[npcId]", RATE_LIMIT_TIERS.WRITE);
+        if (limited) return limited;
+
         const { id: sessionId, npcId } = await params;
         const body = await req.json();
         const { name, race, role, personality, stats, isHostile, imageUrl, dialogue } = body;
@@ -132,6 +140,27 @@ export async function PUT(
             );
         }
 
+        let normalizedImageUrl: string | null | undefined = undefined;
+        if (imageUrl !== undefined) {
+            if (imageUrl === null || imageUrl === '') {
+                normalizedImageUrl = null;
+            } else if (typeof imageUrl === 'string') {
+                const safeImageUrl = normalizeImageUrl(imageUrl);
+                if (!safeImageUrl) {
+                    return NextResponse.json(
+                        { success: false, error: 'Geçersiz görsel URL' },
+                        { status: 400 }
+                    );
+                }
+                normalizedImageUrl = safeImageUrl;
+            } else {
+                return NextResponse.json(
+                    { success: false, error: 'Geçersiz görsel URL' },
+                    { status: 400 }
+                );
+            }
+        }
+
         // Güncelle
         const npc = await prisma.nPC.update({
             where: { id: npcId },
@@ -142,7 +171,7 @@ export async function PUT(
                 personality: personality !== undefined ? personality : existingNpc.personality,
                 stats: stats !== undefined ? (stats ? JSON.stringify(stats) : null) : existingNpc.stats,
                 isHostile: isHostile ?? existingNpc.isHostile,
-                imageUrl: imageUrl !== undefined ? imageUrl : existingNpc.imageUrl,
+                imageUrl: normalizedImageUrl !== undefined ? normalizedImageUrl : existingNpc.imageUrl,
                 dialogue: dialogue !== undefined ? JSON.stringify(dialogue) : existingNpc.dialogue,
             },
         });
@@ -181,6 +210,9 @@ export async function DELETE(
                 { status: 401 }
             );
         }
+
+        const limited = rateLimitResponse(userId, "DELETE:/api/sessions/[id]/npcs/[npcId]", RATE_LIMIT_TIERS.WRITE);
+        if (limited) return limited;
 
         const { id: sessionId, npcId } = await params;
 

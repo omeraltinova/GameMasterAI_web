@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { normalizeImageUrl } from "@/lib/security/imageUrl";
 import { Map, Loader2, X, Maximize2, Trash2, Edit2, Check, XCircle } from "lucide-react";
 import { Button, Input } from "@/components/ui";
 import type { GameMap } from "@/types";
@@ -35,6 +36,8 @@ export function MapViewer({
   if (!map && !isLoading) {
     return null;
   }
+
+  const safeMapImageUrl = normalizeImageUrl(map?.imageUrl);
 
   const handleStartEdit = () => {
     if (map) {
@@ -117,7 +120,7 @@ export function MapViewer({
             )}
           </div>
           <div className="flex items-center gap-1">
-            {map?.imageUrl && !imageError && !isLoading && !isEditing && (
+            {safeMapImageUrl && !imageError && !isLoading && !isEditing && (
               <>
                 <Button
                   variant="ghost"
@@ -179,9 +182,9 @@ export function MapViewer({
                 </span>
               </div>
             </div>
-          ) : map?.imageUrl && !imageError ? (
+          ) : safeMapImageUrl && !imageError ? (
             <img
-              src={map.imageUrl}
+              src={safeMapImageUrl}
               alt={map.name || "Harita"}
               className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => setIsExpanded(true)}
@@ -205,7 +208,7 @@ export function MapViewer({
       </div>
 
       {/* Expanded modal */}
-      {isExpanded && map?.imageUrl && !imageError && (
+      {isExpanded && safeMapImageUrl && !imageError && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
           onClick={() => setIsExpanded(false)}
@@ -213,7 +216,7 @@ export function MapViewer({
           <div className="relative w-full h-full flex items-center justify-center">
             <div className="relative max-w-full max-h-full bg-gradient-to-br from-emerald-900 via-teal-900 to-emerald-950 rounded-lg shadow-2xl overflow-hidden">
               <img
-                src={map.imageUrl}
+                src={safeMapImageUrl}
                 alt={map.name || "Harita"}
                 className="max-w-full max-h-full object-contain"
                 onClick={(e) => e.stopPropagation()}

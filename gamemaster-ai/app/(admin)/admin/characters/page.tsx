@@ -248,7 +248,11 @@ export default function CharactersPage() {
                     </td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <Link href={`/characters/${character.id}`} target="_blank">
+                        <Link
+                          href={`/characters/${character.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           <Button variant="ghost" size="sm" title="Görüntüle">
                             <ExternalLink className="h-4 w-4" />
                           </Button>

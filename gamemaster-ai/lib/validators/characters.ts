@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isSafeImageUrl } from "@/lib/security/imageUrl";
 
 export const characterStatsSchema = z.object({
   strength: z.number().int(),
@@ -21,7 +22,14 @@ export const characterCreateSchema = z.object({
   background: z.string().optional().nullable(),
   appearance: z.string().optional().nullable(),
   backstory: z.string().optional().nullable(),
-  imageUrl: z.string().optional().nullable(),
+  imageUrl: z
+    .string()
+    .trim()
+    .refine((value) => isSafeImageUrl(value), {
+      message: "Geçersiz görsel URL'i. Yalnızca güvenli URL'ler kabul edilir.",
+    })
+    .optional()
+    .nullable(),
 });
 
 export type CharacterCreateInput = z.infer<typeof characterCreateSchema>;

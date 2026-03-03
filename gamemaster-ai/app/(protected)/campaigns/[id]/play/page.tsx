@@ -9,7 +9,7 @@ import { ChatWindow, MessageInput, DiceRoller, CharacterModal, GameSetupWizard, 
 import { InventoryModal } from "@/components/character";
 import { MapModal } from "@/components/map";
 import { useGame, useGM, useDice, useSuggestions, useLocationImage, useMaps } from "@/hooks/useGame";
-import { get, post, put } from "@/lib/api/client";
+import { post, put } from "@/lib/api/client";
 import type { Message, DiceType, Character, Campaign, GMAction, GMPrompt, LocationChange, Combat } from "@/types";
 import {
   Dice6,
@@ -87,7 +87,7 @@ export default function PlayPage() {
     const fetchActiveSession = async () => {
       try {
         setIsLoading(true);
-        const response = await get(`/campaigns/${campaignId}/active-session`) as {
+        const response = await post(`/campaigns/${campaignId}/active-session`, {}) as {
           success: boolean;
           session: any;
           campaign: any;

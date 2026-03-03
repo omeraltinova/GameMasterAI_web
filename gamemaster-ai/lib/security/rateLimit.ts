@@ -39,17 +39,42 @@ export function checkRateLimit(key: string, config: RateLimitConfig) {
 }
 
 type HeaderSource = Headers | Record<string, string | string[] | undefined>;
+type ClientIpOptions = {
+  trustProxyHeaders?: boolean;
+};
 
 function getHeaderValue(headers: HeaderSource, name: string) {
   if (headers instanceof Headers) {
     return headers.get(name) || undefined;
   }
 
-  const value = headers[name];
+  const value = headers[name] ?? headers[name.toLowerCase()] ?? headers[name.toUpperCase()];
   if (Array.isArray(value)) {
     return value[0];
   }
   return value;
+}
+
+function isValidIpCandidate(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+
+  // Basic IPv4 check
+  const ipv4 = trimmed.match(/^(\d{1,3}\.){3}\d{1,3}$/);
+  if (ipv4) {
+    return trimmed.split(".").every((part) => {
+      const n = Number(part);
+      return Number.isInteger(n) && n >= 0 && n <= 255;
+    });
+  }
+
+  // Basic IPv6 check (defense-in-depth; detailed validation is handled upstream)
+  return /^[0-9a-fA-F:]+$/.test(trimmed);
+}
+
+function pickFirstValidForwardedIp(forwardedFor: string) {
+  const candidates = forwardedFor.split(",").map((part) => part.trim()).filter(Boolean);
+  return candidates.find(isValidIpCandidate);
 }
 
 // ── Preset rate-limit tiers ──────────────────────────────────────────────────
@@ -101,7 +126,10 @@ export function applyRateLimit(
   };
 }
 
-export function getClientIp(request?: { headers?: HeaderSource } | null) {
+export function getClientIp(
+  request?: { headers?: HeaderSource } | null,
+  options?: ClientIpOptions,
+) {
   if (!request) {
     return "unknown";
   }
@@ -111,14 +139,22 @@ export function getClientIp(request?: { headers?: HeaderSource } | null) {
     return "unknown";
   }
 
+  const trustProxyHeaders = options?.trustProxyHeaders ?? process.env.TRUST_PROXY_HEADERS === "true";
+  if (!trustProxyHeaders) {
+    return "unknown";
+  }
+
   const forwardedFor = getHeaderValue(headers, "x-forwarded-for");
   if (forwardedFor) {
-    return forwardedFor.split(",")[0].trim() || "unknown";
+    const clientIp = pickFirstValidForwardedIp(forwardedFor);
+    if (clientIp) {
+      return clientIp;
+    }
   }
 
   const realIp = getHeaderValue(headers, "x-real-ip");
-  if (realIp) {
-    return realIp.trim() || "unknown";
+  if (realIp && isValidIpCandidate(realIp)) {
+    return realIp.trim();
   }
 
   return "unknown";

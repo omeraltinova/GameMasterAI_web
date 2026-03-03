@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 // We need to reset the module-level Map between tests so each test starts
 // with a clean store. We use `vi.resetModules()` + dynamic import.
@@ -180,22 +180,28 @@ describe("getClientIp", () => {
     expect(getClientIp({ headers: undefined } as any)).toBe("unknown");
   });
 
-  it("extracts IP from x-forwarded-for (first entry)", async () => {
+  it("returns unknown by default when proxy headers are not trusted", async () => {
     const { getClientIp } = await freshImport();
     const headers = new Headers({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" });
-    expect(getClientIp({ headers })).toBe("1.2.3.4");
+    expect(getClientIp({ headers })).toBe("unknown");
   });
 
-  it("extracts IP from x-forwarded-for (single entry)", async () => {
+  it("extracts IP from x-forwarded-for (first entry) when proxy headers are trusted", async () => {
+    const { getClientIp } = await freshImport();
+    const headers = new Headers({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" });
+    expect(getClientIp({ headers }, { trustProxyHeaders: true })).toBe("1.2.3.4");
+  });
+
+  it("extracts IP from x-forwarded-for (single entry) when proxy headers are trusted", async () => {
     const { getClientIp } = await freshImport();
     const headers = new Headers({ "x-forwarded-for": "10.0.0.1" });
-    expect(getClientIp({ headers })).toBe("10.0.0.1");
+    expect(getClientIp({ headers }, { trustProxyHeaders: true })).toBe("10.0.0.1");
   });
 
   it("falls back to x-real-ip if x-forwarded-for is absent", async () => {
     const { getClientIp } = await freshImport();
     const headers = new Headers({ "x-real-ip": "192.168.1.1" });
-    expect(getClientIp({ headers })).toBe("192.168.1.1");
+    expect(getClientIp({ headers }, { trustProxyHeaders: true })).toBe("192.168.1.1");
   });
 
   it("prefers x-forwarded-for over x-real-ip", async () => {
@@ -204,19 +210,19 @@ describe("getClientIp", () => {
       "x-forwarded-for": "1.1.1.1",
       "x-real-ip": "2.2.2.2",
     });
-    expect(getClientIp({ headers })).toBe("1.1.1.1");
+    expect(getClientIp({ headers }, { trustProxyHeaders: true })).toBe("1.1.1.1");
   });
 
   it("returns 'unknown' when neither header is set", async () => {
     const { getClientIp } = await freshImport();
     const headers = new Headers({ "content-type": "application/json" });
-    expect(getClientIp({ headers })).toBe("unknown");
+    expect(getClientIp({ headers }, { trustProxyHeaders: true })).toBe("unknown");
   });
 
   it("handles plain object headers (Record<string, string>)", async () => {
     const { getClientIp } = await freshImport();
     const headers: Record<string, string> = { "x-forwarded-for": "9.8.7.6" };
-    expect(getClientIp({ headers })).toBe("9.8.7.6");
+    expect(getClientIp({ headers }, { trustProxyHeaders: true })).toBe("9.8.7.6");
   });
 
   it("handles array header values (takes first element)", async () => {
@@ -224,7 +230,13 @@ describe("getClientIp", () => {
     const headers: Record<string, string[]> = {
       "x-forwarded-for": ["3.3.3.3, 4.4.4.4"],
     };
-    expect(getClientIp({ headers })).toBe("3.3.3.3");
+    expect(getClientIp({ headers }, { trustProxyHeaders: true })).toBe("3.3.3.3");
+  });
+
+  it("ignores invalid proxy header values", async () => {
+    const { getClientIp } = await freshImport();
+    const headers = new Headers({ "x-forwarded-for": "not-an-ip, ???" });
+    expect(getClientIp({ headers }, { trustProxyHeaders: true })).toBe("unknown");
   });
 });
 

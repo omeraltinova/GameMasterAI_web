@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
 import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
+import { normalizeImageUrl } from '@/lib/security/imageUrl';
 
 /**
  * GET /api/sessions/:id/npcs
@@ -100,6 +101,25 @@ export async function POST(
         const body = await req.json();
         const { name, race, role, personality, stats, isHostile, imageUrl } = body;
 
+        let normalizedImageUrl: string | null = null;
+        if (imageUrl !== undefined && imageUrl !== null && imageUrl !== '') {
+            if (typeof imageUrl !== 'string') {
+                return NextResponse.json(
+                    { success: false, error: 'Geçersiz görsel URL' },
+                    { status: 400 }
+                );
+            }
+
+            const safeImageUrl = normalizeImageUrl(imageUrl);
+            if (!safeImageUrl) {
+                return NextResponse.json(
+                    { success: false, error: 'Geçersiz görsel URL' },
+                    { status: 400 }
+                );
+            }
+            normalizedImageUrl = safeImageUrl;
+        }
+
         // Validation
         if (!name || typeof name !== 'string') {
             return NextResponse.json(
@@ -153,7 +173,7 @@ export async function POST(
                 personality: personality || null,
                 stats: stats ? JSON.stringify(stats) : null,
                 isHostile: isHostile || false,
-                imageUrl: imageUrl || null,
+                imageUrl: normalizedImageUrl,
                 dialogue: JSON.stringify([]),
             },
         });

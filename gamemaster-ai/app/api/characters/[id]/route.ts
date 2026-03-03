@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
 import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
+import { normalizeImageUrl } from "@/lib/security/imageUrl";
 
 const defaultStats = {
   strength: 10,
@@ -186,7 +187,14 @@ export async function PUT(
     if (imageUrl === null) {
       data.imageUrl = null;
     } else if (typeof imageUrl === "string") {
-      data.imageUrl = imageUrl;
+      const normalizedImageUrl = normalizeImageUrl(imageUrl);
+      if (!normalizedImageUrl) {
+        return NextResponse.json(
+          { success: false, error: "Geçersiz görsel URL'i" },
+          { status: 400 }
+        );
+      }
+      data.imageUrl = normalizedImageUrl;
     }
 
     if (stats && typeof stats === "object") {

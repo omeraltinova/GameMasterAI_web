@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/maps/:mapId
@@ -92,6 +93,9 @@ export async function PUT(
       return unauthorizedResponse();
     }
 
+    const limited = rateLimitResponse(userId, "PUT:/api/maps/[mapId]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
     const body = await req.json();
     const { name, description } = body;
 
@@ -176,6 +180,9 @@ export async function DELETE(
     if (!userId) {
       return unauthorizedResponse();
     }
+
+    const limited = rateLimitResponse(userId, "DELETE:/api/maps/[mapId]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     // Haritayı bul
     const existingMap = await prisma.map.findUnique({

@@ -15,6 +15,8 @@ type AuthTokenUser = {
   isSoftDeleted?: boolean;
 };
 
+const DUMMY_BCRYPT_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+
 const authConfig = {
   providers: [
     CredentialsProvider({
@@ -25,26 +27,35 @@ const authConfig = {
       },
       async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("E-posta ve şifre gerekli");
+          return null;
         }
 
-        const ip = getClientIp(req);
-        const rateLimitKey = `login:${ip}:${credentials.email.toLowerCase()}`;
-        const rateLimit = checkRateLimit(rateLimitKey, { windowMs: 15 * 60 * 1000, max: 10 });
+        const normalizedEmail = credentials.email.toLowerCase().trim();
+        const accountRateLimitKey = `login-account:${normalizedEmail}`;
+        const rateLimit = checkRateLimit(accountRateLimitKey, { windowMs: 15 * 60 * 1000, max: 10 });
         if (!rateLimit.allowed) {
           throw new Error("Çok fazla deneme. Lütfen daha sonra tekrar deneyin.");
         }
 
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email },
-        });
-
-        if (!user) {
-          throw new Error("Kullanıcı bulunamadı");
+        // Optional second layer: only active when proxy IP headers are trusted via env.
+        const ip = getClientIp(req);
+        if (ip !== "unknown") {
+          const ipRateLimit = checkRateLimit(`login-ip:${ip}`, { windowMs: 15 * 60 * 1000, max: 40 });
+          if (!ipRateLimit.allowed) {
+            throw new Error("Çok fazla deneme. Lütfen daha sonra tekrar deneyin.");
+          }
         }
 
-        if (user.isSoftDeleted) {
-          throw new Error("Hesabınız pasif durumda. Destek ekibiyle iletişime geçin.");
+        const user = await prisma.user.findUnique({
+          where: { email: normalizedEmail },
+        });
+
+        // Run password verify for both existent and non-existent users to reduce timing differences.
+        const passwordHashForCheck = user?.password ?? DUMMY_BCRYPT_HASH;
+        const isPasswordValid = await bcrypt.compare(credentials.password, passwordHashForCheck);
+
+        if (!user || !isPasswordValid || user.isSoftDeleted) {
+          return null;
         }
 
         if (user.isSuspended) {
@@ -52,10 +63,7 @@ const authConfig = {
           const suspensionStillActive = !user.suspendedUntil || user.suspendedUntil > now;
 
           if (suspensionStillActive) {
-            const untilText = user.suspendedUntil
-              ? ` Askı bitiş: ${user.suspendedUntil.toLocaleString("tr-TR")}`
-              : "";
-            throw new Error(`Hesabınız askıya alındı.${untilText}`);
+            return null;
           }
 
           // Süresi dolmuş askıyı otomatik kaldır
@@ -67,15 +75,6 @@ const authConfig = {
               suspensionReason: null,
             },
           });
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        );
-
-        if (!isPasswordValid) {
-          throw new Error("Hatalı şifre");
         }
 
         return {

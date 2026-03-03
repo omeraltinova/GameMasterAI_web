@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import {
   registerSchema,
   passwordChangeSchema,
@@ -8,6 +8,21 @@ import {
   characterCreateSchema,
   characterHpUpdateSchema,
 } from '@/lib/validators/characters'
+
+const previousAllowedImageHosts = process.env.NEXT_PUBLIC_ALLOWED_IMAGE_HOSTS
+
+beforeAll(() => {
+  process.env.NEXT_PUBLIC_ALLOWED_IMAGE_HOSTS = 'example.com,cdn.example.com'
+})
+
+afterAll(() => {
+  if (previousAllowedImageHosts === undefined) {
+    delete process.env.NEXT_PUBLIC_ALLOWED_IMAGE_HOSTS
+    return
+  }
+
+  process.env.NEXT_PUBLIC_ALLOWED_IMAGE_HOSTS = previousAllowedImageHosts
+})
 
 // ==========================================
 // registerSchema
@@ -259,6 +274,22 @@ describe('characterCreateSchema', () => {
   it('backstory null kabul eder', () => {
     const result = characterCreateSchema.safeParse({ ...validCharacter, backstory: null })
     expect(result.success).toBe(true)
+  })
+
+  it('allowlist dışı imageUrl reddeder', () => {
+    const result = characterCreateSchema.safeParse({
+      ...validCharacter,
+      imageUrl: 'https://evil.example.org/character.png',
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it('javascript protokollü imageUrl reddeder', () => {
+    const result = characterCreateSchema.safeParse({
+      ...validCharacter,
+      imageUrl: 'javascript:alert(1)',
+    })
+    expect(result.success).toBe(false)
   })
 })
 

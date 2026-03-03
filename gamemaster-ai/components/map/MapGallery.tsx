@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { normalizeImageUrl } from "@/lib/security/imageUrl";
 import { Map, Loader2, Trash2, Eye, Calendar, Sparkles, Grid, List } from "lucide-react";
 import { Button, Badge, Card, CardContent } from "@/components/ui";
 import { MapViewer } from "./MapViewer";
@@ -120,67 +121,160 @@ export function MapGallery({
       {/* Maps grid/list */}
       {viewMode === "grid" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {maps.map((map) => (
-            <Card
-              key={map.id}
-              className="group cursor-pointer hover:border-primary/50 transition-all overflow-hidden"
-              onClick={() => handleMapClick(map)}
-            >
-              {/* Image */}
-              <div className="relative aspect-video bg-gradient-to-br from-emerald-900/60 via-teal-900/40 to-emerald-950/60">
-                {map.imageUrl ? (
-                  <img
-                    src={map.imageUrl}
-                    alt={map.name || "Harita"}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Map className="h-12 w-12 text-white/20" />
-                  </div>
-                )}
-                
-                {/* AI badge */}
-                {map.isAIGenerated && (
-                  <Badge 
-                    variant="primary" 
-                    size="sm" 
-                    className="absolute top-2 left-2 gap-1"
-                  >
-                    <Sparkles className="h-3 w-3" />
-                    AI
-                  </Badge>
-                )}
+          {maps.map((map) => {
+            const safeImageUrl = normalizeImageUrl(map.imageUrl);
 
-                {/* Overlay on hover */}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
-                  <Eye className="h-8 w-8 text-white" />
-                </div>
-              </div>
-
-              <CardContent className="p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <h4 className="font-medium truncate">{map.name || "İsimsiz Harita"}</h4>
-                    {map.description && (
-                      <p className="text-xs text-foreground-muted truncate mt-0.5">
-                        {map.description}
-                      </p>
-                    )}
-                    <div className="flex items-center gap-1 text-xs text-foreground-muted mt-1">
-                      <Calendar className="h-3 w-3" />
-                      {formatDate(map.createdAt)}
+            return (
+              <Card
+                key={map.id}
+                className="group cursor-pointer hover:border-primary/50 transition-all overflow-hidden"
+                onClick={() => handleMapClick(map)}
+              >
+                {/* Image */}
+                <div className="relative aspect-video bg-gradient-to-br from-emerald-900/60 via-teal-900/40 to-emerald-950/60">
+                  {safeImageUrl ? (
+                    <img
+                      src={safeImageUrl}
+                      alt={map.name || "Harita"}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Map className="h-12 w-12 text-white/20" />
                     </div>
-                  </div>
+                  )}
                   
+                  {/* AI badge */}
+                  {map.isAIGenerated && (
+                    <Badge 
+                      variant="primary" 
+                      size="sm" 
+                      className="absolute top-2 left-2 gap-1"
+                    >
+                      <Sparkles className="h-3 w-3" />
+                      AI
+                    </Badge>
+                  )}
+
+                  {/* Overlay on hover */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                    <Eye className="h-8 w-8 text-white" />
+                  </div>
+                </div>
+
+                <CardContent className="p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium truncate">{map.name || "İsimsiz Harita"}</h4>
+                      {map.description && (
+                        <p className="text-xs text-foreground-muted truncate mt-0.5">
+                          {map.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-1 text-xs text-foreground-muted mt-1">
+                        <Calendar className="h-3 w-3" />
+                        {formatDate(map.createdAt)}
+                      </div>
+                    </div>
+                    
+                    {editable && onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(map.id);
+                        }}
+                        disabled={deletingId === map.id}
+                      >
+                        {deletingId === map.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {maps.map((map) => {
+            const safeImageUrl = normalizeImageUrl(map.imageUrl);
+
+            return (
+              <div
+                key={map.id}
+                className="flex items-center gap-4 p-3 rounded-lg bg-background-elevated hover:bg-border/50 cursor-pointer transition-colors group"
+                onClick={() => handleMapClick(map)}
+              >
+                {/* Thumbnail */}
+                <div className="relative w-20 h-14 rounded-md overflow-hidden bg-gradient-to-br from-emerald-900/60 via-teal-900/40 to-emerald-950/60 flex-shrink-0">
+                  {safeImageUrl ? (
+                    <img
+                      src={safeImageUrl}
+                      alt={map.name || "Harita"}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Map className="h-6 w-6 text-white/20" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-medium truncate">{map.name || "İsimsiz Harita"}</h4>
+                    {map.isAIGenerated && (
+                      <Badge variant="primary" size="sm" className="gap-1">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        AI
+                      </Badge>
+                    )}
+                  </div>
+                  {map.description && (
+                    <p className="text-xs text-foreground-muted truncate mt-0.5">
+                      {map.description}
+                    </p>
+                  )}
+                </div>
+
+                {/* Date */}
+                <div className="flex items-center gap-1 text-xs text-foreground-muted">
+                  <Calendar className="h-3 w-3" />
+                  {formatDate(map.createdAt)}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMapClick(map);
+                    }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
                   {editable && onDelete && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 hover:bg-red-500/20 hover:text-red-500"
+                      className="h-8 w-8 p-0 hover:bg-red-500/20 hover:text-red-500"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleDelete(map.id);
@@ -195,94 +289,9 @@ export function MapGallery({
                     </Button>
                   )}
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {maps.map((map) => (
-            <div
-              key={map.id}
-              className="flex items-center gap-4 p-3 rounded-lg bg-background-elevated hover:bg-border/50 cursor-pointer transition-colors group"
-              onClick={() => handleMapClick(map)}
-            >
-              {/* Thumbnail */}
-              <div className="relative w-20 h-14 rounded-md overflow-hidden bg-gradient-to-br from-emerald-900/60 via-teal-900/40 to-emerald-950/60 flex-shrink-0">
-                {map.imageUrl ? (
-                  <img
-                    src={map.imageUrl}
-                    alt={map.name || "Harita"}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Map className="h-6 w-6 text-white/20" />
-                  </div>
-                )}
               </div>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-medium truncate">{map.name || "İsimsiz Harita"}</h4>
-                  {map.isAIGenerated && (
-                    <Badge variant="primary" size="sm" className="gap-1">
-                      <Sparkles className="h-2.5 w-2.5" />
-                      AI
-                    </Badge>
-                  )}
-                </div>
-                {map.description && (
-                  <p className="text-xs text-foreground-muted truncate mt-0.5">
-                    {map.description}
-                  </p>
-                )}
-              </div>
-
-              {/* Date */}
-              <div className="flex items-center gap-1 text-xs text-foreground-muted">
-                <Calendar className="h-3 w-3" />
-                {formatDate(map.createdAt)}
-              </div>
-
-              {/* Actions */}
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleMapClick(map);
-                  }}
-                >
-                  <Eye className="h-4 w-4" />
-                </Button>
-                {editable && onDelete && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 w-8 p-0 hover:bg-red-500/20 hover:text-red-500"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(map.id);
-                    }}
-                    disabled={deletingId === map.id}
-                  >
-                    {deletingId === map.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

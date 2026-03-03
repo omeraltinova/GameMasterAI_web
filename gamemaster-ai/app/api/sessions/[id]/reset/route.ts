@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * POST /api/sessions/:id/reset
@@ -20,6 +21,9 @@ export async function POST(
     if (!userId) {
       return unauthorizedResponse();
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/sessions/[id]/reset", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id: sessionId } = await params;
     const body = await req.json();
@@ -200,5 +204,4 @@ export async function POST(
     );
   }
 }
-
 

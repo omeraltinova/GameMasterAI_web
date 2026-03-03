@@ -1,19 +1,19 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/db/prisma";
 import { checkAchievements, type AchievementStats } from "@/lib/achievements";
+import { getUserId, unauthorizedResponse } from "@/lib/auth/server";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 // KULLANICI BİLGİLERİ (GET) — gizlilik ayarları + stats + achievements + activity
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Oturum açılmamış" }, { status: 401 });
+    const userId = await getUserId();
+    if (!userId) {
+      return unauthorizedResponse("Oturum açmanız gerekiyor");
     }
 
-    const userId = session.user.id;
+    const limited = rateLimitResponse(userId, "GET:/api/profile", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
@@ -181,7 +181,6 @@ export async function GET() {
     };
 
     const checkResults = checkAchievements(achievementStats);
-    const unlockedIds = checkResults.filter((r) => r.unlocked).map((r) => r.id);
 
     // Mevcut DB kayıtları
     const existingAchievements = await prisma.userAchievement.findMany({
@@ -192,22 +191,6 @@ export async function GET() {
     const existingMap = new Map(
       existingAchievements.map((a) => [a.achievementId, a.unlockedAt])
     );
-
-    // Yeni açılanları kaydet
-    const newlyUnlocked = unlockedIds.filter((id) => !existingMap.has(id));
-    if (newlyUnlocked.length > 0) {
-      const newRecords = await prisma.$transaction(
-        newlyUnlocked.map((achievementId) =>
-          prisma.userAchievement.create({
-            data: { userId, achievementId },
-            select: { achievementId: true, unlockedAt: true },
-          })
-        )
-      );
-      newRecords.forEach((r) => {
-        existingMap.set(r.achievementId, r.unlockedAt);
-      });
-    }
 
     const achievements = checkResults.map((r) => ({
       id: r.id,
@@ -284,10 +267,20 @@ export async function GET() {
 // KULLANICI GÜNCELLEME (PATCH) — gizlilik ayarları + bio dahil
 export async function PATCH(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
+    const userId = await getUserId();
+    if (!userId) {
+      return unauthorizedResponse("Oturum açmanız gerekiyor");
+    }
 
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "Oturum açılmamış" }, { status: 401 });
+    const limited = rateLimitResponse(userId, "PATCH:/api/profile", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
+    const currentUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true },
+    });
+    if (!currentUser) {
+      return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
     }
 
     const body = await req.json();
@@ -303,9 +296,12 @@ export async function PATCH(req: Request) {
       }
 
       // Kullanıcı adı değişmişse, başkası tarafından kullanılıyor mu kontrol et
-      if (name !== session.user.name) {
-        const existingUser = await prisma.user.findUnique({
-          where: { username: name },
+      if (name !== currentUser.username) {
+        const existingUser = await prisma.user.findFirst({
+          where: {
+            username: name,
+            id: { not: userId },
+          },
         });
 
         if (existingUser) {
@@ -356,7 +352,7 @@ export async function PATCH(req: Request) {
 
     // Güncelleme işlemi
     const updatedUser = await prisma.user.update({
-      where: { email: session.user.email },
+      where: { id: userId },
       data,
       select: {
         username: true,
@@ -397,13 +393,13 @@ export async function PATCH(req: Request) {
 // HESAP SİLME (DELETE)
 export async function DELETE(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Oturum açılmamış" }, { status: 401 });
+    const userId = await getUserId();
+    if (!userId) {
+      return unauthorizedResponse("Oturum açmanız gerekiyor");
     }
 
-    const userId = session.user.id;
+    const limited = rateLimitResponse(userId, "DELETE:/api/profile", RATE_LIMIT_TIERS.AUTH_SENSITIVE);
+    if (limited) return limited;
 
     // Transaction kullanarak ilişkisel veri bütünlüğünü koruyalım
     await prisma.$transaction(async (tx) => {

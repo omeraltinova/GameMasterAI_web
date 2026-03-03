@@ -273,7 +273,6 @@ export async function GET(
       };
 
       const checkResults = checkAchievements(achievementStats);
-      const unlockedIds = checkResults.filter((r) => r.unlocked).map((r) => r.id);
 
       // Mevcut DB kayıtlarını getir
       const existingAchievements = await prisma.userAchievement.findMany({
@@ -284,25 +283,6 @@ export async function GET(
       const existingMap = new Map(
         existingAchievements.map((a) => [a.achievementId, a.unlockedAt])
       );
-
-      // Yeni açılanları DB'ye kaydet
-      const newlyUnlocked = unlockedIds.filter((id) => !existingMap.has(id));
-
-      if (newlyUnlocked.length > 0) {
-        // SQLite createMany desteklemediği için transaction ile tek tek oluştur
-        const newRecords = await prisma.$transaction(
-          newlyUnlocked.map((achievementId) =>
-            prisma.userAchievement.create({
-              data: { userId, achievementId },
-              select: { achievementId: true, unlockedAt: true },
-            })
-          )
-        );
-
-        newRecords.forEach((r) => {
-          existingMap.set(r.achievementId, r.unlockedAt);
-        });
-      }
 
       // Tüm başarımlar için response oluştur
       achievementsResponse = checkResults.map((r) => ({

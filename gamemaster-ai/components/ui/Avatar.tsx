@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { normalizeImageUrl } from "@/lib/security/imageUrl";
 import { User } from "lucide-react";
 
 export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -41,6 +42,8 @@ function Avatar({
       .slice(0, 2);
   };
 
+  const safeSrc = normalizeImageUrl(src);
+
   return (
     <div
       className={cn(
@@ -51,10 +54,10 @@ function Avatar({
       )}
       {...props}
     >
-      {src ? (
+      {safeSrc ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={src}
+          src={safeSrc}
           alt={alt}
           className="h-full w-full object-cover"
         />
@@ -70,5 +73,4 @@ function Avatar({
 }
 
 export { Avatar };
-
 

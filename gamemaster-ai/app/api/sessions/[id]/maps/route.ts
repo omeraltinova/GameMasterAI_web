@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
+import { normalizeImageUrl } from '@/lib/security/imageUrl';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/sessions/:id/maps
@@ -18,6 +20,9 @@ export async function GET(
     if (!userId) {
       return unauthorizedResponse();
     }
+
+    const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/maps", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     // Session'ı bul ve yetki kontrolü yap
     const session = await prisma.gameSession.findUnique({
@@ -92,6 +97,9 @@ export async function POST(
       return unauthorizedResponse();
     }
 
+    const limited = rateLimitResponse(userId, "POST:/api/sessions/[id]/maps", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
     const body = await req.json();
     const { name, description, imageUrl } = body;
 
@@ -106,6 +114,14 @@ export async function POST(
     if (!imageUrl || typeof imageUrl !== 'string') {
       return NextResponse.json(
         { success: false, error: 'Görsel URL gerekli' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedImageUrl = normalizeImageUrl(imageUrl);
+    if (!normalizedImageUrl) {
+      return NextResponse.json(
+        { success: false, error: 'Geçersiz görsel URL' },
         { status: 400 }
       );
     }
@@ -146,7 +162,7 @@ export async function POST(
         sessionId,
         name: name.trim(),
         description: description?.trim() || null,
-        imageUrl,
+        imageUrl: normalizedImageUrl,
         isAIGenerated: false,
         prompt: null,
       },

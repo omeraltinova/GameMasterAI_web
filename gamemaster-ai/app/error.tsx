@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 
 export default function GlobalError({
     error,
@@ -76,7 +77,7 @@ export default function GlobalError({
                         🔄 Tekrar Dene
                     </button>
 
-                    <a
+                    <Link
                         href="/"
                         className="px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-200 inline-block"
                         style={{
@@ -94,7 +95,7 @@ export default function GlobalError({
                         }}
                     >
                         🏠 Ana Sayfaya Dön
-                    </a>
+                    </Link>
                 </div>
 
                 {/* Flavor text */}

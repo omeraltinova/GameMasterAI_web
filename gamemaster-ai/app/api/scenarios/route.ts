@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { rateLimitResponse, getClientIp, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
+import { Prisma } from "@prisma/client";
 
 // GET /api/scenarios
 // List scenarios with filters (search, genre)
@@ -23,7 +24,9 @@ export async function GET(req: Request) {
     const limit = Math.min(Math.max(limitBase, 1), 50);
     const offset = Math.max(offsetBase, 0);
 
-    const where: any = {};
+    const where: Prisma.ScenarioWhereInput = {
+      isSoftDeleted: false,
+    };
 
     // Search filter
     if (query) {
@@ -98,10 +101,21 @@ export async function POST(req: Request) {
     // Get user ID
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
+      select: {
+        id: true,
+        role: true,
+        isSoftDeleted: true,
+        isSuspended: true,
+        suspendedUntil: true,
+      },
     });
 
-    if (!user) {
+    if (!user || user.isSoftDeleted) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    if (user.isSuspended && (!user.suspendedUntil || user.suspendedUntil > new Date())) {
+      return NextResponse.json({ error: "Hesabınız askıda olduğu için işlem yapılamaz" }, { status: 403 });
     }
 
     const scenario = await prisma.scenario.create({

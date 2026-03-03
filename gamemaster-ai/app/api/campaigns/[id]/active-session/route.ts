@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
 import { generateOpeningNarration } from '@/lib/ai/gamemaster';
+import { canManageCampaign, getCampaignActorRole, hasCampaignAccess } from '@/lib/auth/permissions';
 import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 export async function GET(
@@ -12,10 +13,11 @@ export async function GET(
   const { id: campaignId } = await params;
 
   try {
-    if (userId) {
-      const limited = rateLimitResponse(userId, "GET:/api/campaigns/[id]/active-session", RATE_LIMIT_TIERS.WRITE);
-      if (limited) return limited;
+    if (!userId) {
+      return NextResponse.json({ error: 'Oturum açmanız gerekiyor' }, { status: 401 });
     }
+    const limited = rateLimitResponse(userId, "GET:/api/campaigns/[id]/active-session", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     // 1. Oturumu al
     const campaign = await prisma.campaign.findUnique({
@@ -47,10 +49,8 @@ export async function GET(
     }
 
     // 2. Erişim kontrolü
-    const hasAccess = campaign.creatorId === userId ||
-                     campaign.players.some((p: any) => p.userId === userId);
-
-    if (!hasAccess) {
+    const actorRole = getCampaignActorRole(campaign, userId);
+    if (!hasCampaignAccess(actorRole)) {
       return NextResponse.json({ error: 'Bu oturuma erişimin yok' }, { status: 403 });
     }
 
@@ -59,20 +59,36 @@ export async function GET(
     
     // Session yoksa oluştur
     if (!session) {
+      if (!canManageCampaign(actorRole)) {
+        return NextResponse.json(
+          { error: 'Session henüz başlatılmadı. Lütfen Game Master\'ın oyunu başlatmasını bekleyin.' },
+          { status: 409 },
+        );
+      }
+
       console.log('[active-session] Yeni session oluşturuluyor...');
       
       // World settings parse
-      let worldSettings = null;
-      // @ts-ignore
-      if (campaign.scenario?.worldSettings) {
+      type ParsedWorldSettings = {
+        startingLocation?: {
+          name?: string;
+          description?: string;
+          atmosphere?: string;
+        };
+        [key: string]: unknown;
+      };
+
+      let worldSettings: ParsedWorldSettings | null = null;
+      const rawWorldSettings = campaign.scenario?.worldSettings;
+      if (typeof rawWorldSettings === 'string' && rawWorldSettings.trim().length > 0) {
         try {
-          // @ts-ignore
-          worldSettings = typeof campaign.scenario.worldSettings === 'string' 
-            // @ts-ignore
-            ? JSON.parse(campaign.scenario.worldSettings) 
-            // @ts-ignore
-            : campaign.scenario.worldSettings;
-        } catch (e) {}
+          const parsedWorldSettings = JSON.parse(rawWorldSettings) as unknown;
+          if (parsedWorldSettings && typeof parsedWorldSettings === 'object') {
+            worldSettings = parsedWorldSettings as ParsedWorldSettings;
+          }
+        } catch {
+          worldSettings = null;
+        }
       }
 
       // Session oluştur
@@ -111,6 +127,7 @@ export async function GET(
             characterName: playerCharacter?.name,
             characterClass: playerCharacter?.class,
             characterRace: playerCharacter?.race,
+            userId,
           });
           console.log('[active-session] AI mesajı oluşturuldu:', welcomeMessage.substring(0, 100));
         } catch (err) {
@@ -148,7 +165,7 @@ export async function GET(
     }
 
     // Oturum durumunu ACTIVE yap
-    if (campaign.status !== 'ACTIVE') {
+    if (campaign.status !== 'ACTIVE' && canManageCampaign(actorRole)) {
       await prisma.campaign.update({
         where: { id: campaignId },
         data: { status: 'ACTIVE' },

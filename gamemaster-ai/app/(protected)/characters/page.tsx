@@ -163,7 +163,7 @@ export default function CharactersPage() {
   const activeFilterCount = [selectedRace, selectedClass, selectedLevel].filter(Boolean).length;
 
   const filteredCharacters = useMemo(() => {
-    let result = characters.filter((c) => {
+    const result = characters.filter((c) => {
       // Metin araması
       if (searchQuery) {
         const q = searchQuery.toLowerCase();

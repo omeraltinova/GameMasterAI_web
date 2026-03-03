@@ -1,0 +1,135 @@
+openapi: 3.0.3
+info:
+  title: GameMaster AI API
+  version: 0.1.0
+  description: Core API surface for gameplay, GM actions, and real-time updates.
+servers:
+  - url: /api
+paths:
+  /sessions/{id}/messages:
+    get:
+      summary: Session message history
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: offset
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Message list
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+    post:
+      summary: Send message to session
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                senderType:
+                  type: string
+                  enum: [PLAYER, GM, SYSTEM, DICE]
+      responses:
+        '200':
+          description: Message created
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+
+  /sessions/{id}/events:
+    get:
+      summary: Real-time session event stream (SSE)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: since
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: text/event-stream response
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+
+  /gm/narrate:
+    post:
+      summary: Generate GM narration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sessionId, playerAction]
+              properties:
+                sessionId:
+                  type: string
+                playerAction:
+                  type: string
+      responses:
+        '200':
+          description: Narration generated
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '429':
+          description: AI quota/rate limit exceeded
+
+  /campaigns/{id}/sessions:
+    post:
+      summary: Start a new game session (GM only)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Session created
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (non-GM)
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token

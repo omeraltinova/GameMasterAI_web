@@ -207,6 +207,7 @@ export default function PlayPage() {
     addMessages,
     removeMessage,
     fetchMessages,
+    fetchGameState,
     fetchUpdates,
   } = useGame(sessionId || '');
 
@@ -247,24 +248,87 @@ export default function PlayPage() {
     deleteMap,
   } = useMaps(sessionId || '');
 
-  // Message polling - auto-refresh every 5 seconds when playing
-  const lastPollTime = useRef<number>(Date.now());
+  // SSE real-time + polling fallback
+  const lastSyncTime = useRef<number>(Date.now());
 
   useEffect(() => {
-    // Only poll when we have a session and are in playing phase
     if (!sessionId || gamePhase !== 'playing') return;
 
-    const pollInterval = setInterval(async () => {
-      try {
-        await fetchUpdates(lastPollTime.current);
-        lastPollTime.current = Date.now();
-      } catch (err) {
-        console.error('Polling error:', err);
-      }
-    }, 5000); // Poll every 5 seconds
+    let eventSource: EventSource | null = null;
+    let fallbackInterval: ReturnType<typeof setInterval> | null = null;
+    let isDestroyed = false;
 
-    return () => clearInterval(pollInterval);
-  }, [sessionId, gamePhase, fetchUpdates]);
+    const pollFallback = async () => {
+      try {
+        const result = await fetchUpdates(lastSyncTime.current);
+        if (result?.updates?.messages?.length || result?.updates?.gameStateChanged) {
+          lastSyncTime.current = Date.now();
+        }
+      } catch (err) {
+        console.error('Fallback polling error:', err);
+      }
+    };
+
+    const enablePollingFallback = () => {
+      if (fallbackInterval) return;
+      fallbackInterval = setInterval(() => {
+        void pollFallback();
+      }, 5000);
+    };
+
+    const connectSSE = () => {
+      const since = new Date(lastSyncTime.current).toISOString();
+      const eventsUrl = `/api/sessions/${sessionId}/events?since=${encodeURIComponent(since)}`;
+      eventSource = new EventSource(eventsUrl);
+
+      eventSource.addEventListener('update', (event) => {
+        try {
+          const payload = JSON.parse((event as MessageEvent).data) as {
+            updates?: {
+              messages?: Message[];
+              gameStateChanged?: boolean;
+            };
+          };
+
+          const updatePayload = payload.updates;
+          if (updatePayload?.messages && updatePayload.messages.length > 0) {
+            addMessages(updatePayload.messages);
+          }
+
+          if (updatePayload?.gameStateChanged) {
+            void fetchGameState();
+          }
+
+          lastSyncTime.current = Date.now();
+        } catch (error) {
+          console.error('SSE update parse error:', error);
+        }
+      });
+
+      eventSource.addEventListener('error', () => {
+        if (eventSource) {
+          eventSource.close();
+          eventSource = null;
+        }
+
+        if (!isDestroyed) {
+          enablePollingFallback();
+        }
+      });
+    };
+
+    connectSSE();
+
+    return () => {
+      isDestroyed = true;
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (fallbackInterval) {
+        clearInterval(fallbackInterval);
+      }
+    };
+  }, [sessionId, gamePhase, addMessages, fetchGameState, fetchUpdates]);
 
   // Sayfa yüklendiğinde (F5 / ilk açılış) kaydedilmiş suggestions'ı mesajlardan oku
   const lastCheckedGMMessageId = useRef<string | null>(null);

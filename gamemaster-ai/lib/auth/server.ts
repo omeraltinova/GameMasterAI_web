@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import type { Session } from 'next-auth';
+import { prisma } from '@/lib/db/prisma';
 
 /**
  * Kullanıcı session'ını al
@@ -28,7 +29,30 @@ export async function getUserId(req?: NextRequest): Promise<string | null> {
   const session = await getUserSession(req);
   // NextAuth 5'te user objesinden ID'yi al
   const userId = session?.user?.id || null;
-  return userId;
+  if (!userId) {
+    return null;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      isSoftDeleted: true,
+      isSuspended: true,
+      suspendedUntil: true,
+    },
+  });
+
+  if (!user || user.isSoftDeleted) {
+    return null;
+  }
+
+  const now = new Date();
+  if (user.isSuspended && (!user.suspendedUntil || user.suspendedUntil > now)) {
+    return null;
+  }
+
+  return user.id;
 }
 
 /**

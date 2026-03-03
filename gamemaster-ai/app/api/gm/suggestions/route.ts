@@ -151,6 +151,7 @@ Yanıtını aşağıdaki JSON formatında ver:
         model: suggestionsModel,
         temperature: 0.9, // Daha yaratıcı öneriler için
         maxTokens: 10000,  // Öneri yanıtları için yeterli
+        userId,
       }
     );
 

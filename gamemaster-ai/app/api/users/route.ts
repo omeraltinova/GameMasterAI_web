@@ -29,11 +29,12 @@ export async function GET(req: NextRequest) {
     // Arama filtresi
     const whereClause = search
       ? {
+          isSoftDeleted: false,
           username: {
             contains: search,
           },
         }
-      : {};
+      : { isSoftDeleted: false };
 
     // Toplam sayı
     const totalCount = await prisma.user.count({ where: whereClause });

@@ -63,7 +63,7 @@ export async function POST(
       });
 
       // Session state'i sıfırla
-      let newState: any = {
+      const newState: any = {
         location: 'Başlangıç',
         timeOfDay: 'morning',
         weather: 'clear',

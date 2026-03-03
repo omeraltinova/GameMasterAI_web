@@ -95,6 +95,7 @@ GÖREV: Bir TTRPG oturumu için dünya ayarları oluştur.
       userPrompt,
       {
         temperature: 0.9,
+        userId,
       }
     );
 
@@ -150,4 +151,3 @@ GÖREV: Bir TTRPG oturumu için dünya ayarları oluştur.
     );
   }
 }
-

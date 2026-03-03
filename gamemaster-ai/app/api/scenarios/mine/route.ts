@@ -15,15 +15,26 @@ export async function GET(req: Request) {
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
+      select: {
+        id: true,
+        isSoftDeleted: true,
+        isSuspended: true,
+        suspendedUntil: true,
+      },
     });
 
-    if (!user) {
+    if (!user || user.isSoftDeleted) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    if (user.isSuspended && (!user.suspendedUntil || user.suspendedUntil > new Date())) {
+      return NextResponse.json({ error: "Hesabınız askıda olduğu için işlem yapılamaz" }, { status: 403 });
     }
 
     const scenarios = await prisma.scenario.findMany({
       where: {
         creatorId: user.id,
+        isSoftDeleted: false,
       },
       orderBy: { createdAt: "desc" },
       include: {

@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
       {
         temperature: 0.9,
         maxTokens: 2000,
+        userId,
       }
     );
 

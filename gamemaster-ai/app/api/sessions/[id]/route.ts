@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
+import { canManageCampaign, getCampaignActorRole, hasCampaignAccess } from '@/lib/auth/permissions';
 import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
@@ -68,16 +69,8 @@ export async function GET(
       );
     }
 
-    // creatorId için tip assertion
-    const campaignWithCreatorId = session.campaign as typeof session['campaign'] & { creatorId: string };
-
-    // Kullanıcının yetkisi var mı? (creator veya player olabilir)
-    const isCreator = campaignWithCreatorId?.creatorId === userId;
-    const isPlayer = session.campaign.players.some(
-      (player: any) => player.userId === userId
-    );
-
-    if (!isCreator && !isPlayer) {
+    const actorRole = getCampaignActorRole(session.campaign, userId);
+    if (!hasCampaignAccess(actorRole)) {
       return forbiddenResponse('Bu session\'a erişim yetkiniz yok');
     }
 
@@ -189,18 +182,13 @@ export async function PUT(
       );
     }
 
-    // Kullanıcının yetkisi var mı? (creator veya player olabilir)
-    const isCreator = session.campaign.creatorId === userId;
-    const isPlayer = session.campaign.players.some(
-      (player: any) => player.userId === userId
-    );
-
-    if (!isCreator && !isPlayer) {
-      return forbiddenResponse('Bu session\'ı güncelleme yetkiniz yok');
+    const actorRole = getCampaignActorRole(session.campaign, userId);
+    if (!canManageCampaign(actorRole)) {
+      return forbiddenResponse('Sadece Game Master session durumunu güncelleyebilir');
     }
 
     // Session'ı güncelle
-    const updateData: any = {
+    const updateData: Parameters<typeof prisma.gameSession.update>[0]["data"] = {
       updatedAt: new Date(),
     };
 

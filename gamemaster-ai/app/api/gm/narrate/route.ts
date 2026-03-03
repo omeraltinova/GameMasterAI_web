@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
       temperature: 0.8,
       sessionId,
       characterId,
+      userId,
     });
 
     const aiResponse = aiResult.content;
@@ -220,8 +221,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Tool results'tan ek bilgiler
-    let newNPCs: any[] = [];
-    let givenItems: any[] = [];
+    const newNPCs: any[] = [];
+    const givenItems: any[] = [];
     let diceRollRequest: any = null;
 
     if (toolResults && toolResults.length > 0) {

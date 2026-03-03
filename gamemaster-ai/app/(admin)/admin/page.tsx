@@ -11,6 +11,7 @@ import {
   Activity,
   UserPlus,
   Play,
+  Flag,
   Settings,
 } from "lucide-react";
 
@@ -223,6 +224,17 @@ export default function AdminDashboardPage() {
                   <h4 className="font-medium">Aktif Oturumlar</h4>
                   <p className="text-sm text-foreground-secondary">
                     Canlı oyun oturumlarını izle ve yönet
+                  </p>
+                </div>
+              </Link>
+
+              {/* Moderasyon */}
+              <Link href="/admin/moderation">
+                <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
+                  <Flag className="h-6 w-6 text-warning mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-medium">Moderasyon</h4>
+                  <p className="text-sm text-foreground-secondary">
+                    Rapor kuyruğunu yönet ve aksiyon al
                   </p>
                 </div>
               </Link>

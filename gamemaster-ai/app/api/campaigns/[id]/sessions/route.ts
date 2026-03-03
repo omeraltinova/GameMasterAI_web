@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { canManageCampaign, getCampaignActorRole, hasCampaignAccess } from '@/lib/auth/permissions';
 import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
@@ -42,10 +43,8 @@ export async function GET(
     }
 
     // Kullanıcının yetkisi var mı?
-    const hasAccess = campaign.creatorId === userId ||
-                     campaign.players.some((p: any) => p.userId === userId);
-
-    if (!hasAccess) {
+    const actorRole = getCampaignActorRole(campaign, userId);
+    if (!hasCampaignAccess(actorRole)) {
       return NextResponse.json(
         { success: false, error: 'Bu oturuma erişim yetkiniz yok' },
         { status: 403 }
@@ -122,12 +121,10 @@ export async function POST(
     }
 
     // Kullanıcının yetkisi var mı?
-    const hasAccess = campaign.creatorId === userId ||
-                     campaign.players.some((p: any) => p.userId === userId);
-
-    if (!hasAccess) {
+    const actorRole = getCampaignActorRole(campaign, userId);
+    if (!canManageCampaign(actorRole)) {
       return NextResponse.json(
-        { success: false, error: 'Bu oturuma erişim yetkiniz yok' },
+        { success: false, error: 'Sadece Game Master yeni session başlatabilir' },
         { status: 403 }
       );
     }

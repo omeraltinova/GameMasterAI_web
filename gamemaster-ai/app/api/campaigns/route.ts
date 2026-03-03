@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
     // Kullanıcının oturumlarını al
     const campaigns = await prisma.campaign.findMany({
       where: {
+        isSoftDeleted: false,
         OR: [
           { creatorId: userId },
           {
@@ -42,7 +43,22 @@ export async function GET(req: NextRequest) {
             email: true,
           },
         },
-        scenario: true,
+        scenario: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            genre: true,
+            difficulty: true,
+            startingPrompt: true,
+            isOfficial: true,
+            isFeatured: true,
+            tags: true,
+            worldSettings: true,
+            isSoftDeleted: true,
+            createdAt: true,
+          },
+        },
         characters: {
           where: {
             campaignId: {
@@ -77,7 +93,7 @@ export async function GET(req: NextRequest) {
         description: camp.description,
         creatorId: camp.creatorId,
         creator: camp.creator,
-        scenario: camp.scenario,
+        scenario: camp.scenario?.isSoftDeleted ? null : camp.scenario,
         isMultiplayer: camp.isMultiplayer,
         maxPlayers: camp.maxPlayers,
         inviteCode: camp.inviteCode,
@@ -130,6 +146,20 @@ export async function POST(req: NextRequest) {
     // Yeni oturum oluştur
     // Not: CampaignPlayer kaydı karakter seçildikten sonra oluşturulacak
     // Creator'ın oturumu görmesi için creatorId yeterli
+    if (scenarioId) {
+      const scenario = await prisma.scenario.findFirst({
+        where: { id: scenarioId, isSoftDeleted: false },
+        select: { id: true },
+      });
+
+      if (!scenario) {
+        return NextResponse.json(
+          { success: false, error: 'Senaryo bulunamadı veya pasif durumda' },
+          { status: 404 }
+        );
+      }
+    }
+
     const campaign = await prisma.campaign.create({
       data: {
         name,

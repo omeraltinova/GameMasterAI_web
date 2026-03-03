@@ -6,6 +6,15 @@ import type { Session } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import { checkRateLimit, getClientIp } from "@/lib/security/rateLimit";
 
+type AuthTokenUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  isSuspended?: boolean;
+  isSoftDeleted?: boolean;
+};
+
 const authConfig = {
   providers: [
     CredentialsProvider({
@@ -34,6 +43,32 @@ const authConfig = {
           throw new Error("Kullanıcı bulunamadı");
         }
 
+        if (user.isSoftDeleted) {
+          throw new Error("Hesabınız pasif durumda. Destek ekibiyle iletişime geçin.");
+        }
+
+        if (user.isSuspended) {
+          const now = new Date();
+          const suspensionStillActive = !user.suspendedUntil || user.suspendedUntil > now;
+
+          if (suspensionStillActive) {
+            const untilText = user.suspendedUntil
+              ? ` Askı bitiş: ${user.suspendedUntil.toLocaleString("tr-TR")}`
+              : "";
+            throw new Error(`Hesabınız askıya alındı.${untilText}`);
+          }
+
+          // Süresi dolmuş askıyı otomatik kaldır
+          await prisma.user.update({
+            where: { id: user.id },
+            data: {
+              isSuspended: false,
+              suspendedUntil: null,
+              suspensionReason: null,
+            },
+          });
+        }
+
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.password
@@ -48,6 +83,8 @@ const authConfig = {
           email: user.email,
           name: user.username,
           role: user.role,
+          isSuspended: false,
+          isSoftDeleted: user.isSoftDeleted,
         };
       },
     }),
@@ -59,17 +96,60 @@ const authConfig = {
         session.user.email = token.email;
         session.user.name = token.name;
         session.user.role = token.role;
+        session.user.isSuspended = Boolean(token.isSuspended);
+        session.user.isSoftDeleted = Boolean(token.isSoftDeleted);
       }
       return session;
     },
-    // DÜZELTME BURADA: trigger ve session parametreleri eklendi
-    async jwt({ token, user, trigger, session }: { token: JWT; user: any; trigger?: string; session?: any }) {
+    async jwt({
+      token,
+      user,
+      trigger,
+      session,
+    }: {
+      token: JWT;
+      user?: AuthTokenUser | null;
+      trigger?: string;
+      session?: Session;
+    }) {
       // İlk giriş anı
       if (user) {
         token.id = user.id;
         token.email = user.email;
         token.name = user.name;
         token.role = user.role;
+        token.isSuspended = Boolean(user.isSuspended);
+        token.isSoftDeleted = Boolean(user.isSoftDeleted);
+      }
+
+      if (token.id) {
+        const currentUser = await prisma.user.findUnique({
+          where: { id: token.id },
+          select: {
+            id: true,
+            email: true,
+            username: true,
+            role: true,
+            isSuspended: true,
+            suspendedUntil: true,
+            isSoftDeleted: true,
+          },
+        });
+
+        if (!currentUser || currentUser.isSoftDeleted) {
+          token.isSoftDeleted = true;
+          token.isSuspended = false;
+        } else {
+          const now = new Date();
+          const suspended = currentUser.isSuspended
+            && (!currentUser.suspendedUntil || currentUser.suspendedUntil > now);
+
+          token.email = currentUser.email;
+          token.name = currentUser.username;
+          token.role = currentUser.role;
+          token.isSuspended = suspended;
+          token.isSoftDeleted = currentUser.isSoftDeleted;
+        }
       }
 
       // Kullanıcı update() fonksiyonunu çağırdığında burası çalışır
@@ -78,7 +158,6 @@ const authConfig = {
         if (session.user.name) {
           token.name = session.user.name;
         }
-        // İleride rol veya resim güncellemek istersen onları da buraya ekleyebilirsin
       }
 
       return token;

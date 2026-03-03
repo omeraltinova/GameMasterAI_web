@@ -12,6 +12,7 @@ import {
   User,
   UserSearch,
   Shield,
+  Flag,
   Settings,
   Activity,
   ChevronLeft,
@@ -34,6 +35,7 @@ const adminItems = [
   { href: "/admin/characters", label: "Karakterler", icon: User },
   { href: "/admin/campaigns", label: "Oturumlar", icon: Swords },
   { href: "/admin/scenarios", label: "Senaryolar", icon: Map },
+  { href: "/admin/moderation", label: "Moderasyon", icon: Flag },
   { href: "/admin/active-sessions", label: "Aktif Oturumlar", icon: Activity },
   { href: "/admin/settings", label: "Sistem Ayarları", icon: Settings },
 ];

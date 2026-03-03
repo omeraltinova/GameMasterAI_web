@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
+import { canManageCampaign, getCampaignActorRole, hasCampaignAccess } from '@/lib/auth/permissions';
 import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
@@ -50,19 +51,14 @@ export async function GET(
       );
     }
 
-    // Kullanıcının yetkisi var mı? (creator veya player olabilir)
-    const isCreator = session.campaign.creatorId === userId;
-    const isPlayer = session.campaign.players.some(
-      (player: any) => player.userId === userId
-    );
-
-    if (!isCreator && !isPlayer) {
+    const actorRole = getCampaignActorRole(session.campaign, userId);
+    if (!hasCampaignAccess(actorRole)) {
       return forbiddenResponse('Bu session\'a erişim yetkiniz yok');
     }
 
     // Mesajları al
     const messages = await prisma.message.findMany({
-      where: { sessionId },
+      where: { sessionId, isSoftDeleted: false },
       orderBy: { timestamp: 'desc' },
       take: limit,
       skip: offset,
@@ -70,7 +66,7 @@ export async function GET(
 
     // Toplam mesaj sayısı
     const totalCount = await prisma.message.count({
-      where: { sessionId },
+      where: { sessionId, isSoftDeleted: false },
     });
 
 // Mesajları işle - metadata'dan gmPrompt ve suggestions çıkar
@@ -87,7 +83,7 @@ export async function GET(
           if (metadata && metadata.suggestions) {
             suggestions = metadata.suggestions;
           }
-        } catch (e) {
+        } catch {
           // metadata parse edilemezse ignore et
         }
       }
@@ -175,30 +171,32 @@ export async function POST(
       );
     }
 
-    // Kullanıcının yetkisi var mı? (creator veya player olabilir)
-    const isCreator = session.campaign.creatorId === userId;
-    const currentPlayer = session.campaign.players.find(
-      (player: any) => player.userId === userId
-    );
-    const isPlayer = !!currentPlayer;
+    const actorRole = getCampaignActorRole(session.campaign, userId);
+    const currentPlayer = session.campaign.players.find((player) => player.userId === userId);
 
-    if (!isCreator && !isPlayer) {
+    if (!hasCampaignAccess(actorRole)) {
       return forbiddenResponse('Bu session\'a mesaj gönderme yetkiniz yok');
     }
 
-    // SenderType belirleme - DICE ve SYSTEM mesajları için gelen değeri kullan
-    let resolvedSenderType = 'PLAYER';
-    if (senderType === 'DICE' || senderType === 'SYSTEM') {
-      resolvedSenderType = senderType;
-    } else if (isCreator && senderType === 'GM') {
-      resolvedSenderType = 'GM';
+    // GM/Player ayrımına göre senderType belirle
+    let resolvedSenderType: 'PLAYER' | 'GM' | 'SYSTEM' | 'DICE' = 'PLAYER';
+    if (canManageCampaign(actorRole)) {
+      if (senderType === 'GM' || senderType === 'SYSTEM' || senderType === 'DICE') {
+        resolvedSenderType = senderType;
+      } else {
+        resolvedSenderType = 'GM';
+      }
+    } else {
+      if (senderType && senderType !== 'PLAYER' && senderType !== 'DICE') {
+        return forbiddenResponse('Oyuncular yalnızca PLAYER veya DICE tipinde mesaj gönderebilir');
+      }
+      resolvedSenderType = senderType === 'DICE' ? 'DICE' : 'PLAYER';
     }
 
-    // Oyuncunun karakter veya kullanıcı adını al
-    const senderName = requestSenderName || 
-                       currentPlayer?.character?.name || 
-                       currentPlayer?.user?.username || 
-                       'Oyuncu';
+    // Oyuncu için ad sahteciliğini engelle; GM tarafında requestSenderName opsiyonel.
+    const senderName = canManageCampaign(actorRole)
+      ? (requestSenderName || (resolvedSenderType === 'GM' ? 'Game Master' : 'System'))
+      : (currentPlayer?.character?.name || currentPlayer?.user?.username || 'Oyuncu');
 
     // Mesaj oluştur
     const message = await prisma.message.create({

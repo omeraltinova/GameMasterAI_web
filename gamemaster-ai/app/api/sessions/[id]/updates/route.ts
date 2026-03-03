@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
+import { getCampaignActorRole, hasCampaignAccess } from '@/lib/auth/permissions';
 
 /**
  * GET /api/sessions/:id/updates
@@ -40,13 +42,8 @@ export async function GET(
       );
     }
 
-    // Kullanıcının yetkisi var mı?
-    const isCreator = session.campaign.creatorId === userId;
-    const isPlayer = session.campaign.players.some(
-      (player: any) => player.userId === userId
-    );
-
-    if (!isCreator && !isPlayer) {
+    const actorRole = getCampaignActorRole(session.campaign, userId);
+    if (!hasCampaignAccess(actorRole)) {
       return forbiddenResponse('Bu session\'a erişim yetkiniz yok');
     }
 
@@ -62,7 +59,7 @@ export async function GET(
     }
 
     // Güncellemeleri al
-    const whereClause: any = { sessionId };
+    const whereClause: Prisma.MessageWhereInput = { sessionId };
 
     if (since) {
       whereClause.timestamp = {

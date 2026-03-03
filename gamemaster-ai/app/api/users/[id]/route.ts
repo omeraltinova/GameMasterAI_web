@@ -32,6 +32,7 @@ export async function GET(
         username: true,
         avatar: true,
         role: true,
+        isSoftDeleted: true,
         createdAt: true,
         profilePublic: true,
         showCharacters: true,
@@ -56,6 +57,9 @@ export async function GET(
         },
         // Oluşturduğu oturumlar
         campaigns: {
+          where: {
+            isSoftDeleted: false,
+          },
           select: {
             id: true,
             name: true,
@@ -67,6 +71,11 @@ export async function GET(
         },
         // Katıldığı oturumlar
         campaignPlayers: {
+          where: {
+            campaign: {
+              isSoftDeleted: false,
+            },
+          },
           select: {
             campaign: {
               select: {
@@ -83,6 +92,9 @@ export async function GET(
         },
         // Senaryolar
         scenarios: {
+          where: {
+            isSoftDeleted: false,
+          },
           select: {
             id: true,
             title: true,
@@ -107,7 +119,7 @@ export async function GET(
       },
     });
 
-    if (!user) {
+    if (!user || user.isSoftDeleted) {
       return NextResponse.json(
         { success: false, error: 'Kullanıcı bulunamadı' },
         { status: 404 }
@@ -151,13 +163,13 @@ export async function GET(
     // Mesaj sayısı (sadece PLAYER tipindeki)
     const playerMessageCount = showStat
       ? await prisma.message.count({
-          where: { senderId: userId, senderType: 'PLAYER' },
+          where: { senderId: userId, senderType: 'PLAYER', isSoftDeleted: false },
         })
       : 0;
 
     // Zar istatistikleri
     let totalDiceRolls = 0;
-    let d20Rolls: number[] = [];
+    const d20Rolls: number[] = [];
     let criticalSuccesses = 0;
     let criticalFailures = 0;
 
@@ -217,7 +229,7 @@ export async function GET(
     // Son aktivite
     const lastActivity = showStat
       ? await prisma.message.findFirst({
-          where: { senderId: userId },
+          where: { senderId: userId, isSoftDeleted: false },
           orderBy: { timestamp: 'desc' },
           select: { timestamp: true },
         })

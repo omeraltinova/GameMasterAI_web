@@ -72,6 +72,14 @@ npm run dev
 
 [http://localhost:3000](http://localhost:3000) adresinde açılır.
 
+## Dokümantasyon
+
+- Katkı rehberi: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Doküman indeksi: [`docs/README.md`](./docs/README.md)
+- Kurulum detayı: [`docs/SETUP_GUIDE.md`](./docs/SETUP_GUIDE.md)
+- Prompt mimarisi: [`docs/AI_PROMPT_LOGIC.md`](./docs/AI_PROMPT_LOGIC.md)
+- API tanımı (OpenAPI): [`docs/OPENAPI.yaml`](./docs/OPENAPI.yaml)
+
 ## Komutlar
 
 ```bash

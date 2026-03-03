@@ -24,6 +24,7 @@ interface OpeningNarrationParams {
   characterName?: string;
   characterClass?: string;
   characterRace?: string;
+  userId?: string;
 }
 
 /**
@@ -39,6 +40,7 @@ export async function generateOpeningNarration(params: OpeningNarrationParams): 
     characterName,
     characterClass,
     characterRace,
+    userId,
   } = params;
 
   const systemPrompt = `Sen bir hikaye anlatıcısısın. Görevin, oyuncuya atmosferik ve sürükleyici bir açılış sahnesi yazmak.
@@ -75,6 +77,7 @@ ${gmInstructions}
     ], {
       temperature: 0.8,
       maxTokens: 10000,
+      userId,
     });
 
     const narration = response.choices[0]?.message?.content?.trim();

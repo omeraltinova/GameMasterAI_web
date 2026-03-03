@@ -31,7 +31,22 @@ export async function GET(
             avatar: true,
           },
         },
-        scenario: true,
+        scenario: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            genre: true,
+            difficulty: true,
+            startingPrompt: true,
+            tags: true,
+            worldSettings: true,
+            isOfficial: true,
+            isFeatured: true,
+            isSoftDeleted: true,
+            createdAt: true,
+          },
+        },
         characters: {
           include: {
             user: {
@@ -70,7 +85,7 @@ export async function GET(
       },
     });
 
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json(
         { success: false, error: "Campaign not found" },
         { status: 404 }
@@ -96,6 +111,7 @@ export async function GET(
       success: true,
       campaign: {
         ...campaign,
+        scenario: campaign.scenario?.isSoftDeleted ? null : campaign.scenario,
         playerCount,
       },
     });
@@ -130,7 +146,7 @@ export async function PUT(
       where: { id },
     });
 
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json(
         { success: false, error: "Campaign not found" },
         { status: 404 }
@@ -162,13 +178,13 @@ export async function PUT(
 
       const nextScenarioId = body.scenarioId || null;
       if (nextScenarioId) {
-        const scenarioExists = await prisma.scenario.findUnique({
-          where: { id: nextScenarioId },
+        const scenarioActive = await prisma.scenario.findFirst({
+          where: { id: nextScenarioId, isSoftDeleted: false },
           select: { id: true },
         });
-        if (!scenarioExists) {
+        if (!scenarioActive) {
           return NextResponse.json(
-            { success: false, error: "Senaryo bulunamadi" },
+            { success: false, error: "Senaryo bulunamadi veya pasif durumda" },
             { status: 404 }
           );
         }
@@ -217,7 +233,7 @@ export async function DELETE(
       where: { id },
     });
 
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json(
         { success: false, error: "Campaign not found" },
         { status: 404 }
@@ -228,14 +244,19 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
-    // Delete campaign (cascade will delete related records)
-    await prisma.campaign.delete({
+    // Soft delete campaign
+    await prisma.campaign.update({
       where: { id },
+      data: {
+        isSoftDeleted: true,
+        softDeletedAt: new Date(),
+        status: "PAUSED",
+      },
     });
 
     return NextResponse.json({
       success: true,
-      message: "Campaign deleted successfully",
+      message: "Campaign soft deleted successfully",
     });
   } catch (error) {
     console.error("Campaign delete error:", error);

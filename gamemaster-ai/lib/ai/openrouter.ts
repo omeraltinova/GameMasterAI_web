@@ -3,6 +3,7 @@
 
 import { logAIResponse, generateRequestId } from './logger';
 import { getSystemSettings } from '@/lib/admin/systemSettings';
+import { consumeAITokens } from '@/lib/security/aiRateLimit';
 
 export interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';
@@ -46,6 +47,19 @@ type AIModelConfig = {
 
 let cachedConfig: AIModelConfig | null = null;
 let cachedAt = 0;
+
+async function trackTokenUsage(userId: string | undefined, tokenCount: number | undefined) {
+  if (!userId || typeof tokenCount !== 'number' || !Number.isFinite(tokenCount)) {
+    return;
+  }
+
+  const normalized = Math.max(0, Math.floor(tokenCount));
+  if (normalized <= 0) {
+    return;
+  }
+
+  await consumeAITokens(userId, normalized);
+}
 
 async function resolveAIModelConfig(): Promise<AIModelConfig> {
   const now = Date.now();
@@ -116,6 +130,7 @@ export async function callOpenRouter(
     temperature?: number;
     maxTokens?: number;
     skipFallback?: boolean;
+    userId?: string;
   }
 ): Promise<OpenRouterResponse> {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -138,7 +153,8 @@ export async function callOpenRouter(
     temperature,
     maxTokens,
     apiKey,
-    requestId
+    requestId,
+    options?.userId,
   );
 
   if (primaryResult.success) {
@@ -155,7 +171,8 @@ export async function callOpenRouter(
       temperature,
       maxTokens,
       apiKey,
-      requestId + '-fallback'
+      requestId + '-fallback',
+      options?.userId,
     );
 
     if (fallbackResult.success) {
@@ -179,7 +196,8 @@ async function callWithRetry(
   temperature: number,
   maxTokens: number,
   apiKey: string,
-  requestId: string
+  requestId: string,
+  userId?: string,
 ): Promise<{ success: boolean; response?: OpenRouterResponse; error?: string }> {
   let lastError: string = '';
 
@@ -240,6 +258,7 @@ async function callWithRetry(
       }
 
       const data: OpenRouterResponse = await response.json();
+      await trackTokenUsage(userId, data.usage?.total_tokens);
 
       // Log success
       logAIResponse({
@@ -337,6 +356,7 @@ export async function getAIResponse(
     model?: string;
     temperature?: number;
     maxTokens?: number;
+    userId?: string;
   }
 ): Promise<string> {
   const messages: OpenRouterMessage[] = [
@@ -364,6 +384,7 @@ export async function getAIResponseWithContext(
     model?: string;
     temperature?: number;
     maxTokens?: number;
+    userId?: string;
   }
 ): Promise<string> {
   const messages: OpenRouterMessage[] = [
@@ -414,6 +435,7 @@ export async function callOpenRouterWithTools(
     tools?: ToolDefinition[];
     sessionId?: string;
     characterId?: string;
+    userId?: string;
   }
 ): Promise<{
   content: string;
@@ -457,6 +479,7 @@ export async function callOpenRouterWithTools(
     }
 
     const data: OpenRouterResponseWithTools = await response.json();
+    await trackTokenUsage(options?.userId, data.usage?.total_tokens);
     const choice = data.choices[0];
 
     if (!choice) {
@@ -525,6 +548,7 @@ export async function callOpenRouterWithTools(
 
         if (followUpResponse.ok) {
           const followUpData: OpenRouterResponseWithTools = await followUpResponse.json();
+          await trackTokenUsage(options?.userId, followUpData.usage?.total_tokens);
           content = followUpData.choices[0]?.message?.content || '';
           console.log('[AI] Got follow-up response with content');
         }
@@ -538,7 +562,7 @@ export async function callOpenRouterWithTools(
     }
 
     return { content };
-  } catch (error: any) {
+  } catch (error) {
     console.error('callOpenRouterWithTools error:', error);
     throw error;
   }

@@ -90,7 +90,7 @@ export async function GET() {
       select: { diceType: true, total: true, results: true },
     });
 
-    let totalDiceRolls = diceRolls.length;
+    const totalDiceRolls = diceRolls.length;
     const d20Rolls: number[] = [];
     let criticalSuccesses = 0;
     let criticalFailures = 0;

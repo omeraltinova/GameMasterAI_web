@@ -1,0 +1,5 @@
+-- Add daily AI quota tracking fields to users
+ALTER TABLE "User"
+ADD COLUMN "aiDailyTokenLimit" INTEGER NOT NULL DEFAULT 120000,
+ADD COLUMN "aiTokensUsedToday" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN "aiUsageResetAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;

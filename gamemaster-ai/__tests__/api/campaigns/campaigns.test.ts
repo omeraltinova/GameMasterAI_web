@@ -102,6 +102,7 @@ describe("GET /api/campaigns", () => {
     expect(data.success).toBe(true);
     expect(data.campaigns).toHaveLength(1);
     expect(data.campaigns[0].name).toBe("Test Campaign");
+    expect(data.campaigns[0].creator?.email).toBeUndefined();
   });
 
   it("returns empty array when user has no campaigns", async () => {
@@ -113,6 +114,34 @@ describe("GET /api/campaigns", () => {
 
     const data = await res.json();
     expect(data.campaigns).toHaveLength(0);
+  });
+
+  it("redacts inviteCode when user is a participant but not creator", async () => {
+    mocks.getUserId.mockResolvedValue("user-1");
+    mocks.prisma.campaign.findMany.mockResolvedValue([
+      {
+        id: "camp-2",
+        name: "Party Campaign",
+        description: "A test",
+        creatorId: "gm-2",
+        isMultiplayer: true,
+        maxPlayers: 4,
+        inviteCode: "SECRET42",
+        status: "ACTIVE",
+        creator: { id: "gm-2", username: "gm" },
+        scenario: null,
+        characters: [],
+        players: [],
+        sessions: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+
+    const res = await GET(makeGETRequest());
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.campaigns[0].inviteCode).toBeNull();
   });
 });
 
@@ -145,7 +174,7 @@ describe("POST /api/campaigns", () => {
       scenarioId: null,
       isMultiplayer: false,
       maxPlayers: 4,
-      inviteCode: "ABCD1234",
+      inviteCode: null,
       status: "DRAFT",
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -159,7 +188,15 @@ describe("POST /api/campaigns", () => {
     const data = await res.json();
     expect(data.success).toBe(true);
     expect(data.campaign.name).toBe("My Adventure");
-    expect(data.campaign.inviteCode).toBeTruthy();
+    expect(data.campaign.inviteCode).toBeNull();
+    expect(mocks.prisma.campaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          isMultiplayer: false,
+          inviteCode: null,
+        }),
+      })
+    );
   });
 
   it("creates multiplayer campaign with maxPlayers", async () => {
@@ -190,5 +227,14 @@ describe("POST /api/campaigns", () => {
     const data = await res.json();
     expect(data.campaign.isMultiplayer).toBe(true);
     expect(data.campaign.maxPlayers).toBe(6);
+    expect(data.campaign.inviteCode).toBeTruthy();
+    expect(mocks.prisma.campaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          isMultiplayer: true,
+          inviteCode: expect.any(String),
+        }),
+      })
+    );
   });
 });

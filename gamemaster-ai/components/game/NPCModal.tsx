@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Modal, Button, Badge } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { Users, Swords, Heart, RefreshCw, MessageCircle, X } from "lucide-react";
+import { Users, Swords, Heart, RefreshCw, MessageCircle, X, Trash2 } from "lucide-react";
 
 interface NPC {
     id: string;
@@ -25,14 +25,22 @@ interface NPCModalProps {
     isOpen: boolean;
     onClose: () => void;
     sessionId: string;
+    canManage?: boolean;
     onTalkToNPC?: (npc: NPC) => void;
 }
 
-export function NPCModal({ isOpen, onClose, sessionId, onTalkToNPC }: NPCModalProps) {
+export function NPCModal({ isOpen, onClose, sessionId, canManage = false, onTalkToNPC }: NPCModalProps) {
     const [npcs, setNpcs] = useState<NPC[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [selectedNPC, setSelectedNPC] = useState<NPC | null>(null);
+    const [isDetailLoading, setIsDetailLoading] = useState(false);
+    const [detailError, setDetailError] = useState<string | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [editPersonality, setEditPersonality] = useState("");
+    const [editAttitude, setEditAttitude] = useState<"friendly" | "hostile">("friendly");
 
     const fetchNPCs = useCallback(async () => {
         try {
@@ -46,7 +54,7 @@ export function NPCModal({ isOpen, onClose, sessionId, onTalkToNPC }: NPCModalPr
             } else {
                 setError(data.error || 'NPC listesi yüklenemedi');
             }
-        } catch (err) {
+        } catch {
             setError('NPC listesi yüklenirken hata oluştu');
         } finally {
             setIsLoading(false);
@@ -59,10 +67,99 @@ export function NPCModal({ isOpen, onClose, sessionId, onTalkToNPC }: NPCModalPr
         }
     }, [isOpen, fetchNPCs]);
 
+    useEffect(() => {
+        if (!isOpen) {
+            setSelectedNPC(null);
+            setDetailError(null);
+            setIsDetailLoading(false);
+            setIsDeleting(false);
+            setIsEditing(false);
+            setIsSaving(false);
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        if (!selectedNPC) return;
+        setEditPersonality(selectedNPC.personality || "");
+        setEditAttitude(selectedNPC.isHostile ? "hostile" : "friendly");
+    }, [selectedNPC]);
+
     const handleTalkTo = (npc: NPC) => {
         onTalkToNPC?.(npc);
         onClose();
     };
+
+    const openNPCDetail = useCallback(async (npc: NPC) => {
+        setSelectedNPC(npc);
+        setDetailError(null);
+        setIsDetailLoading(true);
+        try {
+            const response = await fetch(`/api/sessions/${sessionId}/npcs/${npc.id}`);
+            const data = await response.json();
+
+            if (data.success && data.npc) {
+                setSelectedNPC(data.npc);
+            } else {
+                setDetailError(data.error || "NPC detayı yüklenemedi");
+            }
+        } catch {
+            setDetailError("NPC detayı yüklenirken hata oluştu");
+        } finally {
+            setIsDetailLoading(false);
+        }
+    }, [sessionId]);
+
+    const handleDeleteNPC = useCallback(async (npcId: string) => {
+        if (!canManage) return;
+        setIsDeleting(true);
+        setDetailError(null);
+        try {
+            const response = await fetch(`/api/sessions/${sessionId}/npcs/${npcId}`, {
+                method: "DELETE",
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                setNpcs((prev) => prev.filter((npc) => npc.id !== npcId));
+                setSelectedNPC(null);
+            } else {
+                setDetailError(data.error || "NPC silinemedi");
+            }
+        } catch {
+            setDetailError("NPC silinirken hata oluştu");
+        } finally {
+            setIsDeleting(false);
+        }
+    }, [canManage, sessionId]);
+
+    const handleSaveNPC = useCallback(async () => {
+        if (!canManage || !selectedNPC) return;
+        setIsSaving(true);
+        setDetailError(null);
+        try {
+            const response = await fetch(`/api/sessions/${sessionId}/npcs/${selectedNPC.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    personality: editPersonality.trim() || null,
+                    isHostile: editAttitude === "hostile",
+                }),
+            });
+            const data = await response.json();
+
+            if (data.success && data.npc) {
+                setSelectedNPC(data.npc);
+                setNpcs((prev) => prev.map((npc) => (npc.id === data.npc.id ? data.npc : npc)));
+                setIsEditing(false);
+            } else {
+                setDetailError(data.error || "NPC güncellenemedi");
+            }
+        } catch {
+            setDetailError("NPC güncellenirken hata oluştu");
+        } finally {
+            setIsSaving(false);
+        }
+    }, [canManage, editAttitude, editPersonality, selectedNPC, sessionId]);
 
     // Group NPCs by hostility
     const friendlyNPCs = npcs.filter(npc => !npc.isHostile);
@@ -108,7 +205,7 @@ export function NPCModal({ isOpen, onClose, sessionId, onTalkToNPC }: NPCModalPr
                                         <NPCCard
                                             key={npc.id}
                                             npc={npc}
-                                            onSelect={() => setSelectedNPC(npc)}
+                                            onSelect={() => void openNPCDetail(npc)}
                                             onTalkTo={() => handleTalkTo(npc)}
                                         />
                                     ))}
@@ -128,7 +225,7 @@ export function NPCModal({ isOpen, onClose, sessionId, onTalkToNPC }: NPCModalPr
                                         <NPCCard
                                             key={npc.id}
                                             npc={npc}
-                                            onSelect={() => setSelectedNPC(npc)}
+                                            onSelect={() => void openNPCDetail(npc)}
                                             onTalkTo={() => handleTalkTo(npc)}
                                         />
                                     ))}
@@ -140,7 +237,7 @@ export function NPCModal({ isOpen, onClose, sessionId, onTalkToNPC }: NPCModalPr
             </div>
 
             {/* NPC Detail Drawer */}
-            {selectedNPC && (
+            {isOpen && selectedNPC && (
                 <div className="fixed inset-0 bg-black/50 z-60 flex items-center justify-center animate-fade-in">
                     <div className="bg-card border border-border rounded-xl shadow-xl max-w-md w-full mx-4 p-6 animate-slide-up">
                         <div className="flex items-start justify-between mb-4">
@@ -155,29 +252,73 @@ export function NPCModal({ isOpen, onClose, sessionId, onTalkToNPC }: NPCModalPr
                             </Button>
                         </div>
 
-                        {selectedNPC.personality && (
-                            <p className="text-sm text-foreground-secondary mb-4 italic">
-                                "{selectedNPC.personality}"
-                            </p>
+                        {isDetailLoading ? (
+                            <div className="py-8 flex justify-center">
+                                <RefreshCw className="h-6 w-6 animate-spin text-foreground-muted" />
+                            </div>
+                        ) : (
+                            <>
+                                {isEditing ? (
+                                    <div className="space-y-3 mb-4">
+                                        <div>
+                                            <label className="text-xs text-foreground-muted mb-1 block">Kişilik</label>
+                                            <textarea
+                                                value={editPersonality}
+                                                onChange={(e) => setEditPersonality(e.target.value)}
+                                                rows={3}
+                                                className="w-full rounded-lg border border-border bg-input p-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                                placeholder="Örn: Kurnaz, mesafeli, temkinli..."
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-foreground-muted mb-1 block">Tutum</label>
+                                            <select
+                                                value={editAttitude}
+                                                onChange={(e) => setEditAttitude(e.target.value as "friendly" | "hostile")}
+                                                className="w-full rounded-lg border border-border bg-input p-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                                            >
+                                                <option value="friendly">Dostça</option>
+                                                <option value="hostile">Düşmanca</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {selectedNPC.personality && (
+                                            <p className="text-sm text-foreground-secondary mb-4 italic">
+                                                &ldquo;{selectedNPC.personality}&rdquo;
+                                            </p>
+                                        )}
+                                        <p className="text-xs text-foreground-muted mb-4">
+                                            Tutum: {selectedNPC.isHostile ? "Düşmanca" : "Dostça"}
+                                        </p>
+                                    </>
+                                )}
+
+                                {selectedNPC.dialogue && selectedNPC.dialogue.length > 0 && (
+                                    <div className="mb-4">
+                                        <h4 className="text-sm font-medium mb-2">Önemli Sözleri:</h4>
+                                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                                            {selectedNPC.dialogue.slice(-3).map((d, i) => (
+                                                <p key={i} className="text-xs text-foreground-muted bg-background-elevated p-2 rounded">
+                                                    &ldquo;{d.text}&rdquo;
+                                                </p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
 
-                        {selectedNPC.dialogue && selectedNPC.dialogue.length > 0 && (
-                            <div className="mb-4">
-                                <h4 className="text-sm font-medium mb-2">Önemli Sözleri:</h4>
-                                <div className="space-y-1 max-h-32 overflow-y-auto">
-                                    {selectedNPC.dialogue.slice(-3).map((d, i) => (
-                                        <p key={i} className="text-xs text-foreground-muted bg-background-elevated p-2 rounded">
-                                            "{d.text}"
-                                        </p>
-                                    ))}
-                                </div>
-                            </div>
+                        {detailError && (
+                            <p className="text-xs text-danger mb-3">{detailError}</p>
                         )}
 
                         <div className="flex gap-2">
                             <Button
                                 variant="primary"
                                 className="flex-1 gap-2"
+                                disabled={isDetailLoading || isDeleting || isSaving}
                                 onClick={() => {
                                     handleTalkTo(selectedNPC);
                                     setSelectedNPC(null);
@@ -186,7 +327,54 @@ export function NPCModal({ isOpen, onClose, sessionId, onTalkToNPC }: NPCModalPr
                                 <MessageCircle className="h-4 w-4" />
                                 Konuş
                             </Button>
-                            <Button variant="outline" onClick={() => setSelectedNPC(null)}>
+                            {canManage && (
+                                isEditing ? (
+                                    <>
+                                        <Button
+                                            variant="outline"
+                                            disabled={isSaving || isDeleting}
+                                            onClick={() => {
+                                                setIsEditing(false);
+                                                setEditPersonality(selectedNPC.personality || "");
+                                                setEditAttitude(selectedNPC.isHostile ? "hostile" : "friendly");
+                                            }}
+                                        >
+                                            Vazgeç
+                                        </Button>
+                                        <Button
+                                            variant="primary"
+                                            disabled={isSaving || isDeleting}
+                                            onClick={() => void handleSaveNPC()}
+                                        >
+                                            {isSaving ? "Kaydediliyor" : "Kaydet"}
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Button
+                                            variant="outline"
+                                            disabled={isDetailLoading || isDeleting}
+                                            onClick={() => setIsEditing(true)}
+                                        >
+                                            Düzenle
+                                        </Button>
+                                        <Button
+                                            variant="danger"
+                                            className="gap-2"
+                                            disabled={isDetailLoading || isDeleting}
+                                            onClick={() => void handleDeleteNPC(selectedNPC.id)}
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                            {isDeleting ? "Siliniyor" : "Sil"}
+                                        </Button>
+                                    </>
+                                )
+                            )}
+                            <Button
+                                variant="outline"
+                                disabled={isDeleting || isSaving}
+                                onClick={() => setSelectedNPC(null)}
+                            >
                                 Kapat
                             </Button>
                         </div>

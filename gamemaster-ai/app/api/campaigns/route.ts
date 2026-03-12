@@ -40,7 +40,6 @@ export async function GET(req: NextRequest) {
           select: {
             id: true,
             username: true,
-            email: true,
           },
         },
         scenario: {
@@ -92,11 +91,19 @@ export async function GET(req: NextRequest) {
         name: camp.name,
         description: camp.description,
         creatorId: camp.creatorId,
-        creator: camp.creator,
+        creator: camp.creator
+          ? {
+              id: camp.creator.id,
+              username: camp.creator.username,
+            }
+          : null,
         scenario: camp.scenario?.isSoftDeleted ? null : camp.scenario,
         isMultiplayer: camp.isMultiplayer,
         maxPlayers: camp.maxPlayers,
-        inviteCode: camp.inviteCode,
+        inviteCode:
+          camp.isMultiplayer && camp.creatorId === userId
+            ? camp.inviteCode
+            : null,
         status: camp.status,
         characterCount: camp.characters.length,
         playerCount: camp.players.length,
@@ -141,7 +148,8 @@ export async function POST(req: NextRequest) {
     const limited = rateLimitResponse(userId, "POST:/api/campaigns", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
-    const inviteCode = randomBytes(4).toString('hex').toUpperCase();
+    const multiplayer = Boolean(isMultiplayer);
+    const inviteCode = multiplayer ? randomBytes(4).toString('hex').toUpperCase() : null;
 
     // Yeni oturum oluştur
     // Not: CampaignPlayer kaydı karakter seçildikten sonra oluşturulacak
@@ -166,7 +174,7 @@ export async function POST(req: NextRequest) {
         description,
         creatorId: userId,
         scenarioId,
-        isMultiplayer: isMultiplayer || false,
+        isMultiplayer: multiplayer,
         maxPlayers: maxPlayers || 4,
         inviteCode,
         status: 'DRAFT',

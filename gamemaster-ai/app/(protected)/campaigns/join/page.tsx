@@ -48,7 +48,7 @@ export default function JoinCampaignPage() {
 
   const handleJoinCampaign = () => {
     if (foundCampaign) {
-      router.push(`/campaigns/${foundCampaign.id}`);
+      router.push(`/campaigns/${foundCampaign.id}?inviteCode=${encodeURIComponent(rawCode)}`);
     }
   };
 

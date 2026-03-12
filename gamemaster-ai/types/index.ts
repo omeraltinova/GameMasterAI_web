@@ -64,6 +64,7 @@ export interface Character {
   experience: number;
   hp: number;
   maxHp: number;
+  gold?: number;
   stats: CharacterStats;
   background?: string;
   appearance?: string;

@@ -189,6 +189,7 @@ export async function GET(
             prisma.message.findMany({
               where: {
                 sessionId,
+                isSoftDeleted: false,
                 timestamp: { gt: lastSeenAt },
               },
               orderBy: { timestamp: "asc" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar, Modal } from "@/components/ui";
 import {
@@ -32,6 +32,7 @@ import { useSession } from "next-auth/react";
 export default function CampaignLobbyPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { data: session } = useSession();
   const [codeCopied, setCodeCopied] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -56,6 +57,7 @@ export default function CampaignLobbyPage() {
 
   const currentUserId = session?.user?.id;
   const isCreator = campaign?.creatorId === currentUserId;
+  const inviteCodeFromQuery = (searchParams.get("inviteCode") || "").replace(/-/g, "").toUpperCase();
 
   // Fetch campaign data
   useEffect(() => {
@@ -179,7 +181,10 @@ export default function CampaignLobbyPage() {
     try {
       const response = await post<{ success: boolean; message?: string }>(
         `/campaigns/${campaign.id}/join`,
-        { characterId }
+        {
+          characterId,
+          inviteCode: inviteCodeFromQuery || undefined,
+        }
       );
       if (response && response.success) {
         setSelectedCharacterId(characterId);
@@ -214,7 +219,7 @@ export default function CampaignLobbyPage() {
 
   // Davet kodunu kapat
   const handleDisableInvite = async () => {
-    if (!campaign) return;
+    if (!campaign || !campaign.isMultiplayer) return;
     setIsTogglingInvite(true);
     try {
       const response = await put(`/campaigns/${campaign.id}`, {
@@ -232,7 +237,7 @@ export default function CampaignLobbyPage() {
 
   // Davet kodunu aç (yeni kod üret)
   const handleEnableInvite = async () => {
-    if (!campaign) return;
+    if (!campaign || !campaign.isMultiplayer) return;
     setIsTogglingInvite(true);
     try {
       const response = await post(`/campaigns/${campaign.id}/invite`) as { success: boolean; inviteCode?: string };
@@ -297,7 +302,7 @@ export default function CampaignLobbyPage() {
   }
 
   const handleCopyCode = () => {
-    if (campaign.inviteCode) {
+    if (campaign.isMultiplayer && campaign.inviteCode) {
       navigator.clipboard.writeText(campaign.inviteCode);
       setCodeCopied(true);
       setTimeout(() => setCodeCopied(false), 2000);
@@ -411,20 +416,27 @@ export default function CampaignLobbyPage() {
             {campaign.status === "DRAFT" && isCreator && (
               <Button
                 className="gap-2"
-                disabled={!hasCharacterSelected}
+                disabled={!hasCharacterSelected || isLoadingSession}
                 title={!hasCharacterSelected ? "Oturumu başlatmak için önce karakter seçmelisin" : undefined}
                 onClick={async () => {
-                  if (!hasCharacterSelected) return;
+                  if (!hasCharacterSelected || isLoadingSession) return;
+                  setIsLoadingSession(true);
                   try {
-                    // Oturum durumunu ACTIVE yap
-                    await post(`/campaigns/${campaign.id}/pause`); // Bu endpoint ACTIVE'e de çevirebilir
+                    await post(`/campaigns/${campaign.id}/active-session`, {});
                     await refetchCampaign();
+                    router.push(`/campaigns/${campaign.id}/play`);
                   } catch (err) {
                     console.error('Başlatma hatası:', err);
+                  } finally {
+                    setIsLoadingSession(false);
                   }
                 }}
               >
-                <Play className="h-4 w-4" />
+                {isLoadingSession ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4" />
+                )}
                 Oturumu Başlat
               </Button>
             )}

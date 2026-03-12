@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { checkAchievements, type AchievementStats } from "@/lib/achievements";
+import {
+  ACHIEVEMENT_DEFINITIONS,
+  checkAchievements,
+  type AchievementStats,
+} from "@/lib/achievements";
 import { getUserId, unauthorizedResponse } from "@/lib/auth/server";
 import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
+import bcrypt from "bcryptjs";
 
 // KULLANICI BİLGİLERİ (GET) — gizlilik ayarları + stats + achievements + activity
 export async function GET() {
@@ -183,21 +188,51 @@ export async function GET() {
     const checkResults = checkAchievements(achievementStats);
 
     // Mevcut DB kayıtları
-    const existingAchievements = await prisma.userAchievement.findMany({
+    let existingAchievements = await prisma.userAchievement.findMany({
       where: { userId },
       select: { achievementId: true, unlockedAt: true },
     });
 
-    const existingMap = new Map(
+    let existingMap = new Map(
       existingAchievements.map((a) => [a.achievementId, a.unlockedAt])
     );
 
-    const achievements = checkResults.map((r) => ({
-      id: r.id,
-      unlockedAt: r.unlocked
-        ? existingMap.get(r.id)?.toISOString() || null
-        : null,
-    }));
+    // Yeni açılmış başarımları kalıcı olarak kaydet.
+    const newlyUnlockedIds = checkResults
+      .filter((r) => r.unlocked && !existingMap.has(r.id))
+      .map((r) => r.id);
+
+    if (newlyUnlockedIds.length > 0) {
+      const unlockedAt = new Date();
+      await prisma.userAchievement.createMany({
+        data: newlyUnlockedIds.map((achievementId) => ({
+          userId,
+          achievementId,
+          unlockedAt,
+        })),
+        skipDuplicates: true,
+      });
+
+      existingAchievements = await prisma.userAchievement.findMany({
+        where: { userId },
+        select: { achievementId: true, unlockedAt: true },
+      });
+      existingMap = new Map(
+        existingAchievements.map((a) => [a.achievementId, a.unlockedAt])
+      );
+    }
+
+    const achievements = checkResults.map((r) => {
+      // Daha önce açılmış bir başarım, güncel stat eşiği düşse bile "açılmış" kalmalı.
+      const storedUnlockedAt = existingMap.get(r.id) ?? null;
+      const unlocked = Boolean(storedUnlockedAt) || r.unlocked;
+
+      return {
+        id: r.id,
+        unlocked,
+        unlockedAt: storedUnlockedAt ? storedUnlockedAt.toISOString() : null,
+      };
+    });
 
     // --- Son aktiviteler ---
     const recentCharacters = user.characters.slice(0, 5).map((c) => ({
@@ -226,10 +261,27 @@ export async function GET() {
         date: cp.joinedAt.toISOString(),
       }));
 
+    const achievementLabelMap = new Map(
+      ACHIEVEMENT_DEFINITIONS.map((def) => [def.id, def.label])
+    );
+
+    const recentAchievementUnlocks = existingAchievements
+      .sort((a, b) => b.unlockedAt.getTime() - a.unlockedAt.getTime())
+      .slice(0, 5)
+      .map((achievement) => ({
+        type: "achievement_unlocked" as const,
+        label: "Başarım kazanıldı",
+        entityName:
+          achievementLabelMap.get(achievement.achievementId) ??
+          achievement.achievementId,
+        date: achievement.unlockedAt.toISOString(),
+      }));
+
     const recentActivity = [
       ...recentCharacters,
       ...recentCampaigns,
       ...recentJoined,
+      ...recentAchievementUnlocks,
     ]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .slice(0, 8);
@@ -400,6 +452,35 @@ export async function DELETE(req: Request) {
 
     const limited = rateLimitResponse(userId, "DELETE:/api/profile", RATE_LIMIT_TIERS.AUTH_SENSITIVE);
     if (limited) return limited;
+
+    const body = await req.json().catch(() => ({}));
+    const currentPassword = typeof (body as { currentPassword?: unknown }).currentPassword === "string"
+      ? (body as { currentPassword: string }).currentPassword
+      : "";
+
+    if (currentPassword.trim().length < 6) {
+      return NextResponse.json(
+        { error: "Hesabı silmek için mevcut şifrenizi girmeniz gerekiyor." },
+        { status: 400 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { password: true },
+    });
+
+    if (!user) {
+      return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
+    }
+
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      return NextResponse.json(
+        { error: "Mevcut şifre doğrulanamadı." },
+        { status: 403 }
+      );
+    }
 
     // Transaction kullanarak ilişkisel veri bütünlüğünü koruyalım
     await prisma.$transaction(async (tx) => {

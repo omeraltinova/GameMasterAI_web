@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db/prisma";
 import bcrypt from "bcryptjs";
+import { createHash } from "crypto";
 import type { Session } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import { checkRateLimit, getClientIp } from "@/lib/security/rateLimit";
@@ -13,9 +14,38 @@ type AuthTokenUser = {
   role: string;
   isSuspended?: boolean;
   isSoftDeleted?: boolean;
+  passwordSignature?: string;
 };
 
 const DUMMY_BCRYPT_HASH = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
+const LOGIN_GLOBAL_LIMIT = { windowMs: 60 * 1000, max: 180 };
+const LOGIN_IP_LIMIT = { windowMs: 15 * 60 * 1000, max: 40 };
+const LOGIN_ACCOUNT_LIMIT = { windowMs: 15 * 60 * 1000, max: 10 };
+const LOGIN_ACCOUNT_BACKOFF_LIMIT = { windowMs: 2 * 60 * 1000, max: 5 };
+
+function buildPasswordSignature(passwordHash: string) {
+  const secret = process.env.NEXTAUTH_SECRET || "local-dev-secret";
+  return createHash("sha256")
+    .update(`${passwordHash}:${secret}`)
+    .digest("hex");
+}
+
+function revokeToken(token: JWT) {
+  token.id = "";
+  token.email = "";
+  token.name = "";
+  token.role = "VISITOR";
+  token.isSuspended = false;
+  token.isSoftDeleted = true;
+  token.passwordSignature = "";
+  token.sessionRevoked = true;
+  return token;
+}
+
+function buildThrottleMessage(prefix: string, resetAt: number) {
+  const retryAfterSec = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
+  return `${prefix} ${retryAfterSec} saniye sonra tekrar deneyin.`;
+}
 
 const authConfig = {
   providers: [
@@ -31,19 +61,31 @@ const authConfig = {
         }
 
         const normalizedEmail = credentials.email.toLowerCase().trim();
-        const accountRateLimitKey = `login-account:${normalizedEmail}`;
-        const rateLimit = checkRateLimit(accountRateLimitKey, { windowMs: 15 * 60 * 1000, max: 10 });
-        if (!rateLimit.allowed) {
-          throw new Error("Çok fazla deneme. Lütfen daha sonra tekrar deneyin.");
+        const ip = getClientIp(req);
+        const ipRateLimitKey = ip !== "unknown" ? ip : "unknown";
+
+        const globalRateLimit = checkRateLimit("login-global", LOGIN_GLOBAL_LIMIT);
+        if (!globalRateLimit.allowed) {
+          throw new Error(buildThrottleMessage("Giriş denemeleri geçici olarak sınırlandı.", globalRateLimit.resetAt));
         }
 
-        // Optional second layer: only active when proxy IP headers are trusted via env.
-        const ip = getClientIp(req);
-        if (ip !== "unknown") {
-          const ipRateLimit = checkRateLimit(`login-ip:${ip}`, { windowMs: 15 * 60 * 1000, max: 40 });
-          if (!ipRateLimit.allowed) {
-            throw new Error("Çok fazla deneme. Lütfen daha sonra tekrar deneyin.");
-          }
+        const ipRateLimit = checkRateLimit(`login-ip:${ipRateLimitKey}`, LOGIN_IP_LIMIT);
+        if (!ipRateLimit.allowed) {
+          throw new Error(buildThrottleMessage("IP bazlı giriş limiti aşıldı.", ipRateLimit.resetAt));
+        }
+
+        const accountRateLimit = checkRateLimit(`login-account:${normalizedEmail}`, LOGIN_ACCOUNT_LIMIT);
+        if (!accountRateLimit.allowed) {
+          throw new Error(buildThrottleMessage("Hesap bazlı giriş limiti aşıldı.", accountRateLimit.resetAt));
+        }
+
+        // Progressive backoff for rapid repeated attempts on the same account.
+        const accountBackoffRateLimit = checkRateLimit(
+          `login-account-backoff:${normalizedEmail}`,
+          LOGIN_ACCOUNT_BACKOFF_LIMIT,
+        );
+        if (!accountBackoffRateLimit.allowed) {
+          throw new Error(buildThrottleMessage("Çok sık giriş denemesi algılandı.", accountBackoffRateLimit.resetAt));
         }
 
         const user = await prisma.user.findUnique({
@@ -84,6 +126,7 @@ const authConfig = {
           role: user.role,
           isSuspended: false,
           isSoftDeleted: user.isSoftDeleted,
+          passwordSignature: buildPasswordSignature(user.password),
         };
       },
     }),
@@ -119,6 +162,8 @@ const authConfig = {
         token.role = user.role;
         token.isSuspended = Boolean(user.isSuspended);
         token.isSoftDeleted = Boolean(user.isSoftDeleted);
+        token.passwordSignature = user.passwordSignature || "";
+        token.sessionRevoked = false;
       }
 
       if (token.id) {
@@ -129,6 +174,7 @@ const authConfig = {
             email: true,
             username: true,
             role: true,
+            password: true,
             isSuspended: true,
             suspendedUntil: true,
             isSoftDeleted: true,
@@ -136,18 +182,26 @@ const authConfig = {
         });
 
         if (!currentUser || currentUser.isSoftDeleted) {
-          token.isSoftDeleted = true;
-          token.isSuspended = false;
+          return revokeToken(token);
         } else {
+          const currentPasswordSignature = buildPasswordSignature(currentUser.password);
+          if (token.passwordSignature && token.passwordSignature !== currentPasswordSignature) {
+            return revokeToken(token);
+          }
+          if (!token.passwordSignature) {
+            return revokeToken(token);
+          }
+
           const now = new Date();
           const suspended = currentUser.isSuspended
             && (!currentUser.suspendedUntil || currentUser.suspendedUntil > now);
 
           token.email = currentUser.email;
           token.name = currentUser.username;
-          token.role = currentUser.role;
+          token.role = suspended ? "VISITOR" : currentUser.role;
           token.isSuspended = suspended;
           token.isSoftDeleted = currentUser.isSoftDeleted;
+          token.sessionRevoked = false;
         }
       }
 

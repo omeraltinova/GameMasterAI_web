@@ -291,6 +291,14 @@ describe('characterCreateSchema', () => {
     })
     expect(result.success).toBe(false)
   })
+
+  it('base64 imageUrl kabul eder', () => {
+    const result = characterCreateSchema.safeParse({
+      ...validCharacter,
+      imageUrl: 'data:image/png;base64,aGVsbG8=',
+    })
+    expect(result.success).toBe(true)
+  })
 })
 
 // ==========================================

@@ -162,6 +162,10 @@ export async function PATCH(req: Request) {
         return NextResponse.json({ error: "Geçersiz rol değeri" }, { status: 400 });
       }
 
+      if (existingUser.role === "ADMIN" && userId !== session.user.id) {
+        return NextResponse.json({ error: "Başka bir adminin rolü değiştirilemez." }, { status: 403 });
+      }
+
       if (userId === session.user.id && role !== "ADMIN") {
         return NextResponse.json({ error: "Kendi yetkinizi alamazsınız." }, { status: 400 });
       }
@@ -198,6 +202,10 @@ export async function PATCH(req: Request) {
       const suspensionReason = typeof body.suspensionReason === "string"
         ? body.suspensionReason.trim()
         : "";
+
+      if (existingUser.role === "ADMIN" && userId !== session.user.id) {
+        return NextResponse.json({ error: "Başka bir admin askıya alınamaz." }, { status: 403 });
+      }
 
       if (userId === session.user.id && isSuspended) {
         return NextResponse.json({ error: "Kendinizi askıya alamazsınız." }, { status: 400 });

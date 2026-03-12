@@ -54,6 +54,7 @@ export async function GET() {
           experience: char.experience,
           hp: char.hp,
           maxHp: char.maxHp,
+          gold: char.gold,
           stats: JSON.parse(char.stats),
           background: char.background,
           appearance: characterAppearance,
@@ -111,6 +112,7 @@ export async function POST(req: NextRequest) {
       experience,
       hp,
       maxHp,
+      gold,
       stats,
       background,
       appearance,
@@ -129,6 +131,7 @@ export async function POST(req: NextRequest) {
       experience: experience || 0,
       hp: hp || 10,
       maxHp: maxHp || 10,
+      gold: gold ?? 0,
       stats: typeof stats === 'object'
         ? JSON.stringify(stats)
         : JSON.stringify({
@@ -167,6 +170,7 @@ export async function POST(req: NextRequest) {
         experience: character.experience,
         hp: character.hp,
         maxHp: character.maxHp,
+        gold: character.gold,
         stats: JSON.parse(character.stats),
         background: character.background,
         appearance: characterAppearance,

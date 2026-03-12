@@ -74,7 +74,7 @@ function getAuthorize() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.checkRateLimit.mockReturnValue({ allowed: true, remaining: 9 });
+  mocks.checkRateLimit.mockReturnValue({ allowed: true, remaining: 9, resetAt: Date.now() + 60_000 });
   mocks.getClientIp.mockReturnValue("unknown");
   mocks.bcryptCompare.mockResolvedValue(true);
 });
@@ -132,11 +132,41 @@ describe("NextAuth credentials security", () => {
       name: "user",
       role: "MEMBER",
     });
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      "login-global",
+      { windowMs: 60 * 1000, max: 180 },
+    );
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      "login-ip:unknown",
+      { windowMs: 15 * 60 * 1000, max: 40 },
+    );
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      "login-account:user@example.com",
+      { windowMs: 15 * 60 * 1000, max: 10 },
+    );
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      "login-account-backoff:user@example.com",
+      { windowMs: 2 * 60 * 1000, max: 5 },
+    );
   });
 
   it("returns null for missing credentials", async () => {
     const authorize = getAuthorize();
 
     await expect(authorize(undefined, {})).resolves.toBeNull();
+  });
+
+  it("throws throttling error when global limit is exceeded", async () => {
+    const authorize = getAuthorize();
+    mocks.checkRateLimit.mockImplementation((key: string) => {
+      if (key === "login-global") {
+        return { allowed: false, remaining: 0, resetAt: Date.now() + 30_000 };
+      }
+      return { allowed: true, remaining: 9, resetAt: Date.now() + 60_000 };
+    });
+
+    await expect(
+      authorize({ email: "user@example.com", password: "valid" }, {}),
+    ).rejects.toThrow("Giriş denemeleri geçici olarak sınırlandı.");
   });
 });

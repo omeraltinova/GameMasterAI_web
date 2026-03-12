@@ -66,7 +66,6 @@ export async function GET(
         description: map.description,
         imageUrl: map.imageUrl,
         isAIGenerated: map.isAIGenerated,
-        prompt: map.prompt,
         createdAt: map.createdAt.toISOString(),
       })),
       total: session.maps.length,
@@ -177,7 +176,6 @@ export async function POST(
         description: map.description,
         imageUrl: map.imageUrl,
         isAIGenerated: map.isAIGenerated,
-        prompt: map.prompt,
         createdAt: map.createdAt.toISOString(),
       },
     }, { status: 201 });

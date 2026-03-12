@@ -28,6 +28,7 @@ interface Character {
     race: string;
     class: string;
     level: number;
+    gold?: number;
     stats: {
         strength: number;
         dexterity: number;
@@ -66,6 +67,8 @@ export default function InventoryPage() {
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [activeFilter, setActiveFilter] = useState("all");
+    const [goldAdjustment, setGoldAdjustment] = useState("10");
+    const [isUpdatingGold, setIsUpdatingGold] = useState(false);
 
     // Karakter bilgilerini ve envanteri yükle
     const fetchData = useCallback(async () => {
@@ -87,7 +90,10 @@ export default function InventoryPage() {
                 return;
             }
 
-            setCharacter(foundCharacter);
+            setCharacter({
+                ...foundCharacter,
+                gold: foundCharacter.gold ?? 0,
+            });
 
             if (inventoryRes.success) {
                 setItems(inventoryRes.items || []);
@@ -178,6 +184,48 @@ export default function InventoryPage() {
         }
     };
 
+    const handleGoldAdjust = async (direction: 1 | -1) => {
+        if (!characterId || !character) return;
+        const parsedAmount = Number.parseInt(goldAdjustment, 10);
+        const amount = Number.isFinite(parsedAmount) ? parsedAmount : 0;
+
+        if (amount <= 0) {
+            setError("Altın işlemi için 0'dan büyük bir miktar girin");
+            return;
+        }
+
+        const currentGold = character.gold ?? 0;
+        const nextGold = Math.max(0, currentGold + direction * amount);
+        if (nextGold === currentGold) {
+            return;
+        }
+
+        setIsUpdatingGold(true);
+        setError(null);
+        try {
+            const response = await fetch(`/api/characters/${characterId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ gold: nextGold }),
+            });
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.error || "Altın güncellenemedi");
+            }
+
+            const updatedGold = Number.isInteger(data.character?.gold)
+                ? data.character.gold
+                : nextGold;
+            setCharacter((prev) => (prev ? { ...prev, gold: updatedGold } : prev));
+        } catch (err) {
+            console.error("Gold update error:", err);
+            setError(err instanceof Error ? err.message : "Altın güncellenemedi");
+        } finally {
+            setIsUpdatingGold(false);
+        }
+    };
+
     // Filtreleme
     const filteredInventory = inventory.filter(item => {
         // Arama filtresi
@@ -243,7 +291,7 @@ export default function InventoryPage() {
                     </div>
                 </div>
 
-                <Button onClick={() => setShowAddModal(true)} className="gap-2">
+                <Button onClick={() => setShowAddModal(true)} className="gap-2" disabled={isActionLoading}>
                     <Plus className="h-4 w-4" />
                     Item Ekle
                 </Button>
@@ -286,12 +334,41 @@ export default function InventoryPage() {
                     </CardContent>
                 </Card>
 
-                {/* Altın (placeholder) */}
+                {/* Altın */}
                 <Card>
-                    <CardContent className="p-4 text-center">
-                        <Coins className="h-5 w-5 mx-auto mb-1 text-yellow-500" />
-                        <p className="text-2xl font-bold">0</p>
-                        <p className="text-xs text-foreground-muted">Altın</p>
+                    <CardContent className="p-4">
+                        <div className="text-center mb-3">
+                            <Coins className="h-5 w-5 mx-auto mb-1 text-yellow-500" />
+                            <p className="text-2xl font-bold">{character.gold ?? 0}</p>
+                            <p className="text-xs text-foreground-muted">Altın</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                min={1}
+                                value={goldAdjustment}
+                                onChange={(e) => setGoldAdjustment(e.target.value)}
+                                className="w-full h-8 rounded-md border border-border bg-input px-2 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                                aria-label="Altın miktarı"
+                            />
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2"
+                                onClick={() => void handleGoldAdjust(-1)}
+                                disabled={isUpdatingGold}
+                            >
+                                -
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="h-8 px-2"
+                                onClick={() => void handleGoldAdjust(1)}
+                                disabled={isUpdatingGold}
+                            >
+                                +
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
             </div>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
 import { checkAchievements, AchievementStats } from '@/lib/achievements';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/users/:id
@@ -21,8 +22,26 @@ export async function GET(
       );
     }
 
+    const limited = rateLimitResponse(currentUserId, "GET:/api/users/[id]", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
+
     const { id: userId } = await params;
     const isOwnProfile = currentUserId === userId;
+    const currentUser = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: {
+        role: true,
+      },
+    });
+
+    if (!currentUser) {
+      return NextResponse.json(
+        { success: false, error: 'Oturum açmanız gerekiyor' },
+        { status: 401 }
+      );
+    }
+
+    const canViewRole = isOwnProfile || currentUser.role === 'ADMIN';
 
     // Kullanıcı temel bilgileri + gizlilik ayarları + ilişkili veriler
     const user = await prisma.user.findUnique({
@@ -134,7 +153,7 @@ export async function GET(
           id: user.id,
           username: user.username,
           avatar: user.avatar,
-          role: user.role,
+          ...(canViewRole ? { role: user.role } : {}),
           createdAt: user.createdAt,
           isOwnProfile: false,
           isPrivate: true,
@@ -247,7 +266,7 @@ export async function GET(
       : [];
 
     // === Başarım kontrolü ve DB kaydı ===
-    let achievementsResponse: { id: string; unlockedAt: string | null }[] = [];
+    let achievementsResponse: { id: string; unlocked: boolean; unlockedAt: string | null }[] = [];
 
     if (showStat) {
       const monthsSinceJoin = Math.floor(
@@ -284,11 +303,17 @@ export async function GET(
         existingAchievements.map((a) => [a.achievementId, a.unlockedAt])
       );
 
-      // Tüm başarımlar için response oluştur
-      achievementsResponse = checkResults.map((r) => ({
-        id: r.id,
-        unlockedAt: r.unlocked ? (existingMap.get(r.id)?.toISOString() || null) : null,
-      }));
+      // Tüm başarımlar için response oluştur.
+      // Geçmişte açılan başarımlar, güncel stat eşiği düşse de korunur.
+      achievementsResponse = checkResults.map((r) => {
+        const storedUnlockedAt = existingMap.get(r.id) ?? null;
+        const unlocked = Boolean(storedUnlockedAt) || r.unlocked;
+        return {
+          id: r.id,
+          unlocked,
+          unlockedAt: storedUnlockedAt ? storedUnlockedAt.toISOString() : null,
+        };
+      });
     }
 
     return NextResponse.json({
@@ -297,7 +322,7 @@ export async function GET(
         id: user.id,
         username: user.username,
         avatar: user.avatar,
-        role: user.role,
+        ...(canViewRole ? { role: user.role } : {}),
         createdAt: user.createdAt,
         isOwnProfile,
         isPrivate: false,

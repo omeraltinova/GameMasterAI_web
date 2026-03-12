@@ -34,7 +34,6 @@ export async function GET(
               select: {
                 id: true,
                 username: true,
-                email: true,
               },
             },
             scenario: true,
@@ -44,7 +43,6 @@ export async function GET(
                   select: {
                     id: true,
                     username: true,
-                    email: true,
                   },
                 },
                 character: true,
@@ -53,6 +51,9 @@ export async function GET(
           },
         },
         messages: {
+          where: {
+            isSoftDeleted: false,
+          },
           take: 50,
           orderBy: { timestamp: 'desc' },
         },

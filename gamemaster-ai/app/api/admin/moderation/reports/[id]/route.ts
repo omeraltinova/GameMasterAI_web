@@ -10,6 +10,8 @@ import {
   softDeleteModerationTarget,
 } from "@/lib/admin/moderation";
 
+class ModerationConflictError extends Error {}
+
 function resolveDecision(value: unknown) {
   if (typeof value !== "string") {
     return null;
@@ -89,6 +91,23 @@ export async function PATCH(
     const targetEntityType = parseModerationEntityType(existingReport.entityType);
 
     const updatedReport = await prisma.$transaction(async (tx) => {
+      const claimResult = await tx.moderationReport.updateMany({
+        where: {
+          id: existingReport.id,
+          status: "PENDING",
+        },
+        data: {
+          status: decision,
+          reviewedById: session.user.id,
+          reviewedAt: now,
+          resolutionNote: resolutionNote || null,
+        },
+      });
+
+      if (claimResult.count !== 1) {
+        throw new ModerationConflictError("Bu rapor zaten karara bağlanmış");
+      }
+
       let softDeleteApplied = false;
 
       if (softDeleteRequested && targetEntityType) {
@@ -100,14 +119,8 @@ export async function PATCH(
         );
       }
 
-      const report = await tx.moderationReport.update({
+      const report = await tx.moderationReport.findUniqueOrThrow({
         where: { id: existingReport.id },
-        data: {
-          status: decision,
-          reviewedById: session.user.id,
-          reviewedAt: now,
-          resolutionNote: resolutionNote || null,
-        },
         include: {
           reporter: {
             select: {
@@ -126,10 +139,7 @@ export async function PATCH(
         },
       });
 
-      return {
-        report,
-        softDeleteApplied,
-      };
+      return { report, softDeleteApplied };
     });
 
     await logAdminAction({
@@ -155,6 +165,9 @@ export async function PATCH(
       softDeleteApplied: updatedReport.softDeleteApplied,
     });
   } catch (error) {
+    if (error instanceof ModerationConflictError) {
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     console.error("Moderation report güncellenemedi:", error);
     return NextResponse.json({ error: "Moderasyon aksiyonu başarısız" }, { status: 500 });
   }

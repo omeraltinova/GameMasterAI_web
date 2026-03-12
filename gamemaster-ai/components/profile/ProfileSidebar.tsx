@@ -6,7 +6,6 @@ import {
   CardContent,
   Avatar,
   Badge,
-  Button,
   Progress,
 } from "@/components/ui";
 import {
@@ -79,8 +78,8 @@ export function ProfileSidebar({
   };
 
   return (
-    <div className="w-full md:w-80 flex flex-col shrink-0 h-full">
-      <Card className="flex-1 flex flex-col overflow-hidden">
+    <div className="w-full md:w-80 flex flex-col shrink-0 h-full min-h-0">
+      <Card className="flex-1 flex flex-col overflow-hidden min-h-0">
         {/* Profile Banner */}
         <div className="relative h-28 bg-gradient-to-br from-primary/30 via-secondary/20 to-accent/10 overflow-hidden">
           <div
@@ -94,7 +93,7 @@ export function ProfileSidebar({
           <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-card to-transparent" />
         </div>
 
-        <CardContent className="p-6 flex flex-col items-center flex-1 relative -mt-16">
+        <CardContent className="p-6 flex flex-col items-center flex-1 relative -mt-16 overflow-y-auto min-h-0 custom-scrollbar">
           {/* Avatar with upload */}
           <div className="relative group mb-4">
             <Avatar
@@ -150,7 +149,7 @@ export function ProfileSidebar({
                 value={profileCompletion.percentage}
                 className="h-2 mb-2"
               />
-              <div className="space-y-1">
+              <div className="space-y-1 max-h-20 overflow-y-auto pr-1 custom-scrollbar">
                 {profileCompletion.missing.map((item) => (
                   <p
                     key={item.label}

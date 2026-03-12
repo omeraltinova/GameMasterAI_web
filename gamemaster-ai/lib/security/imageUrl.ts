@@ -1,4 +1,13 @@
 const LOCALHOST_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
+const ALLOWED_DATA_IMAGE_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+  "image/avif",
+]);
+const MAX_DATA_IMAGE_URL_LENGTH = 8 * 1024 * 1024;
 
 function parseAllowedHosts(raw: string | undefined) {
   if (!raw) return [];
@@ -45,7 +54,29 @@ function hasAllowedHost(hostname: string, allowedHosts: string[]) {
 
 export type NormalizeImageUrlOptions = {
   allowRelative?: boolean;
+  allowDataUrl?: boolean;
 };
+
+function normalizeDataImageUrl(value: string): string | null {
+  if (value.length > MAX_DATA_IMAGE_URL_LENGTH) {
+    return null;
+  }
+
+  const match = value.match(
+    /^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=]+)$/i
+  );
+  if (!match) {
+    return null;
+  }
+
+  const mimeType = match[1].toLowerCase();
+  const payload = match[2];
+  if (!ALLOWED_DATA_IMAGE_MIME_TYPES.has(mimeType) || payload.length === 0) {
+    return null;
+  }
+
+  return `data:${mimeType};base64,${payload}`;
+}
 
 /**
  * Normalizes and validates image URLs for safe rendering/storage.
@@ -66,6 +97,11 @@ export function normalizeImageUrl(
   const trimmed = value.trim();
   if (!trimmed) {
     return null;
+  }
+
+  const allowDataUrl = options.allowDataUrl ?? false;
+  if (allowDataUrl && trimmed.startsWith("data:")) {
+    return normalizeDataImageUrl(trimmed);
   }
 
   const allowRelative = options.allowRelative ?? true;

@@ -29,13 +29,15 @@ export async function GET(
     // Campaign'ı kontrol et
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
-      include: {
-        creator: true,
+      select: {
+        id: true,
+        creatorId: true,
+        isSoftDeleted: true,
         players: true,
       },
     });
 
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json(
         { success: false, error: 'Oturum bulunamadı' },
         { status: 404 }
@@ -50,6 +52,7 @@ export async function GET(
         { status: 403 }
       );
     }
+    const shouldExposeInviteCode = canManageCampaign(actorRole);
 
     // Session'ları listele
     const sessions = await prisma.gameSession.findMany({
@@ -62,7 +65,6 @@ export async function GET(
               select: {
                 id: true,
                 username: true,
-                email: true,
                 avatar: true,
               },
             },
@@ -72,7 +74,27 @@ export async function GET(
       },
     });
 
-    return NextResponse.json(sessions);
+    return NextResponse.json(
+      sessions.map((session: any) => ({
+        ...session,
+        campaign: session.campaign
+          ? {
+              ...session.campaign,
+              inviteCode:
+                shouldExposeInviteCode && session.campaign.isMultiplayer
+                  ? session.campaign.inviteCode
+                  : null,
+              creator: session.campaign.creator
+                ? {
+                    id: session.campaign.creator.id,
+                    username: session.campaign.creator.username,
+                    avatar: session.campaign.creator.avatar,
+                  }
+                : null,
+            }
+          : null,
+      }))
+    );
   } catch (error) {
     console.error('Sessions fetch error:', error);
     return NextResponse.json(

@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   getUserId: vi.fn(),
   bcryptHash: vi.fn().mockResolvedValue("$2a$10$hashed"),
   bcryptCompare: vi.fn(),
+  checkRateLimit: vi.fn(),
+  getClientIp: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -48,8 +50,8 @@ vi.mock("bcryptjs", () => ({
 
 // Mock rate limiter to always allow
 vi.mock("@/lib/security/rateLimit", () => ({
-  checkRateLimit: vi.fn().mockReturnValue({ allowed: true, remaining: 10 }),
-  getClientIp: vi.fn().mockReturnValue("127.0.0.1"),
+  checkRateLimit: mocks.checkRateLimit,
+  getClientIp: mocks.getClientIp,
   rateLimitResponse: vi.fn().mockReturnValue(null),
   applyRateLimit: vi.fn().mockReturnValue({ limited: false }),
   RATE_LIMIT_TIERS: {
@@ -84,6 +86,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Reset bcrypt default
   mocks.bcryptHash.mockResolvedValue("$2a$10$hashed");
+  mocks.checkRateLimit.mockReturnValue({ allowed: true, remaining: 10 });
+  mocks.getClientIp.mockReturnValue("127.0.0.1");
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -116,6 +120,22 @@ describe("POST /api/register", () => {
 
     const data = await res.json();
     expect(data.success).toBe(true);
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      "register-username:testuser",
+      { windowMs: 60 * 60 * 1000, max: 10 },
+    );
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      "register-email:test@example.com",
+      { windowMs: 60 * 60 * 1000, max: 10 },
+    );
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      "register-ip:127.0.0.1",
+      { windowMs: 60 * 60 * 1000, max: 40 },
+    );
+    expect(mocks.checkRateLimit).toHaveBeenCalledWith(
+      "register-subnet:127.0.0.0/24",
+      { windowMs: 60 * 60 * 1000, max: 120 },
+    );
   });
 
   it("returns 400 for invalid data (missing email)", async () => {
@@ -167,7 +187,7 @@ describe("POST /api/register", () => {
     expect(res.status).toBe(201);
   });
 
-  it("returns 409 when user already exists", async () => {
+  it("returns generic success when user already exists", async () => {
     mocks.prisma.user.findFirst.mockResolvedValue({
       id: "existing",
       username: "testuser",
@@ -175,7 +195,34 @@ describe("POST /api/register", () => {
     });
 
     const res = await registerPOST(makeRequest(validBody));
-    expect(res.status).toBe(409);
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(mocks.prisma.user.create).not.toHaveBeenCalled();
+  });
+
+  it("returns generic success on unique constraint race", async () => {
+    mocks.prisma.user.findFirst.mockResolvedValue(null);
+    mocks.prisma.user.create.mockRejectedValue({ code: "P2002" });
+
+    const res = await registerPOST(makeRequest(validBody));
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+  });
+
+  it("blocks when username rate limit is exceeded", async () => {
+    mocks.checkRateLimit.mockImplementation((key: string) => {
+      if (key.startsWith("register-username:")) {
+        return { allowed: false, remaining: 0 };
+      }
+      return { allowed: true, remaining: 10 };
+    });
+
+    const res = await registerPOST(makeRequest(validBody));
+    expect(res.status).toBe(429);
+    expect(mocks.prisma.user.findFirst).not.toHaveBeenCalled();
+    expect(mocks.prisma.user.create).not.toHaveBeenCalled();
   });
 
   it("returns 400 for weak password", async () => {

@@ -142,6 +142,12 @@ interface Achievement {
   unlockedAt: string | null;
 }
 
+interface ApiAchievement {
+  id: string;
+  unlocked?: boolean;
+  unlockedAt: string | null;
+}
+
 function getStatusLabel(status: string) {
   switch (status) {
     case "ACTIVE": return "Aktif";
@@ -214,7 +220,7 @@ export default function PlayerProfilePage() {
   }>({ created: [], joined: [] });
   const [scenarios, setScenarios] = useState<ScenarioData[]>([]);
   const [privacySettings, setPrivacySettings] = useState<PrivacyData | null>(null);
-  const [apiAchievements, setApiAchievements] = useState<{ id: string; unlockedAt: string | null }[]>([]);
+  const [apiAchievements, setApiAchievements] = useState<ApiAchievement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -256,19 +262,26 @@ export default function PlayerProfilePage() {
     if (apiAchievements.length === 0) return [];
 
     const apiMap = new Map(
-      apiAchievements.map((a) => [a.id, a.unlockedAt])
+      apiAchievements.map((a) => [a.id, a])
     );
 
-    return ACHIEVEMENT_DEFINITIONS.map((def) => ({
-      id: def.id,
-      label: def.label,
-      description: def.description,
-      icon: ICON_MAP[def.iconName] || Star,
-      color: def.color,
-      category: def.category,
-      unlocked: apiMap.get(def.id) !== null && apiMap.get(def.id) !== undefined,
-      unlockedAt: apiMap.get(def.id) ?? null,
-    }));
+    return ACHIEVEMENT_DEFINITIONS.map((def) => {
+      const fromApi = apiMap.get(def.id);
+      const unlocked =
+        fromApi?.unlocked ??
+        (fromApi?.unlockedAt !== null && fromApi?.unlockedAt !== undefined);
+
+      return {
+        id: def.id,
+        label: def.label,
+        description: def.description,
+        icon: ICON_MAP[def.iconName] || Star,
+        color: def.color,
+        category: def.category,
+        unlocked,
+        unlockedAt: fromApi?.unlockedAt ?? null,
+      };
+    });
   }, [apiAchievements]);
 
   const [showAllAchievements, setShowAllAchievements] = useState(false);

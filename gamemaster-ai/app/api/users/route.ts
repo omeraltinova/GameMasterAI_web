@@ -17,6 +17,21 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const currentUser = await prisma.user.findUnique({
+      where: { id: currentUserId },
+      select: {
+        role: true,
+        isSoftDeleted: true,
+      },
+    });
+    if (!currentUser || currentUser.isSoftDeleted) {
+      return NextResponse.json(
+        { success: false, error: 'Oturum açmanız gerekiyor' },
+        { status: 401 }
+      );
+    }
+    const includeRoleInResponse = currentUser.role === 'ADMIN';
+
     const limited = rateLimitResponse(currentUserId, "GET:/api/users", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
@@ -67,7 +82,7 @@ export async function GET(req: NextRequest) {
         id: user.id,
         username: user.username,
         avatar: user.avatar,
-        role: user.role,
+        ...(includeRoleInResponse ? { role: user.role } : {}),
         createdAt: user.createdAt,
         characterCount: user._count.characters,
         campaignCount: user._count.campaigns + user._count.campaignPlayers,

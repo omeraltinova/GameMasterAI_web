@@ -13,6 +13,7 @@ import {
   Play,
   Flag,
   Settings,
+  BarChart3,
 } from "lucide-react";
 
 interface DashboardData {
@@ -249,6 +250,17 @@ export default function AdminDashboardPage() {
                   </p>
                 </div>
               </Link>
+
+              {/* İstatistikler */}
+              <Link href="/admin/stats">
+                <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
+                  <BarChart3 className="h-6 w-6 text-primary mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-medium">İstatistikler</h4>
+                  <p className="text-sm text-foreground-secondary">
+                    Trendler, aktif kullanıcılar ve tamamlama oranları
+                  </p>
+                </div>
+              </Link>
             </div>
           </CardContent>
         </Card>
@@ -263,7 +275,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {data?.recentUsers.map((user, i) => (
+              {data?.recentUsers.map((user) => (
                 <div
                   key={user.id}
                   className="flex items-start gap-3 pb-4 border-b border-border last:border-0 last:pb-0"

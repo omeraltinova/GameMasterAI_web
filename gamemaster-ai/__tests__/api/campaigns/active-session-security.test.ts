@@ -155,14 +155,14 @@ describe("/api/campaigns/[id]/active-session security", () => {
       id: true,
       username: true,
       avatar: true,
-      role: true,
     });
     expect(queryArg?.select?.players?.select?.user?.select).toEqual({
       id: true,
       username: true,
       avatar: true,
-      role: true,
     });
+    expect(queryArg?.select?.creator?.select?.role).toBeUndefined();
+    expect(queryArg?.select?.players?.select?.user?.select?.role).toBeUndefined();
     expect(queryArg?.select?.creator?.select?.password).toBeUndefined();
     expect(queryArg?.select?.players?.select?.user?.select?.password).toBeUndefined();
   });
@@ -178,6 +178,34 @@ describe("/api/campaigns/[id]/active-session security", () => {
     expect(mocks.prisma.gameSession.create).not.toHaveBeenCalled();
     expect(mocks.prisma.message.create).not.toHaveBeenCalled();
     expect(mocks.prisma.campaign.update).not.toHaveBeenCalled();
+  });
+
+  it("GET redacts inviteCode for non-GM participants", async () => {
+    mocks.getUserId.mockResolvedValue("player-1");
+    mocks.prisma.campaign.findUnique.mockResolvedValue(buildCampaign({ inviteCode: "SECRET42" }));
+
+    const response = await GET(makeRequest("GET"), {
+      params: Promise.resolve({ id: "camp-1" }),
+    });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.campaign?.inviteCode).toBeNull();
+    expect(data.campaign?.creator?.role).toBeUndefined();
+    expect(data.campaign?.players?.[0]?.user?.role).toBeUndefined();
+  });
+
+  it("GET keeps inviteCode for GM", async () => {
+    mocks.getUserId.mockResolvedValue("gm-1");
+    mocks.prisma.campaign.findUnique.mockResolvedValue(buildCampaign({ inviteCode: "SECRET42" }));
+
+    const response = await GET(makeRequest("GET"), {
+      params: Promise.resolve({ id: "camp-1" }),
+    });
+
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.campaign?.inviteCode).toBe("SECRET42");
   });
 
   it("POST can create and activate session for GM when none exists", async () => {
@@ -197,5 +225,36 @@ describe("/api/campaigns/[id]/active-session security", () => {
       where: { id: "camp-1" },
       data: { status: "ACTIVE" },
     });
+  });
+
+  it("POST does not auto-reactivate completed campaigns", async () => {
+    mocks.getUserId.mockResolvedValue("gm-1");
+    mocks.prisma.campaign.findUnique.mockResolvedValue(
+      buildCampaign({ status: "COMPLETED" }),
+    );
+
+    const response = await POST(makeRequest("POST"), {
+      params: Promise.resolve({ id: "camp-1" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.prisma.campaign.update).not.toHaveBeenCalled();
+    const data = await response.json();
+    expect(data.campaign?.status).toBe("COMPLETED");
+  });
+
+  it("POST blocks session creation when campaign is not DRAFT", async () => {
+    mocks.getUserId.mockResolvedValue("gm-1");
+    mocks.prisma.campaign.findUnique.mockResolvedValue(
+      buildCampaign({ status: "PAUSED", sessions: [] }),
+    );
+
+    const response = await POST(makeRequest("POST"), {
+      params: Promise.resolve({ id: "camp-1" }),
+    });
+
+    expect(response.status).toBe(409);
+    expect(mocks.prisma.gameSession.create).not.toHaveBeenCalled();
+    expect(mocks.prisma.campaign.update).not.toHaveBeenCalled();
   });
 });

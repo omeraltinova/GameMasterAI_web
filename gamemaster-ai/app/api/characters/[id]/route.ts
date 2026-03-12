@@ -80,6 +80,7 @@ export async function GET(
         experience: character.experience,
         hp: character.hp,
         maxHp: character.maxHp,
+        gold: character.gold,
         stats: parseStats(character.stats),
         background: character.background,
         appearance: characterAppearance,
@@ -137,6 +138,17 @@ export async function PUT(
     }
 
     const body = await req.json();
+    const blockedProgressionFields = ["hp", "maxHp", "level", "experience"] as const;
+    const blockedFieldProvided = blockedProgressionFields.find((field) =>
+      Object.prototype.hasOwnProperty.call(body, field)
+    );
+    if (blockedFieldProvided) {
+      return NextResponse.json(
+        { success: false, error: "Bu endpoint ile hp/maxHp/level/experience alanları güncellenemez" },
+        { status: 400 }
+      );
+    }
+
     const {
       name,
       race,
@@ -146,10 +158,7 @@ export async function PUT(
       appearance,
       backstory,
       imageUrl,
-      hp,
-      maxHp,
-      level,
-      experience,
+      gold,
     } = body;
 
     const data: Record<string, unknown> = {};
@@ -187,7 +196,9 @@ export async function PUT(
     if (imageUrl === null) {
       data.imageUrl = null;
     } else if (typeof imageUrl === "string") {
-      const normalizedImageUrl = normalizeImageUrl(imageUrl);
+      const normalizedImageUrl = normalizeImageUrl(imageUrl, {
+        allowDataUrl: true,
+      });
       if (!normalizedImageUrl) {
         return NextResponse.json(
           { success: false, error: "Geçersiz görsel URL'i" },
@@ -201,20 +212,15 @@ export async function PUT(
       data.stats = JSON.stringify(stats);
     }
 
-    if (Number.isFinite(hp)) {
-      data.hp = hp;
-    }
-
-    if (Number.isFinite(maxHp)) {
-      data.maxHp = maxHp;
-    }
-
-    if (Number.isFinite(level)) {
-      data.level = level;
-    }
-
-    if (Number.isFinite(experience)) {
-      data.experience = experience;
+    if (gold !== undefined) {
+      const numericGold = Number(gold);
+      if (!Number.isInteger(numericGold) || numericGold < 0) {
+        return NextResponse.json(
+          { success: false, error: "Gold alanı 0 veya daha büyük tam sayı olmalıdır" },
+          { status: 400 }
+        );
+      }
+      data.gold = numericGold;
     }
 
     if (Object.keys(data).length === 0) {
@@ -243,6 +249,7 @@ export async function PUT(
         experience: updatedCharacter.experience,
         hp: updatedCharacter.hp,
         maxHp: updatedCharacter.maxHp,
+        gold: updatedCharacter.gold,
         stats: parseStats(updatedCharacter.stats),
         background: updatedCharacter.background,
         appearance: updatedAppearance,

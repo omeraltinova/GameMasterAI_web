@@ -70,6 +70,7 @@ model Character {
   experience Int      @default(0)
   hp         Int
   maxHp      Int
+  gold       Int      @default(0)
   stats      String   // JSON olarak saklanacak
   background String?
   appearance String?

@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
     $transaction: vi.fn(),
   },
   getUserId: vi.fn(),
+  rateLimitResponse: vi.fn(),
   checkAchievements: vi.fn(),
 }));
 
@@ -29,6 +30,13 @@ vi.mock("@/lib/db/prisma", () => ({
 
 vi.mock("@/lib/auth/server", () => ({
   getUserId: mocks.getUserId,
+}));
+
+vi.mock("@/lib/security/rateLimit", () => ({
+  rateLimitResponse: mocks.rateLimitResponse,
+  RATE_LIMIT_TIERS: {
+    READ: { windowMs: 60_000, max: 100 },
+  },
 }));
 
 vi.mock("@/lib/achievements", () => ({
@@ -72,6 +80,7 @@ function buildBaseUser() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.rateLimitResponse.mockReturnValue(null);
 
   mocks.prisma.user.findUnique.mockResolvedValue(buildBaseUser());
   mocks.prisma.message.count.mockResolvedValue(0);
@@ -100,7 +109,7 @@ describe("GET /api/users/[id] security", () => {
     const body = await response.json();
     expect(body.success).toBe(true);
     expect(Array.isArray(body.achievements)).toBe(true);
-    expect(body.achievements[0]).toEqual({ id: "newcomer", unlockedAt: null });
+    expect(body.achievements[0]).toEqual({ id: "newcomer", unlocked: true, unlockedAt: null });
   });
 
   it("does not write achievements in GET even for profile owner", async () => {
@@ -113,5 +122,84 @@ describe("GET /api/users/[id] security", () => {
     expect(response.status).toBe(200);
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
     expect(mocks.prisma.userAchievement.create).not.toHaveBeenCalled();
+  });
+
+  it("keeps previously unlocked achievements visible even if current checks fail", async () => {
+    mocks.getUserId.mockResolvedValue("viewer-user");
+    mocks.prisma.userAchievement.findMany.mockResolvedValue([
+      {
+        achievementId: "newcomer",
+        unlockedAt: new Date("2026-01-10T12:00:00.000Z"),
+      },
+    ]);
+    mocks.checkAchievements.mockReturnValue([
+      { id: "newcomer", unlocked: false },
+    ]);
+
+    const response = await GET(makeRequest(), {
+      params: Promise.resolve({ id: "target-user" }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.achievements[0]).toEqual({
+      id: "newcomer",
+      unlocked: true,
+      unlockedAt: "2026-01-10T12:00:00.000Z",
+    });
+  });
+
+  it("redacts target role for non-admin viewer", async () => {
+    mocks.getUserId.mockResolvedValue("viewer-user");
+    mocks.prisma.user.findUnique
+      .mockResolvedValueOnce({
+        role: "MEMBER",
+      })
+      .mockResolvedValueOnce(buildBaseUser());
+
+    const response = await GET(makeRequest(), {
+      params: Promise.resolve({ id: "target-user" }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.profile.role).toBeUndefined();
+  });
+
+  it("keeps target role visible for admin viewer", async () => {
+    mocks.getUserId.mockResolvedValue("viewer-user");
+    mocks.prisma.user.findUnique
+      .mockResolvedValueOnce({
+        role: "ADMIN",
+      })
+      .mockResolvedValueOnce(buildBaseUser());
+
+    const response = await GET(makeRequest(), {
+      params: Promise.resolve({ id: "target-user" }),
+    });
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.profile.role).toBe("MEMBER");
+  });
+
+  it("applies route-level rate limit on profile read", async () => {
+    mocks.getUserId.mockResolvedValue("viewer-user");
+    const limitedResponse = new Response(JSON.stringify({ success: false, error: "Too many requests" }), {
+      status: 429,
+      headers: { "Content-Type": "application/json" },
+    });
+    mocks.rateLimitResponse.mockReturnValue(limitedResponse);
+
+    const response = await GET(makeRequest(), {
+      params: Promise.resolve({ id: "target-user" }),
+    });
+
+    expect(response.status).toBe(429);
+    expect(mocks.rateLimitResponse).toHaveBeenCalledWith(
+      "viewer-user",
+      "GET:/api/users/[id]",
+      expect.any(Object),
+    );
   });
 });

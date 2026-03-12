@@ -42,7 +42,7 @@ export async function GET(
         }
 
         const hasAccess = session.campaign.creatorId === userId ||
-            session.campaign.players.some((p: any) => p.userId === userId);
+            session.campaign.players.some((p: { userId: string }) => p.userId === userId);
 
         if (!hasAccess) {
             return NextResponse.json(
@@ -118,12 +118,10 @@ export async function PUT(
             );
         }
 
-        const hasAccess = session.campaign.creatorId === userId ||
-            session.campaign.players.some((p: any) => p.userId === userId);
-
-        if (!hasAccess) {
+        const isCreator = session.campaign.creatorId === userId;
+        if (!isCreator) {
             return NextResponse.json(
-                { success: false, error: 'Erişim yetkiniz yok' },
+                { success: false, error: 'Sadece oturum sahibi NPC güncelleyebilir' },
                 { status: 403 }
             );
         }

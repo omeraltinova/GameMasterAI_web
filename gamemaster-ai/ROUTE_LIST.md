@@ -12,14 +12,26 @@ Generated from the current repo state.
 ### `/admin`
 - File: `app/(admin)/admin/page.tsx`
 
-### `/admin/settings`
-- File: `app/(admin)/admin/settings/page.tsx`
+### `/admin/active-sessions`
+- File: `app/(admin)/admin/active-sessions/page.tsx`
 
 ### `/admin/campaigns`
 - File: `app/(admin)/admin/campaigns/page.tsx`
 
+### `/admin/characters`
+- File: `app/(admin)/admin/characters/page.tsx`
+
+### `/admin/moderation`
+- File: `app/(admin)/admin/moderation/page.tsx`
+
 ### `/admin/scenarios`
 - File: `app/(admin)/admin/scenarios/page.tsx`
+
+### `/admin/settings`
+- File: `app/(admin)/admin/settings/page.tsx`
+
+### `/admin/stats`
+- File: `app/(admin)/admin/stats/page.tsx`
 
 ### `/admin/users`
 - File: `app/(admin)/admin/users/page.tsx`
@@ -51,6 +63,9 @@ Generated from the current repo state.
 ### `/characters/[id]/edit`
 - File: `app/(protected)/characters/[id]/edit/page.tsx`
 
+### `/characters/[id]/inventory`
+- File: `app/(protected)/characters/[id]/inventory/page.tsx`
+
 ### `/characters/new`
 - File: `app/(protected)/characters/new/page.tsx`
 
@@ -62,6 +77,12 @@ Generated from the current repo state.
 
 ### `/login`
 - File: `app/(auth)/login/page.tsx`
+
+### `/players`
+- File: `app/(protected)/players/page.tsx`
+
+### `/players/[id]`
+- File: `app/(protected)/players/[id]/page.tsx`
 
 ### `/profile`
 - File: `app/(protected)/profile/page.tsx`
@@ -85,33 +106,65 @@ Generated from the current repo state.
 - File: `app/(protected)/scenarios/new/page.tsx`
 
 ## API Routes (Route Handlers)
-### `/api/admin/campaigns`
-- File: `app/api/admin/campaigns/route.ts`
-- Methods: DELETE, GET
-
-### `/api/admin/dashboard`
-- File: `app/api/admin/dashboard/route.ts`
+### `/api/admin/active-sessions`
+- File: `app/api/admin/active-sessions/route.ts`
 - Methods: GET
 
-### `/api/admin/settings`
-- File: `app/api/admin/settings/route.ts`
-- Methods: GET, PATCH
+### `/api/admin/active-sessions/[id]`
+- File: `app/api/admin/active-sessions/[id]/route.ts`
+- Methods: PATCH
 
 ### `/api/admin/audit`
 - File: `app/api/admin/audit/route.ts`
 - Methods: GET
 
+### `/api/admin/campaigns`
+- File: `app/api/admin/campaigns/route.ts`
+- Methods: GET, DELETE
+
+### `/api/admin/characters`
+- File: `app/api/admin/characters/route.ts`
+- Methods: GET, DELETE
+
+### `/api/admin/collections`
+- File: `app/api/admin/collections/route.ts`
+- Methods: GET, POST
+
+### `/api/admin/collections/[id]`
+- File: `app/api/admin/collections/[id]/route.ts`
+- Methods: PATCH, DELETE
+
+### `/api/admin/dashboard`
+- File: `app/api/admin/dashboard/route.ts`
+- Methods: GET
+
+### `/api/admin/moderation/reports`
+- File: `app/api/admin/moderation/reports/route.ts`
+- Methods: GET
+
+### `/api/admin/moderation/reports/[id]`
+- File: `app/api/admin/moderation/reports/[id]/route.ts`
+- Methods: PATCH
+
 ### `/api/admin/scenarios`
 - File: `app/api/admin/scenarios/route.ts`
-- Methods: DELETE, GET, PATCH
+- Methods: GET, PATCH, DELETE
+
+### `/api/admin/settings`
+- File: `app/api/admin/settings/route.ts`
+- Methods: GET, PATCH
 
 ### `/api/admin/users`
 - File: `app/api/admin/users/route.ts`
-- Methods: DELETE, GET, PATCH
+- Methods: GET, PATCH, DELETE
 
 ### `/api/auth/[...nextauth]`
 - File: `app/api/auth/[...nextauth]/route.ts`
-- Methods: Unknown
+- Methods: GET, POST
+
+### `/api/auth/password`
+- File: `app/api/auth/password/route.ts`
+- Methods: POST
 
 ### `/api/campaigns`
 - File: `app/api/campaigns/route.ts`
@@ -119,11 +172,11 @@ Generated from the current repo state.
 
 ### `/api/campaigns/[id]`
 - File: `app/api/campaigns/[id]/route.ts`
-- Methods: DELETE, GET, PUT
+- Methods: GET, PUT, DELETE
 
 ### `/api/campaigns/[id]/active-session`
 - File: `app/api/campaigns/[id]/active-session/route.ts`
-- Methods: GET
+- Methods: GET, POST
 
 ### `/api/campaigns/[id]/complete`
 - File: `app/api/campaigns/[id]/complete/route.ts`
@@ -135,7 +188,7 @@ Generated from the current repo state.
 
 ### `/api/campaigns/[id]/join`
 - File: `app/api/campaigns/[id]/join/route.ts`
-- Methods: DELETE, POST
+- Methods: POST, DELETE
 
 ### `/api/campaigns/[id]/pause`
 - File: `app/api/campaigns/[id]/pause/route.ts`
@@ -163,7 +216,11 @@ Generated from the current repo state.
 
 ### `/api/characters/[id]`
 - File: `app/api/characters/[id]/route.ts`
-- Methods: DELETE, GET, PUT
+- Methods: GET, PUT, DELETE
+
+### `/api/characters/[id]/hp`
+- File: `app/api/characters/[id]/hp/route.ts`
+- Methods: PUT
 
 ### `/api/characters/[id]/inventory`
 - File: `app/api/characters/[id]/inventory/route.ts`
@@ -171,14 +228,46 @@ Generated from the current repo state.
 
 ### `/api/characters/[id]/inventory/[itemId]`
 - File: `app/api/characters/[id]/inventory/[itemId]/route.ts`
-- Methods: DELETE, GET, PUT
+- Methods: GET, PUT, DELETE
 
 ### `/api/characters/[id]/inventory/[itemId]/equip`
 - File: `app/api/characters/[id]/inventory/[itemId]/equip/route.ts`
 - Methods: PUT
 
+### `/api/characters/[id]/levelup`
+- File: `app/api/characters/[id]/levelup/route.ts`
+- Methods: PUT
+
+### `/api/combat/[id]`
+- File: `app/api/combat/[id]/route.ts`
+- Methods: GET
+
+### `/api/combat/[id]/action`
+- File: `app/api/combat/[id]/action/route.ts`
+- Methods: POST
+
+### `/api/combat/[id]/end`
+- File: `app/api/combat/[id]/end/route.ts`
+- Methods: POST
+
+### `/api/combat/[id]/next-turn`
+- File: `app/api/combat/[id]/next-turn/route.ts`
+- Methods: POST
+
 ### `/api/dice/roll`
 - File: `app/api/dice/roll/route.ts`
+- Methods: POST
+
+### `/api/dice/roll-attack`
+- File: `app/api/dice/roll-attack/route.ts`
+- Methods: POST
+
+### `/api/dice/roll-check`
+- File: `app/api/dice/roll-check/route.ts`
+- Methods: POST
+
+### `/api/dice/roll-damage`
+- File: `app/api/dice/roll-damage/route.ts`
 - Methods: POST
 
 ### `/api/gm/combat-action`
@@ -187,6 +276,14 @@ Generated from the current repo state.
 
 ### `/api/gm/describe-location`
 - File: `app/api/gm/describe-location/route.ts`
+- Methods: POST
+
+### `/api/gm/generate-character`
+- File: `app/api/gm/generate-character/route.ts`
+- Methods: POST
+
+### `/api/gm/generate-character-portrait`
+- File: `app/api/gm/generate-character-portrait/route.ts`
 - Methods: POST
 
 ### `/api/gm/generate-location-image`
@@ -219,23 +316,27 @@ Generated from the current repo state.
 
 ### `/api/login`
 - File: `app/api/login/route.ts`
-- Methods: Unknown
+- Methods: GET, POST
+
+### `/api/maps/[mapId]`
+- File: `app/api/maps/[mapId]/route.ts`
+- Methods: GET, PUT, DELETE
 
 ### `/api/messages/[id]`
 - File: `app/api/messages/[id]/route.ts`
-- Methods: PATCH, PUT
+- Methods: PUT, PATCH
 
 ### `/api/profile`
 - File: `app/api/profile/route.ts`
-- Methods: DELETE, PATCH
+- Methods: GET, PATCH, DELETE
 
 ### `/api/register`
 - File: `app/api/register/route.ts`
 - Methods: POST
 
-### `/api/system/status`
-- File: `app/api/system/status/route.ts`
-- Methods: GET
+### `/api/reports`
+- File: `app/api/reports/route.ts`
+- Methods: POST
 
 ### `/api/scenarios`
 - File: `app/api/scenarios/route.ts`
@@ -243,7 +344,7 @@ Generated from the current repo state.
 
 ### `/api/scenarios/[id]`
 - File: `app/api/scenarios/[id]/route.ts`
-- Methods: DELETE, GET, PUT
+- Methods: GET, PUT, DELETE
 
 ### `/api/scenarios/mine`
 - File: `app/api/scenarios/mine/route.ts`
@@ -257,9 +358,21 @@ Generated from the current repo state.
 - File: `app/api/sessions/[id]/route.ts`
 - Methods: GET, PUT
 
+### `/api/sessions/[id]/combat/start`
+- File: `app/api/sessions/[id]/combat/start/route.ts`
+- Methods: POST
+
 ### `/api/sessions/[id]/dice-history`
 - File: `app/api/sessions/[id]/dice-history/route.ts`
 - Methods: GET
+
+### `/api/sessions/[id]/events`
+- File: `app/api/sessions/[id]/events/route.ts`
+- Methods: GET
+
+### `/api/sessions/[id]/maps`
+- File: `app/api/sessions/[id]/maps/route.ts`
+- Methods: GET, POST
 
 ### `/api/sessions/[id]/messages`
 - File: `app/api/sessions/[id]/messages/route.ts`
@@ -271,7 +384,7 @@ Generated from the current repo state.
 
 ### `/api/sessions/[id]/npcs/[npcId]`
 - File: `app/api/sessions/[id]/npcs/[npcId]/route.ts`
-- Methods: DELETE, GET, PUT
+- Methods: GET, PUT, DELETE
 
 ### `/api/sessions/[id]/reset`
 - File: `app/api/sessions/[id]/reset/route.ts`
@@ -284,3 +397,20 @@ Generated from the current repo state.
 ### `/api/sessions/[id]/updates`
 - File: `app/api/sessions/[id]/updates/route.ts`
 - Methods: GET
+
+### `/api/system/stats`
+- File: `app/api/system/stats/route.ts`
+- Methods: GET
+
+### `/api/system/status`
+- File: `app/api/system/status/route.ts`
+- Methods: GET
+
+### `/api/users`
+- File: `app/api/users/route.ts`
+- Methods: GET
+
+### `/api/users/[id]`
+- File: `app/api/users/[id]/route.ts`
+- Methods: GET
+

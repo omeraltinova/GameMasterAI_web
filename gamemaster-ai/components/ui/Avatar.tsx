@@ -42,7 +42,7 @@ function Avatar({
       .slice(0, 2);
   };
 
-  const safeSrc = normalizeImageUrl(src);
+  const safeSrc = normalizeImageUrl(src, { allowDataUrl: true });
 
   return (
     <div
@@ -73,4 +73,3 @@ function Avatar({
 }
 
 export { Avatar };
-

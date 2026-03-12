@@ -3,6 +3,12 @@ import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
 import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
+const MIN_DICE_COUNT = 1;
+const MAX_DICE_COUNT = 20;
+const MIN_DICE_MODIFIER = -100;
+const MAX_DICE_MODIFIER = 100;
+const MAX_PURPOSE_LENGTH = 120;
+
 /**
  * POST /api/dice/roll
  * Zar atma endpoint'i
@@ -35,6 +41,58 @@ export async function POST(req: NextRequest) {
     if (!sessionId || typeof sessionId !== 'string') {
       return NextResponse.json(
         { success: false, error: 'Session ID gerekiyor' },
+        { status: 400 }
+      );
+    }
+
+    const parsedDiceCount = count === undefined ? 1 : Number(count);
+    if (!Number.isInteger(parsedDiceCount) || parsedDiceCount < MIN_DICE_COUNT || parsedDiceCount > MAX_DICE_COUNT) {
+      return NextResponse.json(
+        { success: false, error: `Zar adedi ${MIN_DICE_COUNT}-${MAX_DICE_COUNT} arasında tam sayı olmalı` },
+        { status: 400 }
+      );
+    }
+
+    const parsedModifier = modifier === undefined ? 0 : Number(modifier);
+    if (!Number.isInteger(parsedModifier) || parsedModifier < MIN_DICE_MODIFIER || parsedModifier > MAX_DICE_MODIFIER) {
+      return NextResponse.json(
+        { success: false, error: `Zar modifiyeri ${MIN_DICE_MODIFIER} ile ${MAX_DICE_MODIFIER} arasında tam sayı olmalı` },
+        { status: 400 }
+      );
+    }
+
+    if (advantage !== undefined && typeof advantage !== 'boolean') {
+      return NextResponse.json(
+        { success: false, error: 'advantage alanı boolean olmalı' },
+        { status: 400 }
+      );
+    }
+
+    if (disadvantage !== undefined && typeof disadvantage !== 'boolean') {
+      return NextResponse.json(
+        { success: false, error: 'disadvantage alanı boolean olmalı' },
+        { status: 400 }
+      );
+    }
+
+    if (advantage === true && disadvantage === true) {
+      return NextResponse.json(
+        { success: false, error: 'Aynı anda hem avantaj hem dezavantaj uygulanamaz' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedPurpose = typeof purpose === 'string' ? purpose.trim() : undefined;
+    if (purpose !== undefined && typeof purpose !== 'string') {
+      return NextResponse.json(
+        { success: false, error: 'purpose metin olmalı' },
+        { status: 400 }
+      );
+    }
+
+    if (normalizedPurpose && normalizedPurpose.length > MAX_PURPOSE_LENGTH) {
+      return NextResponse.json(
+        { success: false, error: `purpose en fazla ${MAX_PURPOSE_LENGTH} karakter olabilir` },
         { status: 400 }
       );
     }
@@ -91,8 +149,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Zar at
-    const diceCount = count || 1;
-    const diceModifier = modifier || 0;
+    const diceCount = parsedDiceCount;
+    const diceModifier = parsedModifier;
     const hasAdvantage = advantage === true;
     const hasDisadvantage = disadvantage === true;
 
@@ -141,7 +199,7 @@ export async function POST(req: NextRequest) {
         results: JSON.stringify(results),
         modifier: diceModifier,
         total,
-        purpose: purpose || (hasAdvantage ? 'Avantajlı Atış' : hasDisadvantage ? 'Dezavantajlı Atış' : undefined),
+        purpose: normalizedPurpose || (hasAdvantage ? 'Avantajlı Atış' : hasDisadvantage ? 'Dezavantajlı Atış' : undefined),
       },
     });
 
@@ -169,8 +227,8 @@ export async function POST(req: NextRequest) {
       rollMessage += ` = **${total}**`;
     }
 
-    if (purpose) {
-      rollMessage += ` (${purpose})`;
+    if (normalizedPurpose) {
+      rollMessage += ` (${normalizedPurpose})`;
     }
 
     // d20 kritik kontrolü
@@ -200,7 +258,7 @@ export async function POST(req: NextRequest) {
           results,
           modifier: diceModifier,
           total,
-          purpose,
+          purpose: normalizedPurpose,
         }),
       },
     });
@@ -218,7 +276,7 @@ export async function POST(req: NextRequest) {
         results,
         modifier: diceModifier,
         total,
-        purpose,
+        purpose: normalizedPurpose,
         timestamp: diceRoll.timestamp,
       },
       message: {

@@ -116,8 +116,11 @@ export function ChatWindow({
       className="flex-1 overflow-y-auto p-4 space-y-4"
     >
       {messages.map((message, index) => {
-        const safeLocationImageUrl = normalizeImageUrl(message.locationImageUrl);
-        const isImageSystemMessage = message.senderType === 'SYSTEM' && !!safeLocationImageUrl;
+        const rawLocationImageUrl =
+          typeof message.locationImageUrl === "string" ? message.locationImageUrl.trim() : "";
+        const safeLocationImageUrl = normalizeImageUrl(rawLocationImageUrl || null);
+        const hasLocationImageMetadata = rawLocationImageUrl.length > 0 || Boolean(message.locationName);
+        const isImageSystemMessage = message.senderType === 'SYSTEM' && hasLocationImageMetadata;
         const senderType = isImageSystemMessage ? 'GM' : message.senderType;
         const config = senderConfig[senderType];
         const Icon = config.icon;
@@ -234,10 +237,16 @@ export function ChatWindow({
               </div>
               
               {/* Mekan Görseli - GM mesajlarında */}
-              {safeLocationImageUrl && (
-                <div 
-                  className="mt-2 rounded-lg overflow-hidden border border-border cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setExpandedImage({ url: safeLocationImageUrl, name: message.locationName || 'Mekan Görseli' })}
+              {hasLocationImageMetadata && (
+                <div
+                  className={cn(
+                    "mt-2 rounded-lg overflow-hidden border border-border transition-opacity",
+                    safeLocationImageUrl && "cursor-pointer hover:opacity-90"
+                  )}
+                  onClick={() => {
+                    if (!safeLocationImageUrl) return;
+                    setExpandedImage({ url: safeLocationImageUrl, name: message.locationName || 'Mekan Görseli' });
+                  }}
                 >
                   <div className="flex items-center gap-2 px-3 py-2 bg-background-secondary border-b border-border">
                     <MapPin className="h-3 w-3 text-primary" />
@@ -245,13 +254,19 @@ export function ChatWindow({
                       {message.locationName || 'Mekan Görseli'}
                     </span>
                   </div>
-                  <div className="relative aspect-[16/9] w-full">
-                    <img
-                      src={safeLocationImageUrl}
-                      alt={message.locationName || "Mekan görseli"}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                  {safeLocationImageUrl ? (
+                    <div className="relative aspect-[16/9] w-full">
+                      <img
+                        src={safeLocationImageUrl}
+                        alt={message.locationName || "Mekan görseli"}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <p className="px-3 py-2 text-xs text-foreground-muted bg-background">
+                      Görsel güvenlik nedeniyle gösterilemiyor.
+                    </p>
+                  )}
                 </div>
               )}
               
@@ -322,4 +337,3 @@ export function ChatWindow({
     </div>
   );
 }
-

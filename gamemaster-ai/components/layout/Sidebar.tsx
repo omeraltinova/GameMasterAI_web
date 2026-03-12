@@ -15,6 +15,7 @@ import {
   Flag,
   Settings,
   Activity,
+  BarChart3,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -37,13 +38,19 @@ const adminItems = [
   { href: "/admin/scenarios", label: "Senaryolar", icon: Map },
   { href: "/admin/moderation", label: "Moderasyon", icon: Flag },
   { href: "/admin/active-sessions", label: "Aktif Oturumlar", icon: Activity },
+  { href: "/admin/stats", label: "İstatistikler", icon: BarChart3 },
   { href: "/admin/settings", label: "Sistem Ayarları", icon: Settings },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const [collapsed, setCollapsed] = useState(false);
+  const isPlayPage = /^\/campaigns\/[^/]+\/play(?:\/|$)/.test(pathname || "");
+  const [collapsedByContext, setCollapsedByContext] = useState({
+    play: true,
+    app: false,
+  });
+  const collapsed = isPlayPage ? collapsedByContext.play : collapsedByContext.app;
 
   // DÜZELTME: 'any' yerine inline tip tanımı kullandık
   const isAdmin = (session?.user as { role?: string })?.role === "ADMIN";
@@ -58,7 +65,7 @@ export function Sidebar() {
     >
       <div className="flex flex-col h-full">
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        <nav className={cn("flex-1 space-y-1 overflow-y-auto", collapsed ? "p-2" : "p-3")}>
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.icon;
@@ -68,7 +75,8 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                  "flex items-center py-2.5 rounded-lg transition-colors",
+                  collapsed ? "justify-center px-2" : "gap-3 px-3",
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-foreground-secondary hover:text-foreground hover:bg-background-elevated"
@@ -97,7 +105,7 @@ export function Sidebar() {
                 </div>
               )}
               <div className={cn(
-                "mx-1 p-1 rounded-xl",
+                collapsed ? "mx-0.5 p-1 rounded-lg" : "mx-1 p-1 rounded-xl",
                 "bg-gradient-to-b from-primary/5 to-transparent",
                 "border border-primary/10"
               )}>
@@ -110,7 +118,8 @@ export function Sidebar() {
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+                        "flex items-center py-2.5 rounded-lg transition-colors",
+                        collapsed ? "justify-center px-2" : "gap-3 px-3",
                         isActive
                           ? "bg-primary/10 text-primary"
                           : "text-foreground-secondary hover:text-foreground hover:bg-background-elevated"
@@ -132,9 +141,16 @@ export function Sidebar() {
         {/* Collapse Toggle */}
         <div className="p-3 border-t border-border">
           <button
-            onClick={() => setCollapsed(!collapsed)}
+            onClick={() =>
+              setCollapsedByContext((prev) =>
+                isPlayPage
+                  ? { ...prev, play: !prev.play }
+                  : { ...prev, app: !prev.app }
+              )
+            }
             className={cn(
-              "flex items-center gap-3 w-full px-3 py-2 rounded-lg",
+              "flex items-center w-full py-2 rounded-lg",
+              collapsed ? "justify-center px-2" : "gap-3 px-3",
               "text-foreground-secondary hover:text-foreground hover:bg-background-elevated",
               "transition-colors"
             )}

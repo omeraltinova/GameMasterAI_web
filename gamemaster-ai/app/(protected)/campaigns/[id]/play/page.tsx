@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, ConfirmDialog } from "@/components/ui";
-import { ChatWindow, MessageInput, DiceRoller, CharacterModal, GameSetupWizard, rollDiceForAction, ActionSuggestions, LocationImage, DiceModal, NPCModal, CombatTracker } from "@/components/game";
+import { ChatWindow, MessageInput, CharacterModal, GameSetupWizard, ActionSuggestions, LocationImage, DiceModal, NPCModal, CombatTracker, DiceHistory } from "@/components/game";
 import { InventoryModal } from "@/components/character";
 import { MapModal } from "@/components/map";
 import { useGame, useGM, useDice, useSuggestions, useLocationImage, useMaps } from "@/hooks/useGame";
-import { post, put } from "@/lib/api/client";
+import { APIError, get, post, put } from "@/lib/api/client";
 import type { Message, DiceType, Character, Campaign, GMAction, GMPrompt, LocationChange, Combat } from "@/types";
 import {
   Dice6,
@@ -22,6 +22,7 @@ import {
   RefreshCw,
   Globe,
   Map,
+  Swords,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +50,106 @@ interface WorldSettings {
   openingNarration: string;
 }
 
+function parseCombatValue(combatData: unknown): Combat | null {
+  if (!combatData || typeof combatData !== "object") return null;
+
+  const payload = combatData as Record<string, unknown>;
+
+  const parseParticipants = (value: unknown) => {
+    const parseArray = (arr: unknown[]): Combat["participants"] => {
+      return arr
+        .map((entry) => {
+          if (!entry || typeof entry !== "object") return null;
+          const participant = entry as Record<string, unknown>;
+          if (typeof participant.id !== "string" || typeof participant.name !== "string") {
+            return null;
+          }
+
+          const typeValue = participant.type;
+          const type =
+            typeValue === "player" || typeValue === "enemy" || typeValue === "ally"
+              ? typeValue
+              : "enemy";
+
+          const hp = Number(participant.hp ?? 0);
+          const maxHp = Number(participant.maxHp ?? 1);
+          const initiative = Number(participant.initiative ?? 0);
+          const ac = Number(participant.ac ?? 10);
+
+          return {
+            id: participant.id,
+            type,
+            name: participant.name,
+            initiative: Number.isFinite(initiative) ? Math.round(initiative) : 0,
+            hp: Number.isFinite(hp) ? Math.max(0, Math.round(hp)) : 0,
+            maxHp: Number.isFinite(maxHp) ? Math.max(1, Math.round(maxHp)) : 1,
+            ac: Number.isFinite(ac) ? Math.max(1, Math.round(ac)) : 10,
+          };
+        })
+        .filter((entry): entry is Combat["participants"][number] => entry !== null);
+    };
+
+    if (Array.isArray(value)) {
+      return parseArray(value);
+    }
+
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        return Array.isArray(parsed) ? parseArray(parsed) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    return [];
+  };
+
+  const parseLog = (value: unknown) => {
+    if (Array.isArray(value)) {
+      return value.filter((entry): entry is string => typeof entry === "string");
+    }
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        return Array.isArray(parsed)
+          ? parsed.filter((entry): entry is string => typeof entry === "string")
+          : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  };
+
+  const participants = parseParticipants(payload.participants);
+  const turnOrder = parseParticipants(payload.turnOrder);
+  const status = payload.status === "ended" ? "ended" : "active";
+
+  if (typeof payload.id !== "string" || typeof payload.sessionId !== "string") {
+    return null;
+  }
+
+  return {
+    id: payload.id,
+    sessionId: payload.sessionId,
+    participants,
+    turnOrder: turnOrder.length > 0 ? turnOrder : participants,
+    currentTurn: Number.isFinite(Number(payload.currentTurn))
+      ? Math.max(0, Math.round(Number(payload.currentTurn)))
+      : 0,
+    round: Number.isFinite(Number(payload.round))
+      ? Math.max(1, Math.round(Number(payload.round)))
+      : 1,
+    status,
+    log: parseLog(payload.log),
+    createdAt:
+      typeof payload.createdAt === "string"
+        ? payload.createdAt
+        : new Date().toISOString(),
+  };
+}
+
 export default function PlayPage() {
   const params = useParams();
   const router = useRouter();
@@ -57,11 +158,12 @@ export default function PlayPage() {
   const [character, setCharacter] = useState<Character | null>(null);
   const [playerName, setPlayerName] = useState<string>("Oyuncu");
   const [allPlayers, setAllPlayers] = useState<Array<{ userId: string; username: string; character: Character | null; isCreator: boolean }>>([]);
-  const [showSidePanel, setShowSidePanel] = useState(false);
+  const [sidePanelMode, setSidePanelMode] = useState<"characters" | "dice" | null>(null);
   const [selectedCharacterForModal, setSelectedCharacterForModal] = useState<Character | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [gamePhase, setGamePhase] = useState<GamePhase>("loading");
   const [isNewSession, setIsNewSession] = useState(false);
   const [pendingMandatoryAction, setPendingMandatoryAction] = useState<GMPrompt | null>(null);
@@ -78,6 +180,8 @@ export default function PlayPage() {
   const [showCharacterModal, setShowCharacterModal] = useState(false);
   const [worldSettings, setWorldSettings] = useState<WorldSettings | null>(null);
   const [activeCombat, setActiveCombat] = useState<Combat | null>(null);
+  const [isCombatLoading, setIsCombatLoading] = useState(false);
+  const [diceHistoryRefreshSignal, setDiceHistoryRefreshSignal] = useState(0);
 
   // Get campaign ID from URL params
   const campaignId = params.id as string;
@@ -213,6 +317,9 @@ export default function PlayPage() {
 
   const {
     narrate,
+    npcDialogue,
+    describeLocation,
+    combatAction,
     isLoading: isGMLoading,
     error: gmError,
   } = useGM(sessionId || '');
@@ -247,6 +354,101 @@ export default function PlayPage() {
     updateMap,
     deleteMap,
   } = useMaps(sessionId || '');
+
+  const syncActiveCombat = useCallback(async () => {
+    if (!sessionId) return;
+
+    try {
+      const response = await get<{ success: boolean; session?: { combats?: unknown[] } }>(
+        `/sessions/${sessionId}`
+      );
+
+      const rawCombats = response?.session?.combats;
+      if (!Array.isArray(rawCombats) || rawCombats.length === 0) {
+        setActiveCombat(null);
+        return;
+      }
+
+      const normalizedCombats = rawCombats
+        .map((combatEntry) => parseCombatValue(combatEntry))
+        .filter((combatEntry): combatEntry is Combat => combatEntry !== null);
+
+      const active = normalizedCombats.find((combatEntry) => combatEntry.status === "active") || null;
+      if (!active) {
+        setActiveCombat(null);
+        return;
+      }
+
+      try {
+        const combatResponse = await get<{ success: boolean; combat?: unknown }>(
+          `/combat/${active.id}`
+        );
+        const parsedCombat = combatResponse?.combat ? parseCombatValue(combatResponse.combat) : null;
+        const combatToSet = parsedCombat || active;
+        setActiveCombat(combatToSet.status === "active" ? combatToSet : null);
+      } catch (detailError) {
+        console.error("Combat detail sync error:", detailError);
+        setActiveCombat(active);
+      }
+    } catch (err) {
+      console.error("Combat sync error:", err);
+    }
+  }, [sessionId]);
+
+  const performCombatAction = useCallback(async (
+    actionText: string,
+    options?: {
+      targetName?: string;
+      damage?: number;
+    }
+  ) => {
+    if (!activeCombat) return false;
+
+    const normalizedTargetName = options?.targetName?.trim().toLowerCase();
+    const targetParticipant = normalizedTargetName
+      ? activeCombat.participants.find(
+          (participant) => participant.name.trim().toLowerCase() === normalizedTargetName
+        )
+      : activeCombat.participants.find(
+          (participant) => participant.type === "enemy" && participant.hp > 0
+        );
+
+    const playerIdentity = (character?.name || playerName).trim().toLowerCase();
+    const actorParticipant =
+      activeCombat.participants.find((participant) => participant.id === character?.id) ||
+      activeCombat.participants.find(
+        (participant) => participant.name.trim().toLowerCase() === playerIdentity
+      );
+
+    try {
+      const response = await post<{ success: boolean; combat?: unknown }>(
+        `/combat/${activeCombat.id}/action`,
+        {
+          action: actionText,
+          actorId: actorParticipant?.id,
+          targetId: targetParticipant?.id,
+          damage: options?.damage,
+        }
+      );
+
+      if (!response?.success) {
+        return false;
+      }
+
+      const parsedCombat = response.combat ? parseCombatValue(response.combat) : null;
+      if (parsedCombat) {
+        setActiveCombat(parsedCombat.status === "active" ? parsedCombat : null);
+      } else {
+        await syncActiveCombat();
+      }
+
+      await fetchMessages();
+      return true;
+    } catch (err) {
+      console.error("Combat action endpoint error:", err);
+      return false;
+    }
+  }, [activeCombat, character?.id, character?.name, playerName, fetchMessages, syncActiveCombat]);
 
   // SSE real-time + polling fallback
   const lastSyncTime = useRef<number>(Date.now());
@@ -329,6 +531,41 @@ export default function PlayPage() {
       }
     };
   }, [sessionId, gamePhase, addMessages, fetchGameState, fetchUpdates]);
+
+  useEffect(() => {
+    if (!sessionId || gamePhase !== "playing") return;
+    void syncActiveCombat();
+  }, [sessionId, gamePhase, syncActiveCombat]);
+
+  const lastCombatMessageIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sessionId || gamePhase !== "playing") return;
+
+    const lastCombatMessage = [...messages].reverse().find((message) => message.senderType === "COMBAT");
+    if (!lastCombatMessage) return;
+    if (lastCombatMessage.id === lastCombatMessageIdRef.current) return;
+
+    lastCombatMessageIdRef.current = lastCombatMessage.id;
+    void syncActiveCombat();
+  }, [messages, sessionId, gamePhase, syncActiveCombat]);
+
+  const lastDiceMessageIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!sessionId || gamePhase !== "playing") return;
+
+    const lastDiceMessage = [...messages].reverse().find((message) => message.senderType === "DICE");
+    if (!lastDiceMessage) return;
+    if (lastDiceMessage.id === lastDiceMessageIdRef.current) return;
+
+    lastDiceMessageIdRef.current = lastDiceMessage.id;
+    setDiceHistoryRefreshSignal((prev) => prev + 1);
+  }, [messages, sessionId, gamePhase]);
+
+  useEffect(() => {
+    if (!actionError) return;
+    const timeout = setTimeout(() => setActionError(null), 6000);
+    return () => clearTimeout(timeout);
+  }, [actionError]);
 
   // Sayfa yüklendiğinde (F5 / ilk açılış) kaydedilmiş suggestions'ı mesajlardan oku
   const lastCheckedGMMessageId = useRef<string | null>(null);
@@ -414,6 +651,72 @@ export default function PlayPage() {
       console.error('Pause hatası:', err);
       setError('Oturum duraklatılamadı');
     }
+  };
+
+  const handleDescribeCurrentLocation = async () => {
+    if (!sessionId || isGMLoading) return;
+
+    const locationName =
+      currentLocation ||
+      gameState?.location ||
+      worldSettings?.startingLocation?.name ||
+      "Bilinmeyen Mekan";
+
+    const recentGmDetails = messages
+      .filter((message) => message.senderType === "GM")
+      .slice(-2)
+      .map((message) => message.content.slice(0, 140))
+      .filter((content) => content.length > 0);
+
+    const result = await describeLocation({
+      locationName,
+      locationType: "other",
+      atmosphere: worldSettings?.startingLocation?.atmosphere || gameState?.weather || "mysterious",
+      details: recentGmDetails.length > 0 ? recentGmDetails : undefined,
+    });
+
+    if (result?.success && result.locationDescription) {
+      const gmMessage: Message = {
+        id: result.messageId || `gm-location-${Date.now()}`,
+        sessionId: sessionId || "",
+        senderType: "GM",
+        senderName: "Game Master",
+        content: result.locationDescription,
+        timestamp: result.timestamp || new Date().toISOString(),
+      };
+      addMessage(gmMessage);
+      void fetchGameState();
+      fetchSuggestions(result.locationDescription, result.messageId);
+    }
+  };
+
+  const handleTalkToNPC = async (npc: { id: string; name: string }) => {
+    if (!sessionId) return;
+
+    clearSuggestions();
+    setPendingMandatoryAction(null);
+
+    const defaultPlayerPrompt = `${npc.name}, burada neler olduğunu anlatır mısın?`;
+    const tempId = `temp-npc-talk-${Date.now()}`;
+    addMessage({
+      id: tempId,
+      sessionId,
+      senderType: "PLAYER",
+      senderName: character?.name || playerName,
+      content: defaultPlayerPrompt,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await npcDialogue(npc.id, defaultPlayerPrompt);
+    removeMessage(tempId);
+
+    if (result?.success && result.dialogue) {
+      await fetchMessages();
+      fetchSuggestions(result.dialogue, result.messageId);
+      return;
+    }
+
+    await handleSendMessage(`${npc.name} ile konuşmak istiyorum`);
   };
 
 
@@ -609,6 +912,37 @@ export default function PlayPage() {
 
     // AI'ya seçimi gönder - API oyuncu mesajını da kaydeder
     const actionContent = `[${action.label}] ${action.description || action.value || ''}`.trim();
+
+    if (activeCombat?.status === "active") {
+      const combatTarget = activeCombat.participants.find(
+        (participant) => participant.type === "enemy" && participant.hp > 0,
+      );
+      const combatApplied = await performCombatAction(actionContent, {
+        targetName: combatTarget?.name,
+      });
+      if (combatApplied) {
+        return;
+      }
+
+      const combatResult = await combatAction({
+        action: actionContent,
+        attacker: character?.name || playerName,
+        target: combatTarget?.name,
+      });
+
+      if (combatResult?.success && combatResult.combatNarration) {
+        addMessage({
+          id: combatResult.messageId || `combat-${Date.now()}`,
+          sessionId: sessionId || "",
+          senderType: "COMBAT",
+          senderName: "Combat Tracker",
+          content: combatResult.combatNarration,
+          timestamp: combatResult.timestamp || new Date().toISOString(),
+        });
+        return;
+      }
+    }
+
     const result = await narrate(`${action.label}: ${action.value || action.description || ''}`);
 
     if (result && result.narration) {
@@ -668,39 +1002,156 @@ export default function PlayPage() {
     }
   };
 
+  const handleStartCombat = async () => {
+    if (!sessionId || isCombatLoading) return;
+
+    setActionError(null);
+    setIsCombatLoading(true);
+    try {
+      const response = await post<{ success: boolean; combat?: unknown }>(
+        `/sessions/${sessionId}/combat/start`,
+        {}
+      );
+
+      const parsedCombat = response?.combat ? parseCombatValue(response.combat) : null;
+      if (response?.success && parsedCombat) {
+        setActiveCombat(parsedCombat);
+      } else {
+        await syncActiveCombat();
+      }
+    } catch (err) {
+      const userMessage = err instanceof APIError
+        ? err.message
+        : "Savaş başlatılırken bir hata oluştu.";
+      setActionError(userMessage);
+      if (!(err instanceof APIError)) {
+        console.error("Combat start error:", err);
+      }
+    } finally {
+      setIsCombatLoading(false);
+    }
+  };
+
+  const handleNextCombatTurn = async () => {
+    if (!activeCombat || isCombatLoading) return;
+
+    setActionError(null);
+    setIsCombatLoading(true);
+    try {
+      const response = await post<{ success: boolean; combat?: unknown }>(
+        `/combat/${activeCombat.id}/next-turn`,
+        {}
+      );
+      const parsedCombat = response?.combat ? parseCombatValue(response.combat) : null;
+      if (response?.success && parsedCombat) {
+        setActiveCombat(parsedCombat);
+      } else {
+        await syncActiveCombat();
+      }
+    } catch (err) {
+      const userMessage = err instanceof APIError
+        ? err.message
+        : "Sonraki tura geçilirken bir hata oluştu.";
+      setActionError(userMessage);
+      if (!(err instanceof APIError)) {
+        console.error("Next turn error:", err);
+      }
+    } finally {
+      setIsCombatLoading(false);
+    }
+  };
+
+  const handleEndCombat = async () => {
+    if (!activeCombat || isCombatLoading) return;
+
+    setActionError(null);
+    setIsCombatLoading(true);
+    try {
+      const response = await post<{ success: boolean; combat?: unknown }>(
+        `/combat/${activeCombat.id}/end`,
+        {}
+      );
+      const parsedCombat = response?.combat ? parseCombatValue(response.combat) : null;
+      if (response?.success && parsedCombat) {
+        setActiveCombat(parsedCombat.status === "active" ? parsedCombat : null);
+      } else {
+        setActiveCombat(null);
+      }
+    } catch (err) {
+      const userMessage = err instanceof APIError
+        ? err.message
+        : "Savaş bitirilirken bir hata oluştu.";
+      setActionError(userMessage);
+      if (!(err instanceof APIError)) {
+        console.error("End combat error:", err);
+      }
+    } finally {
+      setIsCombatLoading(false);
+    }
+  };
+
   // Zar atışı handler'ı (ActionButtons'dan)
   const handleActionDiceRoll = async (action: GMAction, messageId: string) => {
     // Zorunlu aksiyon state'ini temizle
     setPendingMandatoryAction(null);
 
-    // Zarı at
-    const rollResult = rollDiceForAction(action);
-    const skillText = action.skill ? ` ${action.skill}` : '';
-    const dcText = action.dc ? ` (DC ${action.dc})` : '';
-    const successText = rollResult.success !== undefined
-      ? (rollResult.success ? ' ✅ Başarılı!' : ' ❌ Başarısız')
-      : '';
+    const diceType = action.diceType || "d20";
+    const diceCount = action.diceCount || 1;
+    const diceModifier = action.modifier || 0;
+    const rollPurpose = action.skill
+      ? `${action.skill} kontrolü`
+      : action.label || "Aksiyon zarı";
 
-    // Zar mesajını API üzerinden kaydet
-    const diceContent = `🎲 ${character?.name || playerName}${skillText}${dcText} atışı: [${rollResult.results.join(', ')}]${rollResult.modifier !== 0 ? ` + ${rollResult.modifier}` : ''} = ${rollResult.total}${successText}`;
+    const diceResponse = await rollDice(diceType, diceCount, diceModifier, {
+      purpose: rollPurpose,
+      characterId: character?.id,
+    });
 
-    try {
-      // Zar mesajını veritabanına kaydet
-      const diceResponse = await post(`/sessions/${sessionId}/messages`, {
-        senderType: 'DICE',
-        senderName: 'Zar Atışı',
-        content: diceContent,
-      }) as { success: boolean; message: Message };
+    if (diceResponse?.success && diceResponse.message) {
+      addMessage(diceResponse.message);
+    }
 
-      if (diceResponse.success && diceResponse.message) {
-        addMessage(diceResponse.message);
+    if (!diceResponse?.success || typeof diceResponse.total !== "number") {
+      return;
+    }
+
+    const isSuccess = typeof action.dc === "number" ? diceResponse.total >= action.dc : undefined;
+    const actionText = `${action.skill || action.label || 'Zar'} kontrolü attım. Sonuç: ${diceResponse.total}${
+      isSuccess !== undefined ? (isSuccess ? " (Başarılı)" : " (Başarısız)") : ""
+    }`;
+
+    if (activeCombat?.status === "active") {
+      const combatTarget = activeCombat.participants.find(
+        (participant) => participant.type === "enemy" && participant.hp > 0,
+      );
+      const combatApplied = await performCombatAction(actionText, {
+        targetName: combatTarget?.name,
+      });
+      if (combatApplied) {
+        return;
       }
-    } catch (err) {
-      console.error('Dice message save error:', err);
+
+      const combatResult = await combatAction({
+        action: actionText,
+        attacker: character?.name || playerName,
+        target: combatTarget?.name,
+        rollResult: diceResponse.total,
+      });
+
+      if (combatResult?.success && combatResult.combatNarration) {
+        addMessage({
+          id: combatResult.messageId || `combat-${Date.now()}`,
+          sessionId: sessionId || "",
+          senderType: "COMBAT",
+          senderName: "Combat Tracker",
+          content: combatResult.combatNarration,
+          timestamp: combatResult.timestamp || new Date().toISOString(),
+        });
+      }
+      return;
     }
 
     // AI'ya zar sonucunu bildir - skipPlayerMessageSave ile oyuncu mesajı kaydetme
-    const actionText = `${action.skill || 'Zar'} kontrolü attım. Sonuç: ${rollResult.total}${rollResult.success !== undefined ? (rollResult.success ? ' (Başarılı)' : ' (Başarısız)') : ''}`;
     const result = await narrate(actionText, { skipPlayerMessageSave: true });
 
     if (result && result.narration) {
@@ -750,26 +1201,45 @@ export default function PlayPage() {
     diceType: DiceType,
     count: number,
     modifier: number,
-    results: number[]
+    rollMode: "normal" | "advantage" | "disadvantage" = "normal",
   ) => {
-    // DiceRoller'dan gelen sonuçları kullan (tekrar atma!)
-    const total = results.reduce((a, b) => a + b, 0) + modifier;
-    const diceContent = `🎲 ${character?.name || playerName} ${count}${diceType}${modifier >= 0 ? '+' : ''}${modifier !== 0 ? modifier : ''} attı: [${results.join(', ')}] = ${total}`;
+    const diceResponse = await rollDice(diceType, count, modifier, {
+      purpose: "Manuel zar atışı",
+      advantage: rollMode === "advantage",
+      disadvantage: rollMode === "disadvantage",
+      characterId: character?.id,
+    });
 
-    // Zar mesajını API üzerinden kaydet
-    try {
-      const diceResponse = await post(`/sessions/${sessionId}/messages`, {
-        senderType: 'DICE',
-        senderName: 'Zar Atışı',
-        content: diceContent,
-      }) as { success: boolean; message: Message };
-
-      if (diceResponse.success && diceResponse.message) {
-        addMessage(diceResponse.message);
-      }
-    } catch (err) {
-      console.error('Dice message save error:', err);
+    if (diceResponse?.success && diceResponse.message) {
+      addMessage(diceResponse.message);
+      return {
+        results: Array.isArray(diceResponse.results) ? diceResponse.results : [],
+        total:
+          typeof diceResponse.total === "number"
+            ? diceResponse.total
+            : 0,
+      };
     }
+
+    const diceSides = Number.parseInt(diceType.replace("d", ""), 10);
+    if (diceType === "d20" && count === 1 && rollMode !== "normal") {
+      const rollA = Math.floor(Math.random() * 20) + 1;
+      const rollB = Math.floor(Math.random() * 20) + 1;
+      const chosen = rollMode === "advantage" ? Math.max(rollA, rollB) : Math.min(rollA, rollB);
+      return {
+        results: [rollA, rollB],
+        total: chosen + modifier,
+      };
+    }
+
+    const fallbackResults = Array.from({ length: Math.max(1, count) }, () => (
+      Math.floor(Math.random() * Math.max(1, diceSides)) + 1
+    ));
+
+    return {
+      results: fallbackResults,
+      total: fallbackResults.reduce((sum, value) => sum + value, 0) + modifier,
+    };
   };
 
   // Sahne görseli üretme handler'ı
@@ -997,17 +1467,8 @@ export default function PlayPage() {
               <CombatTracker
                 combat={activeCombat}
                 isGameMaster={isCreator}
-                onNextTurn={() => {
-                  setActiveCombat(prev => {
-                    if (!prev) return null;
-                    const nextTurn = (prev.currentTurn + 1) % prev.turnOrder.length;
-                    const nextRound = nextTurn === 0 ? prev.round + 1 : prev.round;
-                    return { ...prev, currentTurn: nextTurn, round: nextRound };
-                  });
-                }}
-                onEndCombat={() => {
-                  setActiveCombat(prev => prev ? { ...prev, status: "ended" } : null);
-                }}
+                onNextTurn={handleNextCombatTurn}
+                onEndCombat={handleEndCombat}
               />
             </div>
           )}
@@ -1026,10 +1487,10 @@ export default function PlayPage() {
             />
 
             {/* Error Message */}
-            {(gameError || gmError) && (
+            {(actionError || gameError || gmError) && (
               <div className="px-4 pb-2">
                 <div className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-destructive/10 text-destructive text-sm">
-                  <span>{gameError || gmError}</span>
+                  <span>{actionError || gameError || gmError}</span>
                 </div>
               </div>
             )}
@@ -1157,10 +1618,51 @@ export default function PlayPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setShowSidePanel(!showSidePanel)}
+                onClick={() => void handleDescribeCurrentLocation()}
+                disabled={isGMLoading || isGameLoading}
+                className="gap-1"
+              >
+                <Globe className="h-4 w-4" />
+                Mekanı Betimle
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (activeCombat?.status === "active") {
+                    void handleEndCombat();
+                  } else {
+                    void handleStartCombat();
+                  }
+                }}
+                disabled={isCombatLoading || isGMLoading || isGameLoading}
+                className="gap-1"
+              >
+                <Swords className={cn("h-4 w-4", isCombatLoading && "animate-pulse")} />
+                {activeCombat?.status === "active" ? "Savaşı Bitir" : "Savaş Başlat"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setSidePanelMode((prev) => (prev === "dice" ? null : "dice"))
+                }
                 className={cn(
                   "gap-1",
-                  showSidePanel && "bg-primary/10 border-primary"
+                  sidePanelMode === "dice" && "bg-primary/10 border-primary"
+                )}
+              >
+                🎲 Zar Geçmişi
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  setSidePanelMode((prev) => (prev === "characters" ? null : "characters"))
+                }
+                className={cn(
+                  "gap-1",
+                  sidePanelMode === "characters" && "bg-primary/10 border-primary"
                 )}
               >
                 🧙 Karakter
@@ -1169,110 +1671,128 @@ export default function PlayPage() {
           </div>
         </div>
 
-        {/* Side Panel - Karakter Listesi */}
-        {showSidePanel && (
+        {/* Side Panel - Karakterler / Zar Geçmişi */}
+        {sidePanelMode && (
           <aside className="w-80 border-l border-border bg-background-secondary overflow-y-auto animate-slide-up">
             <div className="p-4">
               {/* Panel Header */}
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold">Karakterler</h3>
+                <h3 className="font-semibold">
+                  {sidePanelMode === "characters" ? "Karakterler" : "Zar Geçmişi"}
+                </h3>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setShowSidePanel(false)}
+                  onClick={() => setSidePanelMode(null)}
                 >
                   <X className="h-4 w-4" />
                 </Button>
               </div>
 
-              {/* Karakter Listesi */}
-              <div className="space-y-2">
-                {allPlayers.length > 0 ? (
-                  allPlayers.map((player) => {
-                    const char = player.character;
-                    const isMe = player.userId === authSession?.user?.id;
-                    return (
-                      <button
-                        key={player.userId}
-                        onClick={() => {
-                          if (char) {
-                            setSelectedCharacterForModal(char);
-                            setShowCharacterModal(true);
-                          }
-                        }}
-                        disabled={!char}
-                        className={cn(
-                          "w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left",
-                          char
-                            ? "hover:border-primary/50 hover:bg-background-elevated cursor-pointer"
-                            : "opacity-50 cursor-not-allowed",
-                          isMe
-                            ? "border-primary/30 bg-primary/5"
-                            : "border-border"
-                        )}
-                      >
-                        <div className={cn(
-                          "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
-                          isMe ? "bg-primary/20 text-primary" : "bg-background-elevated text-foreground-muted"
-                        )}>
-                          {char ? char.name.charAt(0).toUpperCase() : "?"}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <Link
-                              href={`/players/${player.userId}`}
-                              className="font-medium text-sm truncate hover:text-primary transition-colors"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {char?.name || player.username}
-                            </Link>
-                            {isMe && (
-                              <Badge variant="primary" size="sm">Sen</Badge>
+              {sidePanelMode === "characters" ? (
+                <>
+                  {/* Karakter Listesi */}
+                  <div className="space-y-2">
+                    {allPlayers.length > 0 ? (
+                      allPlayers.map((player) => {
+                        const char = player.character;
+                        const isMe = player.userId === authSession?.user?.id;
+                        return (
+                          <button
+                            key={player.userId}
+                            onClick={() => {
+                              if (char) {
+                                setSelectedCharacterForModal(char);
+                                setShowCharacterModal(true);
+                              }
+                            }}
+                            disabled={!char}
+                            className={cn(
+                              "w-full flex items-center gap-3 p-3 rounded-lg border transition-all text-left",
+                              char
+                                ? "hover:border-primary/50 hover:bg-background-elevated cursor-pointer"
+                                : "opacity-50 cursor-not-allowed",
+                              isMe
+                                ? "border-primary/30 bg-primary/5"
+                                : "border-border"
                             )}
+                          >
+                            <div className={cn(
+                              "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0",
+                              isMe ? "bg-primary/20 text-primary" : "bg-background-elevated text-foreground-muted"
+                            )}>
+                              {char ? char.name.charAt(0).toUpperCase() : "?"}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Link
+                                  href={`/players/${player.userId}`}
+                                  className="font-medium text-sm truncate hover:text-primary transition-colors"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {char?.name || player.username}
+                                </Link>
+                                {isMe && (
+                                  <Badge variant="primary" size="sm">Sen</Badge>
+                                )}
+                              </div>
+                              {char ? (
+                                <p className="text-xs text-foreground-muted truncate">
+                                  Lv.{char.level} {char.race} {char.class}
+                                </p>
+                              ) : (
+                                <p className="text-xs text-foreground-muted italic">
+                                  Karakter seçmedi
+                                </p>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      /* Solo mod veya veri yüklenemedi - sadece kendi karakterini göster */
+                      character && (
+                        <button
+                          onClick={() => {
+                            setSelectedCharacterForModal(character);
+                            setShowCharacterModal(true);
+                          }}
+                          className="w-full flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5 hover:border-primary/50 hover:bg-background-elevated transition-all text-left cursor-pointer"
+                        >
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 bg-primary/20 text-primary">
+                            {character.name.charAt(0).toUpperCase()}
                           </div>
-                          {char ? (
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-sm truncate">{character.name}</p>
+                              <Badge variant="primary" size="sm">Sen</Badge>
+                            </div>
                             <p className="text-xs text-foreground-muted truncate">
-                              Lv.{char.level} {char.race} {char.class}
+                              Lv.{character.level} {character.race} {character.class}
                             </p>
-                          ) : (
-                            <p className="text-xs text-foreground-muted italic">
-                              Karakter seçmedi
-                            </p>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })
-                ) : (
-                  /* Solo mod veya veri yüklenemedi - sadece kendi karakterini göster */
-                  character && (
-                    <button
-                      onClick={() => {
-                        setSelectedCharacterForModal(character);
-                        setShowCharacterModal(true);
-                      }}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5 hover:border-primary/50 hover:bg-background-elevated transition-all text-left cursor-pointer"
-                    >
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 bg-primary/20 text-primary">
-                        {character.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm truncate">{character.name}</p>
-                          <Badge variant="primary" size="sm">Sen</Badge>
-                        </div>
-                        <p className="text-xs text-foreground-muted truncate">
-                          Lv.{character.level} {character.race} {character.class}
-                        </p>
-                      </div>
-                    </button>
-                  )
-                )}
-              </div>
+                          </div>
+                        </button>
+                      )
+                    )}
+                  </div>
 
-              <p className="text-xs text-foreground-muted text-center mt-4">
-                Detay görmek için karaktere tıkla
-              </p>
+                  <p className="text-xs text-foreground-muted text-center mt-4">
+                    Detay görmek için karaktere tıkla
+                  </p>
+                </>
+              ) : (
+                <>
+                  <DiceHistory
+                    sessionId={sessionId || ""}
+                    characterId={character?.id}
+                    limit={20}
+                    refreshSignal={diceHistoryRefreshSignal}
+                  />
+                  <p className="text-xs text-foreground-muted text-center mt-4">
+                    Zar geçmişi bu oturum için canlı güncellenir
+                  </p>
+                </>
+              )}
             </div>
           </aside>
         )}
@@ -1431,9 +1951,9 @@ export default function PlayPage() {
           isOpen={showNPCModal}
           onClose={() => setShowNPCModal(false)}
           sessionId={sessionId}
+          canManage={isCreator}
           onTalkToNPC={(npc) => {
-            // Send message to talk to NPC
-            handleSendMessage(`${npc.name} ile konuşmak istiyorum`);
+            void handleTalkToNPC(npc);
           }}
         />
       )}

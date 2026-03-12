@@ -21,7 +21,12 @@ const diceOptions: { type: DiceType; label: string; max: number; color: string }
 interface DiceModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onRoll?: (diceType: DiceType, count: number, modifier: number, results: number[], rollMode?: RollMode) => void;
+    onRoll?: (
+        diceType: DiceType,
+        count: number,
+        modifier: number,
+        rollMode?: RollMode
+    ) => Promise<{ results: number[]; total: number } | null> | { results: number[]; total: number } | null;
 }
 
 export function DiceModal({ isOpen, onClose, onRoll }: DiceModalProps) {
@@ -38,40 +43,56 @@ export function DiceModal({ isOpen, onClose, onRoll }: DiceModalProps) {
         rollMode: RollMode;
     } | null>(null);
 
-    const rollDice = () => {
+    const generateLocalRoll = (
+        dice: DiceType,
+        diceCount: number,
+        diceModifier: number,
+        mode: RollMode
+    ) => {
+        const diceMax = diceOptions.find((d) => d.type === dice)?.max || 20;
+        const results: number[] = [];
+        let total = 0;
+
+        if (dice === 'd20' && diceCount === 1 && mode !== 'normal') {
+            const roll1 = Math.floor(Math.random() * 20) + 1;
+            const roll2 = Math.floor(Math.random() * 20) + 1;
+            results.push(roll1, roll2);
+            const chosenRoll = mode === 'advantage' ? Math.max(roll1, roll2) : Math.min(roll1, roll2);
+            total = chosenRoll + diceModifier;
+        } else {
+            for (let i = 0; i < diceCount; i++) {
+                results.push(Math.floor(Math.random() * diceMax) + 1);
+            }
+            total = results.reduce((a, b) => a + b, 0) + diceModifier;
+        }
+
+        return { results, total };
+    };
+
+    const rollDice = async () => {
         setIsRolling(true);
         setLastResult(null);
 
         // Rolling animation duration
-        setTimeout(() => {
-            const diceMax = diceOptions.find((d) => d.type === selectedDice)?.max || 20;
-            const results: number[] = [];
-            let total = 0;
+        await new Promise((resolve) => setTimeout(resolve, 800));
 
-            if (selectedDice === 'd20' && count === 1 && rollMode !== 'normal') {
-                const roll1 = Math.floor(Math.random() * 20) + 1;
-                const roll2 = Math.floor(Math.random() * 20) + 1;
-                results.push(roll1, roll2);
-                const chosenRoll = rollMode === 'advantage' ? Math.max(roll1, roll2) : Math.min(roll1, roll2);
-                total = chosenRoll + modifier;
-            } else {
-                for (let i = 0; i < count; i++) {
-                    results.push(Math.floor(Math.random() * diceMax) + 1);
-                }
-                total = results.reduce((a, b) => a + b, 0) + modifier;
-            }
+        const effectiveMode = selectedDice === 'd20' && count === 1 ? rollMode : 'normal';
+        let rollData = onRoll
+            ? await onRoll(selectedDice, count, modifier, effectiveMode)
+            : null;
 
-            setLastResult({
-                dice: selectedDice,
-                results,
-                modifier,
-                total,
-                rollMode: selectedDice === 'd20' && count === 1 ? rollMode : 'normal',
-            });
+        if (!rollData || !Array.isArray(rollData.results) || typeof rollData.total !== 'number') {
+            rollData = generateLocalRoll(selectedDice, count, modifier, effectiveMode);
+        }
 
-            onRoll?.(selectedDice, count, modifier, results, rollMode);
-            setIsRolling(false);
-        }, 800);
+        setLastResult({
+            dice: selectedDice,
+            results: rollData.results,
+            modifier,
+            total: rollData.total,
+            rollMode: effectiveMode,
+        });
+        setIsRolling(false);
     };
 
     const getEffectiveRoll = () => {

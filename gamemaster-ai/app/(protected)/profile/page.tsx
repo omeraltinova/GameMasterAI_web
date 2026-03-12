@@ -92,7 +92,12 @@ interface StatsData {
 }
 
 interface ActivityItem {
-  type: "character_created" | "campaign_created" | "campaign_joined" | "session_activity";
+  type:
+    | "character_created"
+    | "campaign_created"
+    | "campaign_joined"
+    | "achievement_unlocked"
+    | "session_activity";
   label: string;
   entityName: string;
   date: string;
@@ -106,6 +111,12 @@ interface Achievement {
   unlocked: boolean;
   color: string;
   category: AchievementCategory;
+  unlockedAt: string | null;
+}
+
+interface ApiAchievement {
+  id: string;
+  unlocked?: boolean;
   unlockedAt: string | null;
 }
 
@@ -138,7 +149,7 @@ export default function ProfilePage() {
   // Yeni state'ler
   const [bio, setBio] = useState("");
   const [stats, setStats] = useState<StatsData | null>(null);
-  const [apiAchievements, setApiAchievements] = useState<{ id: string; unlockedAt: string | null }[]>([]);
+  const [apiAchievements, setApiAchievements] = useState<ApiAchievement[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
 
@@ -187,19 +198,26 @@ export default function ProfilePage() {
     if (apiAchievements.length === 0) return [];
 
     const apiMap = new Map(
-      apiAchievements.map((a) => [a.id, a.unlockedAt])
+      apiAchievements.map((a) => [a.id, a])
     );
 
-    return ACHIEVEMENT_DEFINITIONS.map((def) => ({
-      id: def.id,
-      label: def.label,
-      description: def.description,
-      icon: ICON_MAP[def.iconName] || Star,
-      color: def.color,
-      category: def.category,
-      unlocked: apiMap.get(def.id) !== null && apiMap.get(def.id) !== undefined,
-      unlockedAt: apiMap.get(def.id) ?? null,
-    }));
+    return ACHIEVEMENT_DEFINITIONS.map((def) => {
+      const fromApi = apiMap.get(def.id);
+      const unlocked =
+        fromApi?.unlocked ??
+        (fromApi?.unlockedAt !== null && fromApi?.unlockedAt !== undefined);
+
+      return {
+        id: def.id,
+        label: def.label,
+        description: def.description,
+        icon: ICON_MAP[def.iconName] || Star,
+        color: def.color,
+        category: def.category,
+        unlocked,
+        unlockedAt: fromApi?.unlockedAt ?? null,
+      };
+    });
   }, [apiAchievements]);
 
   const unlockedAchievements = finalAchievements.filter((a) => a.unlocked);
@@ -280,8 +298,15 @@ export default function ProfilePage() {
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
+      const currentPassword = window.prompt("Hesabınızı silmek için mevcut şifrenizi girin:");
+      if (!currentPassword) {
+        throw new Error("Hesap silme için şifre girmelisiniz.");
+      }
+
       const res = await fetch("/api/profile", {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword }),
       });
 
       if (!res.ok) {
@@ -754,4 +779,3 @@ function PreviewSection({
     </div>
   );
 }
-

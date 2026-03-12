@@ -63,7 +63,6 @@ export async function GET(
         description: map.description,
         imageUrl: map.imageUrl,
         isAIGenerated: map.isAIGenerated,
-        prompt: map.prompt,
         createdAt: map.createdAt.toISOString(),
       },
     });
@@ -125,11 +124,9 @@ export async function PUT(
       );
     }
 
-    // Yetki kontrolü - sadece oluşturucu güncelleyebilir
+    // Yetki kontrolü - sadece GM/oluşturucu güncelleyebilir
     const isCreator = existingMap.session.campaign.creatorId === userId;
-    const isPlayer = existingMap.session.campaign.players.some(p => p.userId === userId);
-
-    if (!isCreator && !isPlayer) {
+    if (!isCreator) {
       return forbiddenResponse('Bu haritayı güncelleme yetkiniz yok');
     }
 
@@ -151,7 +148,6 @@ export async function PUT(
         description: updatedMap.description,
         imageUrl: updatedMap.imageUrl,
         isAIGenerated: updatedMap.isAIGenerated,
-        prompt: updatedMap.prompt,
         createdAt: updatedMap.createdAt.toISOString(),
       },
     });
@@ -210,11 +206,9 @@ export async function DELETE(
       );
     }
 
-    // Yetki kontrolü
+    // Yetki kontrolü - sadece GM/oluşturucu silebilir
     const isCreator = existingMap.session.campaign.creatorId === userId;
-    const isPlayer = existingMap.session.campaign.players.some(p => p.userId === userId);
-
-    if (!isCreator && !isPlayer) {
+    if (!isCreator) {
       return forbiddenResponse('Bu haritayı silme yetkiniz yok');
     }
 

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 // GET /api/scenarios/mine
 // Get current user's scenarios
@@ -12,6 +13,13 @@ export async function GET(req: Request) {
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const limited = rateLimitResponse(
+      session.user.email,
+      "GET:/api/scenarios/mine",
+      RATE_LIMIT_TIERS.READ
+    );
+    if (limited) return limited;
 
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },

@@ -18,6 +18,7 @@ export const characterCreateSchema = z.object({
   experience: z.number().int().min(0).optional(),
   hp: z.number().int().min(0).optional(),
   maxHp: z.number().int().min(1).optional(),
+  gold: z.number().int().min(0).optional(),
   stats: characterStatsSchema.optional(),
   background: z.string().optional().nullable(),
   appearance: z.string().optional().nullable(),
@@ -25,7 +26,7 @@ export const characterCreateSchema = z.object({
   imageUrl: z
     .string()
     .trim()
-    .refine((value) => isSafeImageUrl(value), {
+    .refine((value) => isSafeImageUrl(value, { allowDataUrl: true }), {
       message: "Geçersiz görsel URL'i. Yalnızca güvenli URL'ler kabul edilir.",
     })
     .optional()

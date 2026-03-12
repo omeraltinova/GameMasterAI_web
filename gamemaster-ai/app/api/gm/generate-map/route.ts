@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[GenerateMap] Generating map for: ${locationName}`);
     console.log(`[GenerateMap] Style: ${selectedMapStyle}, Type: ${locationType}`);
-    console.log(`[GenerateMap] Prompt: ${fullPrompt.substring(0, 200)}...`);
+    console.log(`[GenerateMap] Prompt length: ${fullPrompt.length}`);
 
     // AI ile görsel üret
     const result = await generateLocationImage(fullPrompt, locationType);
@@ -225,10 +225,8 @@ export async function POST(req: NextRequest) {
         description: map.description,
         imageUrl: map.imageUrl,
         isAIGenerated: map.isAIGenerated,
-        prompt: map.prompt,
         createdAt: map.createdAt.toISOString(),
       },
-      revisedPrompt: result.revisedPrompt,
     });
   } catch (error) {
     console.error('Map generation error:', error);

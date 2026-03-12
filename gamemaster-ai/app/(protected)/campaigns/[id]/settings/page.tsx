@@ -136,7 +136,7 @@ export default function CampaignSettingsPage() {
 
   // Handle invite code refresh
   const handleRefreshInvite = async () => {
-    if (!isCreator) return;
+    if (!isCreator || !campaign?.isMultiplayer) return;
 
     setIsRefreshingInvite(true);
     setError(null);
@@ -160,7 +160,7 @@ export default function CampaignSettingsPage() {
 
   // Handle copy invite code
   const handleCopyInvite = () => {
-    if (campaign?.inviteCode) {
+    if (campaign?.isMultiplayer && campaign?.inviteCode) {
       navigator.clipboard.writeText(campaign.inviteCode);
       setSuccessMessage("Davet kodu kopyalandı");
       setTimeout(() => setSuccessMessage(null), 2000);
@@ -351,50 +351,52 @@ export default function CampaignSettingsPage() {
       </Card>
 
       {/* Invite Code Management */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Copy className="h-5 w-5 text-primary" />
-            Davet Kodu
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-foreground-secondary">
-            Bu kodu diğer oyuncularla paylaşarak oturuma katılmalarını sağlayabilirsiniz.
-          </p>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 p-3 bg-background-elevated rounded-lg font-mono text-lg tracking-wider text-center">
-              {campaign.inviteCode || "—"}
+      {campaign.isMultiplayer && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Copy className="h-5 w-5 text-primary" />
+              Davet Kodu
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-foreground-secondary">
+              Bu kodu diğer oyuncularla paylaşarak oturuma katılmalarını sağlayabilirsiniz.
+            </p>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 p-3 bg-background-elevated rounded-lg font-mono text-lg tracking-wider text-center">
+                {campaign.inviteCode || "—"}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyInvite}
+                className="gap-2"
+              >
+                <Copy className="h-4 w-4" />
+                Kopyala
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefreshInvite}
+                disabled={isRefreshingInvite}
+                className="gap-2"
+              >
+                {isRefreshingInvite ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Yenile
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopyInvite}
-              className="gap-2"
-            >
-              <Copy className="h-4 w-4" />
-              Kopyala
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefreshInvite}
-              disabled={isRefreshingInvite}
-              className="gap-2"
-            >
-              {isRefreshingInvite ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
-              Yenile
-            </Button>
-          </div>
-          <p className="text-xs text-foreground-muted">
-            Not: Kodu yenilemek, eski kodu geçersiz kılacaktır.
-          </p>
-        </CardContent>
-      </Card>
+            <p className="text-xs text-foreground-muted">
+              Not: Kodu yenilemek, eski kodu geçersiz kılacaktır.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Campaign Status Management */}
       <Card>
@@ -622,5 +624,4 @@ export default function CampaignSettingsPage() {
     </div>
   );
 }
-
 

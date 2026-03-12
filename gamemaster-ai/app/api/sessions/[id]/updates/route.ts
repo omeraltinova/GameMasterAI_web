@@ -3,6 +3,9 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
 import { getCampaignActorRole, hasCampaignAccess } from '@/lib/auth/permissions';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
+
+const MAX_MESSAGES_PER_POLL = 20;
 
 /**
  * GET /api/sessions/:id/updates
@@ -22,6 +25,9 @@ export async function GET(
     if (!userId) {
       return unauthorizedResponse();
     }
+
+    const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/updates", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     // Session'ı kontrol et
     const session = await prisma.gameSession.findUnique({
@@ -50,16 +56,19 @@ export async function GET(
     // Since parametresini parse et
     let since: Date | null = null;
     if (sinceParam) {
-      try {
-        since = new Date(sinceParam);
-      } catch (error) {
-        console.error('Invalid since parameter:', error);
+      const parsedSince = new Date(sinceParam);
+      if (!Number.isNaN(parsedSince.getTime())) {
+        since = parsedSince;
+      } else {
         since = null;
       }
     }
 
     // Güncellemeleri al
-    const whereClause: Prisma.MessageWhereInput = { sessionId };
+    const whereClause: Prisma.MessageWhereInput = {
+      sessionId,
+      isSoftDeleted: false,
+    };
 
     if (since) {
       whereClause.timestamp = {
@@ -71,7 +80,7 @@ export async function GET(
     const updates = await prisma.message.findMany({
       where: whereClause,
       orderBy: { timestamp: 'desc' },
-      take: 20,
+      take: MAX_MESSAGES_PER_POLL,
     });
 
     const sanitizedUpdates = updates.map((msg) => {

@@ -330,7 +330,7 @@ export function useGM(sessionId: string) {
     locationName: string;
     locationType?: string;
     atmosphere?: string;
-    details?: string;
+    details?: string[] | string;
   }) => {
     setIsLoading(true);
     setError(null);
@@ -590,6 +590,13 @@ export function useDice(sessionId: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  type DiceRollOptions = {
+    purpose?: string;
+    advantage?: boolean;
+    disadvantage?: boolean;
+    characterId?: string;
+  };
+
   /**
    * Zar at
    */
@@ -597,7 +604,7 @@ export function useDice(sessionId: string) {
     diceType: DiceType,
     count: number = 1,
     modifier: number = 0,
-    purpose?: string
+    options: DiceRollOptions = {}
   ) => {
     setIsLoading(true);
     setError(null);
@@ -606,15 +613,28 @@ export function useDice(sessionId: string) {
         success: boolean;
         results: number[];
         total: number;
-        message: Message;
+        roll?: {
+          id: string;
+          diceType: DiceType;
+          count: number;
+          results: number[];
+          modifier: number;
+          total: number;
+          purpose?: string;
+          timestamp: string;
+        };
+        message?: Message;
       }>(
         '/dice/roll',
         {
           sessionId,
+          characterId: options.characterId,
           diceType,
           count,
           modifier,
-          purpose,
+          purpose: options.purpose,
+          advantage: options.advantage === true,
+          disadvantage: options.disadvantage === true,
         }
       );
       return data;
@@ -626,10 +646,90 @@ export function useDice(sessionId: string) {
     }
   }, [sessionId]);
 
+  const rollCheck = useCallback(async (params: {
+    diceType?: DiceType;
+    modifier?: number;
+    purpose?: string;
+    ability?: string;
+    skill?: string;
+    dc?: number;
+    advantage?: boolean;
+    disadvantage?: boolean;
+    characterId?: string;
+  }) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await post('/dice/roll-check', {
+        sessionId,
+        ...params,
+      });
+      return data;
+    } catch (err) {
+      setError(err instanceof APIError ? err.message : 'Kontrol zarı atılamadı');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  const rollAttack = useCallback(async (params: {
+    modifier?: number;
+    purpose?: string;
+    weaponName?: string;
+    targetName?: string;
+    advantage?: boolean;
+    disadvantage?: boolean;
+    characterId?: string;
+  }) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await post('/dice/roll-attack', {
+        sessionId,
+        ...params,
+      });
+      return data;
+    } catch (err) {
+      setError(err instanceof APIError ? err.message : 'Saldırı zarı atılamadı');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  const rollDamage = useCallback(async (params: {
+    diceType: DiceType;
+    count?: number;
+    modifier?: number;
+    purpose?: string;
+    weaponName?: string;
+    targetName?: string;
+    characterId?: string;
+  }) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await post('/dice/roll-damage', {
+        sessionId,
+        ...params,
+      });
+      return data;
+    } catch (err) {
+      setError(err instanceof APIError ? err.message : 'Hasar zarı atılamadı');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
   return {
     isLoading,
     error,
     rollDice,
+    rollCheck,
+    rollAttack,
+    rollDamage,
   };
 }
 

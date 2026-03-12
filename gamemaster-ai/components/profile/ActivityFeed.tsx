@@ -12,12 +12,18 @@ import {
   Swords,
   Users,
   MessageSquare,
+  Trophy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
 interface ActivityItem {
-  type: "character_created" | "campaign_created" | "campaign_joined" | "session_activity";
+  type:
+    | "character_created"
+    | "campaign_created"
+    | "campaign_joined"
+    | "achievement_unlocked"
+    | "session_activity";
   label: string;
   entityName: string;
   date: string;
@@ -44,6 +50,7 @@ const activityConfig: Record<string, { icon: LucideIcon; color: string; bg: stri
   character_created: { icon: User, color: "text-primary", bg: "bg-primary/10" },
   campaign_created: { icon: Swords, color: "text-secondary", bg: "bg-secondary/10" },
   campaign_joined: { icon: Users, color: "text-accent", bg: "bg-accent/10" },
+  achievement_unlocked: { icon: Trophy, color: "text-warning", bg: "bg-warning/10" },
   session_activity: { icon: MessageSquare, color: "text-info", bg: "bg-info/10" },
 };
 

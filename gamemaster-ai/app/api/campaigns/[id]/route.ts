@@ -27,7 +27,6 @@ export async function GET(
           select: {
             id: true,
             username: true,
-            email: true,
             avatar: true,
           },
         },
@@ -106,11 +105,20 @@ export async function GET(
 
     // Calculate player count
     const playerCount = campaign.players.filter((p: any) => p.isActive).length;
+    const shouldExposeInviteCode = campaign.creatorId === userId && campaign.isMultiplayer;
 
     return NextResponse.json({
       success: true,
       campaign: {
         ...campaign,
+        inviteCode: shouldExposeInviteCode ? campaign.inviteCode : null,
+        creator: campaign.creator
+          ? {
+              id: campaign.creator.id,
+              username: campaign.creator.username,
+              avatar: campaign.creator.avatar,
+            }
+          : null,
         scenario: campaign.scenario?.isSoftDeleted ? null : campaign.scenario,
         playerCount,
       },
@@ -161,7 +169,13 @@ export async function PUT(
     if (body.name !== undefined) updateData.name = body.name;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.maxPlayers !== undefined) updateData.maxPlayers = body.maxPlayers;
-    if (body.isMultiplayer !== undefined) updateData.isMultiplayer = body.isMultiplayer;
+    if (body.isMultiplayer !== undefined) {
+      updateData.isMultiplayer = body.isMultiplayer;
+      if (body.isMultiplayer === false) {
+        // Solo modda davet kodu olmamalı
+        updateData.inviteCode = null;
+      }
+    }
 
     // Davet kodunu kapatma (null olarak set etme)
     if (body.inviteCode === null) {

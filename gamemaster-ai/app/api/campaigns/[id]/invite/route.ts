@@ -28,10 +28,17 @@ export async function POST(
       where: { id: campaignId },
     });
 
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json(
         { success: false, error: 'Oturum bulunamadı' },
         { status: 404 }
+      );
+    }
+
+    if (!campaign.isMultiplayer) {
+      return NextResponse.json(
+        { success: false, error: 'Solo oturumlarda davet kodu kullanılamaz' },
+        { status: 400 }
       );
     }
 

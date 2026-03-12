@@ -15,8 +15,10 @@ export async function GET(
   try {
     const { id: sessionId } = await params;
     const searchParams = req.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const parsedLimit = Number.parseInt(searchParams.get('limit') || '50', 10);
+    const parsedOffset = Number.parseInt(searchParams.get('offset') || '0', 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
+    const offset = Number.isFinite(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
 
     // Auth kontrolü (NextAuth session)
     const userId = await getUserId();

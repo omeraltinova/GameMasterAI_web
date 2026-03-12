@@ -14,6 +14,7 @@ export async function GET(req: Request) {
     const scenarios = await prisma.scenario.findMany({
       where: {
         isOfficial: true,
+        isSoftDeleted: false,
       },
       take: limit,
       orderBy: { createdAt: "desc" },

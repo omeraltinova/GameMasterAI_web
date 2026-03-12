@@ -21,6 +21,7 @@ declare module "next-auth" {
     role: string;
     isSuspended?: boolean;
     isSoftDeleted?: boolean;
+    passwordSignature?: string;
   }
 }
 
@@ -32,5 +33,7 @@ declare module "next-auth/jwt" {
     role: string;
     isSuspended?: boolean;
     isSoftDeleted?: boolean;
+    passwordSignature?: string;
+    sessionRevoked?: boolean;
   }
 }

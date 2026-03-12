@@ -66,4 +66,25 @@ describe("imageUrl security", () => {
     expect(normalizeImageUrl("javascript:alert(1)")).toBeNull();
     expect(isSafeImageUrl("data:image/png;base64,abc")).toBe(false);
   });
+
+  it("accepts safe base64 data URLs when allowDataUrl is true", () => {
+    const value = normalizeImageUrl("data:image/png;base64,aGVsbG8=", {
+      allowDataUrl: true,
+    });
+    expect(value).toBe("data:image/png;base64,aGVsbG8=");
+  });
+
+  it("rejects risky or invalid data URLs even when allowDataUrl is true", () => {
+    expect(
+      normalizeImageUrl("data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=", {
+        allowDataUrl: true,
+      }),
+    ).toBeNull();
+
+    expect(
+      normalizeImageUrl("data:image/png;base64,not_base64!", {
+        allowDataUrl: true,
+      }),
+    ).toBeNull();
+  });
 });

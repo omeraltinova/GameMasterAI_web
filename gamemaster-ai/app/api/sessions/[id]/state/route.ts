@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
 import { getCampaignActorRole, hasCampaignAccess } from '@/lib/auth/permissions';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/sessions/:id/state
@@ -20,21 +21,25 @@ export async function GET(
       return unauthorizedResponse();
     }
 
+    const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/state", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
+
     // Session'ı al
     const session = await prisma.gameSession.findUnique({
       where: { id: sessionId },
-      include: {
+      select: {
+        id: true,
+        campaignId: true,
+        currentState: true,
+        turnOrder: true,
+        activePlayer: true,
+        updatedAt: true,
         campaign: {
-          include: {
+          select: {
+            creatorId: true,
             players: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    username: true,
-                  },
-                },
-                character: true,
+              select: {
+                userId: true,
               },
             },
           },

@@ -240,37 +240,54 @@ Yanıtını aşağıdaki JSON formatında ver:
     // Suggestions'ı ilgili GM mesajının metadata'sına kaydet
     // messageId gönderildiyse onu kullan, yoksa son GM mesajını bul
     try {
-      let targetMessageId = messageId;
+      let targetMessageId: string | null =
+        typeof messageId === "string" && messageId.trim().length > 0
+          ? messageId.trim()
+          : null;
+      const providedMessageId = targetMessageId;
 
       if (!targetMessageId) {
         const lastGM = await prisma.message.findFirst({
-          where: { sessionId, senderType: 'GM' },
+          where: { sessionId, senderType: 'GM', isSoftDeleted: false },
           orderBy: { timestamp: 'desc' },
-          select: { id: true, metadata: true },
+          select: { id: true },
         });
-        targetMessageId = lastGM?.id;
+        targetMessageId = lastGM?.id || null;
       }
 
       if (targetMessageId) {
-        // Mevcut metadata'yı oku ve suggestions ekle
-        const targetMsg = await prisma.message.findUnique({
-          where: { id: targetMessageId },
+        // messageId sağlanmışsa, bu mesajın gerçekten bu session'a ait olduğunu zorunlu doğrula.
+        const targetMsg = await prisma.message.findFirst({
+          where: { id: targetMessageId, sessionId },
           select: { metadata: true },
         });
 
-        let existingMetadata: Record<string, unknown> = {};
-        if (targetMsg?.metadata) {
-          try {
-            existingMetadata = JSON.parse(targetMsg.metadata);
-          } catch { /* ignore */ }
-        }
+        if (!targetMsg) {
+          if (providedMessageId) {
+            return NextResponse.json(
+              { success: false, error: "Mesaj bu oturuma ait değil" },
+              { status: 403 }
+            );
+          }
+        } else {
+          let existingMetadata: Record<string, unknown> = {};
+          if (targetMsg.metadata) {
+            try {
+              existingMetadata = JSON.parse(targetMsg.metadata);
+            } catch { /* ignore */ }
+          }
 
-        await prisma.message.update({
-          where: { id: targetMessageId },
-          data: {
-            metadata: JSON.stringify({ ...existingMetadata, suggestions }),
-          },
-        });
+          const updateResult = await prisma.message.updateMany({
+            where: { id: targetMessageId, sessionId },
+            data: {
+              metadata: JSON.stringify({ ...existingMetadata, suggestions }),
+            },
+          });
+
+          if (updateResult.count !== 1) {
+            throw new Error("Suggestions metadata update failed");
+          }
+        }
       }
     } catch (saveErr) {
       console.error('Suggestions kaydetme hatası:', saveErr);

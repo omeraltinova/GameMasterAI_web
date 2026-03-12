@@ -281,6 +281,38 @@ describe("POST /api/dice/roll", () => {
     expect(res.status).toBe(400);
   });
 
+  it("returns 400 when dice count exceeds limit", async () => {
+    mocks.getUserId.mockResolvedValue("user-1");
+
+    const res = await rollDice(
+      makePOSTRequest("http://localhost:3000/api/dice/roll", {
+        sessionId: "s1",
+        diceType: "d6",
+        count: 999,
+      })
+    );
+
+    expect(res.status).toBe(400);
+    expect(mocks.prisma.gameSession.findUnique).not.toHaveBeenCalled();
+    expect(mocks.prisma.diceRoll.create).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when modifier is out of bounds", async () => {
+    mocks.getUserId.mockResolvedValue("user-1");
+
+    const res = await rollDice(
+      makePOSTRequest("http://localhost:3000/api/dice/roll", {
+        sessionId: "s1",
+        diceType: "d20",
+        modifier: 1000,
+      })
+    );
+
+    expect(res.status).toBe(400);
+    expect(mocks.prisma.gameSession.findUnique).not.toHaveBeenCalled();
+    expect(mocks.prisma.diceRoll.create).not.toHaveBeenCalled();
+  });
+
   it("successfully rolls dice and returns results", async () => {
     mocks.getUserId.mockResolvedValue("user-1");
     mocks.prisma.gameSession.findUnique.mockResolvedValue({

@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
     const campaign = await prisma.campaign.findFirst({
       where: {
         inviteCode: inviteCode.toUpperCase(),
+        isMultiplayer: true,
+        isSoftDeleted: false,
       },
       include: {
         creator: {
@@ -95,5 +97,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-
 

@@ -38,6 +38,8 @@ export function MapViewer({
   }
 
   const safeMapImageUrl = normalizeImageUrl(map?.imageUrl);
+  const mapName = map?.name || "Harita";
+  const mapDescription = map?.description || "";
 
   const handleStartEdit = () => {
     if (map) {
@@ -185,7 +187,7 @@ export function MapViewer({
           ) : safeMapImageUrl && !imageError ? (
             <img
               src={safeMapImageUrl}
-              alt={map.name || "Harita"}
+              alt={mapName}
               className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => setIsExpanded(true)}
               onError={() => setImageError(true)}
@@ -217,7 +219,7 @@ export function MapViewer({
             <div className="relative max-w-full max-h-full bg-gradient-to-br from-emerald-900 via-teal-900 to-emerald-950 rounded-lg shadow-2xl overflow-hidden">
               <img
                 src={safeMapImageUrl}
-                alt={map.name || "Harita"}
+                alt={mapName}
                 className="max-w-full max-h-full object-contain"
                 onClick={(e) => e.stopPropagation()}
               />
@@ -226,11 +228,11 @@ export function MapViewer({
               <div className="flex items-center gap-2">
                 <Map className="h-4 w-4 text-white" />
                 <span className="text-sm font-medium text-white">
-                  {map.name}
+                  {mapName}
                 </span>
               </div>
-              {map.description && (
-                <p className="text-xs text-white/70 mt-1 max-w-xs">{map.description}</p>
+              {mapDescription && (
+                <p className="text-xs text-white/70 mt-1 max-w-xs">{mapDescription}</p>
               )}
             </div>
             <Button

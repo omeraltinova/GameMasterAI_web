@@ -22,6 +22,7 @@ async function getCampaignWithLatestSession(campaignId: string) {
       name: true,
       description: true,
       creatorId: true,
+      isSoftDeleted: true,
       scenarioId: true,
       isMultiplayer: true,
       maxPlayers: true,
@@ -34,7 +35,6 @@ async function getCampaignWithLatestSession(campaignId: string) {
           id: true,
           username: true,
           avatar: true,
-          role: true,
         },
       },
       scenario: {
@@ -61,7 +61,6 @@ async function getCampaignWithLatestSession(campaignId: string) {
               id: true,
               username: true,
               avatar: true,
-              role: true,
             },
           },
         },
@@ -129,6 +128,30 @@ function processSession(session: any) {
         suggestions,
       };
     }),
+  };
+}
+
+function sanitizeCampaignForActor(campaign: any, actorRole: "GM" | "PLAYER" | "NONE") {
+  return {
+    ...campaign,
+    inviteCode: actorRole === "GM" && campaign.isMultiplayer ? campaign.inviteCode : null,
+    creator: campaign.creator
+      ? {
+          id: campaign.creator.id,
+          username: campaign.creator.username,
+          avatar: campaign.creator.avatar,
+        }
+      : null,
+    players: (campaign.players || []).map((player: any) => ({
+      ...player,
+      user: player.user
+        ? {
+            id: player.user.id,
+            username: player.user.username,
+            avatar: player.user.avatar,
+          }
+        : null,
+    })),
   };
 }
 
@@ -221,7 +244,7 @@ export async function GET(
     if (limited) return limited;
 
     const campaign = await getCampaignWithLatestSession(campaignId);
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json({ error: 'Oturum bulunamadı' }, { status: 404 });
     }
 
@@ -241,7 +264,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       session: processSession(session),
-      campaign,
+      campaign: sanitizeCampaignForActor(campaign, actorRole),
     });
   } catch (error) {
     console.error('Active session GET hatası:', error);
@@ -265,7 +288,7 @@ export async function POST(
     if (limited) return limited;
 
     const campaign = await getCampaignWithLatestSession(campaignId);
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json({ error: 'Oturum bulunamadı' }, { status: 404 });
     }
 
@@ -283,11 +306,18 @@ export async function POST(
         );
       }
 
+      if (campaign.status !== 'DRAFT') {
+        return NextResponse.json(
+          { error: 'Session yalnızca taslak durumundaki oturumlar için başlatılabilir.' },
+          { status: 409 },
+        );
+      }
+
       session = await createSessionForCampaign(campaign, campaignId, userId);
     }
 
     let campaignForResponse = campaign;
-    if (campaign.status !== 'ACTIVE' && canManageCampaign(actorRole)) {
+    if (campaign.status === 'DRAFT' && canManageCampaign(actorRole)) {
       await prisma.campaign.update({
         where: { id: campaignId },
         data: { status: 'ACTIVE' },
@@ -302,7 +332,7 @@ export async function POST(
     return NextResponse.json({
       success: true,
       session: processSession(session),
-      campaign: campaignForResponse,
+      campaign: sanitizeCampaignForActor(campaignForResponse, actorRole),
     });
   } catch (error) {
     console.error('Active session POST hatası:', error);

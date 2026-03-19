@@ -105,6 +105,12 @@ Generated from the current repo state.
 ### `/scenarios/new`
 - File: `app/(protected)/scenarios/new/page.tsx`
 
+### `/scenarios/collections`
+- File: `app/(protected)/scenarios/collections/page.tsx`
+
+### `/scenarios/collections/[id]`
+- File: `app/(protected)/scenarios/collections/[id]/page.tsx`
+
 ## API Routes (Route Handlers)
 ### `/api/admin/active-sessions`
 - File: `app/api/admin/active-sessions/route.ts`
@@ -354,6 +360,14 @@ Generated from the current repo state.
 - File: `app/api/scenarios/official/route.ts`
 - Methods: GET
 
+### `/api/scenarios/collections`
+- File: `app/api/scenarios/collections/route.ts`
+- Methods: GET
+
+### `/api/scenarios/collections/[id]`
+- File: `app/api/scenarios/collections/[id]/route.ts`
+- Methods: GET
+
 ### `/api/sessions/[id]`
 - File: `app/api/sessions/[id]/route.ts`
 - Methods: GET, PUT
@@ -396,6 +410,14 @@ Generated from the current repo state.
 
 ### `/api/sessions/[id]/updates`
 - File: `app/api/sessions/[id]/updates/route.ts`
+- Methods: GET
+
+### `/api/scenarios/collections`
+- File: `app/api/scenarios/collections/route.ts`
+- Methods: GET
+
+### `/api/scenarios/collections/[id]`
+- File: `app/api/scenarios/collections/[id]/route.ts`
 - Methods: GET
 
 ### `/api/system/stats`

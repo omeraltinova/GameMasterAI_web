@@ -213,41 +213,69 @@ export default function ScenariosPage() {
             <Map className="h-4 w-4 mr-2" />
             Senaryolarım
           </TabsTrigger>
+          <TabsTrigger value="collections">
+            <BookOpen className="h-4 w-4 mr-2" />
+            Koleksiyonlar
+          </TabsTrigger>
         </TabsList>
 
         <div className="mt-6">
-          {loading ? (
-             <div className="flex justify-center py-12">
-               <Loader2 className="h-8 w-8 animate-spin text-primary" />
-             </div>
-          ) : displayedScenarios.length > 0 ? (
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {displayedScenarios.map((scenario) => (
-                <div key={scenario.id} onClick={() => router.push(`/scenarios/${scenario.id}`)}>
-                   <ScenarioCard scenario={scenario} />
-                </div>
-              ))}
-            </div>
-          ) : (
-             <Card>
+          {activeTab === "collections" && (
+            <Card>
               <CardContent className="py-16 text-center">
-                <Sparkles className="h-16 w-16 text-foreground-muted mx-auto mb-4" />
+                <BookOpen className="h-16 w-16 text-foreground-muted mx-auto mb-4" />
                 <h3 className="text-xl font-semibold mb-2">
-                  Senaryo bulunamadı
+                  Senaryo Koleksiyonları
                 </h3>
                 <p className="text-foreground-secondary mb-6 max-w-md mx-auto">
-                  {activeTab === "mine" 
-                    ? "Henüz bir senaryo oluşturmadın." 
-                    : "Aradığın kriterlere uygun senaryo bulunamadı."}
+                  Önceden hazırlanmış senaryo paketlerini keşfet
                 </p>
-                <Link href="/scenarios/new">
+                <Link href="/scenarios/collections">
                   <Button className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Senaryo Oluştur
+                    <Sparkles className="h-4 w-4" />
+                    Koleksiyonları Gör
                   </Button>
                 </Link>
               </CardContent>
             </Card>
+          )}
+
+          {activeTab !== "collections" && (
+            <>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : displayedScenarios.length > 0 ? (
+                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {displayedScenarios.map((scenario) => (
+                    <div key={scenario.id} onClick={() => router.push(`/scenarios/${scenario.id}`)}>
+                      <ScenarioCard scenario={scenario} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="py-16 text-center">
+                    <Sparkles className="h-16 w-16 text-foreground-muted mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">
+                      Senaryo bulunamadı
+                    </h3>
+                    <p className="text-foreground-secondary mb-6 max-w-md mx-auto">
+                      {activeTab === "mine"
+                        ? "Henüz bir senaryo oluşturmadın."
+                        : "Aradığın kriterlere uygun senaryo bulunamadı."}
+                    </p>
+                    <Link href="/scenarios/new">
+                      <Button className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Senaryo Oluştur
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
         </div>
       </Tabs>

@@ -3,7 +3,7 @@
 Bu dosya, planlanan ama henuz tamamlanmamis isleri takip eder.
 Isaretleri tamamladikca guncelle. Yeni talepleri en alttaki "Yeni Isler" bolumune ekle.
 
-Last update: 2026-03-05
+Last update: 2026-03-15
 
 ## Faz 1 - Temel Altyapi
 | Durum | Is | Amac | Neden | Mevcut |
@@ -20,30 +20,22 @@ Last update: 2026-03-05
 | [x] | Karakter HP hizli guncelleme endpoint + UI akisi | HP degisimi icin hizli akis | Combat/iyilesme akislari pratiklesir | `PUT /api/characters/:id/hp` + UI |
 | [x] | Sifre degistirme UI + API | Kullanici sifresini guvenle degistirebilsin | Hesap guvenligi | `/api/auth/password` + profil formu |
 | [x] | Karakter altin takibi (persist + UI) | Envanter ekonomisini gercek veriye baglamak | Placeholder yerine kalici ve guncellenebilir altin degeri | Character `gold` alani + inventory sayfasinda artir/azalt |
-| [ ] | 2FA/guvenlik ayarlari (opsiyonel) | Ek guvenlik katmani | Hesap ele gecirmeye karsi koruma | Profilde "Yakinda" etiketi var, islev yok |
 
-## Faz 3 - Kampanya Sistemi (plan-paritesi)
-| Durum | Is | Amac | Neden | Mevcut |
-| --- | --- | --- | --- | --- |
-| [ ] | /api/campaigns/:id/start endpointi (alias) | Kampanyayi baslatma endpoint adini standartlastirmak | Planla birebir uyum | Baslatma `POST /api/campaigns/:id/sessions` ile |
-| [ ] | /api/campaigns/:id/leave endpointi (alias) | Kampanyadan ayrilma endpoint adini standartlastirmak | Planla birebir uyum | Ayrilma `DELETE /api/campaigns/:id/join` ile |
-| [ ] | /api/campaigns/join/:inviteCode GET endpointi | Davet koduyla kampanya bilgisi getirmek | Link tabanli katilim akisi | `POST /api/campaigns/join` (body: inviteCode) var |
-
-## Faz 4 - Oyun Mekanikleri
+## Faz 3 - Oyun Mekanikleri
 | Durum | Is | Amac | Neden | Mevcut |
 | --- | --- | --- | --- | --- |
 | [x] | Combat sistemi (initiative, turn order, action/hasar, combat log) | Savas akisini yonetmek | Oynanis derinligi | `sessions/:id/combat/start` + `combat/:id/*` + play UI |
 | [x] | Map sistemi (session map CRUD, viewer/gallery, AI map generator UI) | Lokasyonlari gorsel takip etmek | Oyun takibi ve immersion | `sessions/:id/maps`, `maps/:id`, `MapModal/MapGenerator` |
 | [x] | Equipment slots UI + equip logic | Ekipman slotlariyla net loadout | Item yonetimi sade ve kurallara uygun | `EquipmentSlots` + equip endpointi |
 
-## Faz 5 - AI Entegrasyonu
+## Faz 4 - AI Entegrasyonu
 | Durum | Is | Amac | Neden | Mevcut |
 | --- | --- | --- | --- | --- |
 | [x] | AI senaryo olusturma arayuzu (/api/gm/generate-scenario) | Tek tikla senaryo uretmek | Hizli baslangic | `ScenarioForm` icinde "AI ile Doldur" |
 | [x] | AI harita olusturma arayuzu (/api/gm/generate-map) | Lokasyon haritasini AI ile uretmek | Gorsel destek | `MapModal` + `MapGenerator` |
 | [x] | NPC personality/attitude ayarlari UI (opsiyonel) | NPC davranisini ayarlamak | Tutarlilik ve hikaye kontrolu | `NPCModal` icinde duzenleme formu + kaydet |
 
-## Faz 6 - Polish & Test
+## Faz 5 - Polish & Test
 | Durum | Is | Amac | Neden | Mevcut |
 | --- | --- | --- | --- | --- |
 | [x] | Multiplayer polling dongusu (fetchUpdates interval + since) | Cok oyunculu real-time yakini guncelleme | Mesaj/state senkronu | SSE + polling fallback (5 sn) |
@@ -56,6 +48,9 @@ Last update: 2026-03-05
 | --- | --- | --- | --- | --- |
 | [x] | /characters/[id]/inventory sayfasi | Envanteri ayri sayfada yonetmek | Character sheet sade kalsin | Sayfa mevcut |
 | [x] | /admin/stats sayfasi | Admin istatistiklerini ayri sayfada toplamak | Dashboard sade kalir | Sayfa eklendi ve admin menusune baglandi |
+| [x] | /scenarios/collections sayfasi | Senaryo koleksiyonlarini listelemek | Koleksiyonlar UI | Sayfa eklendi |
+| [x] | /scenarios/collections/[id] sayfasi | Koleksiyon detaylarini gormek | Koleksiyon UI | Sayfa eklendi |
+| [x] | /scenarios/collections API endpointleri | Koleksiyonlar icin API | User UI icin veri | GET /api/scenarios/collections ve /api/scenarios/collections/[id] |
 
 ## Eksik API Endpointleri (plan listesine gore)
 | Durum | Is | Amac | Neden | Mevcut |

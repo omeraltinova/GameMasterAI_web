@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { normalizeImageUrl } from "@/lib/security/imageUrl";
 import { Map, Loader2, X, Maximize2, Trash2, Edit2, Check, XCircle } from "lucide-react";
@@ -185,12 +186,14 @@ export function MapViewer({
               </div>
             </div>
           ) : safeMapImageUrl && !imageError ? (
-            <img
+            <Image
               src={safeMapImageUrl}
               alt={mapName}
-              className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+              fill
+              className="object-cover cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => setIsExpanded(true)}
               onError={() => setImageError(true)}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           ) : imageError ? (
             <div className="absolute inset-0 flex items-center justify-center bg-muted">
@@ -217,10 +220,12 @@ export function MapViewer({
         >
           <div className="relative w-full h-full flex items-center justify-center">
             <div className="relative max-w-full max-h-full bg-gradient-to-br from-emerald-900 via-teal-900 to-emerald-950 rounded-lg shadow-2xl overflow-hidden">
-              <img
+              <Image
                 src={safeMapImageUrl}
                 alt={mapName}
-                className="max-w-full max-h-full object-contain"
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 onClick={(e) => e.stopPropagation()}
               />
             </div>

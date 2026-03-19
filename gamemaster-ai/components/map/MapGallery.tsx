@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { normalizeImageUrl } from "@/lib/security/imageUrl";
 import { Map, Loader2, Trash2, Eye, Calendar, Sparkles, Grid, List } from "lucide-react";
@@ -133,14 +134,15 @@ export function MapGallery({
                 {/* Image */}
                 <div className="relative aspect-video bg-gradient-to-br from-emerald-900/60 via-teal-900/40 to-emerald-950/60">
                   {safeImageUrl ? (
-                    <img
-                      src={safeImageUrl}
-                      alt={map.name || "Harita"}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
+                    <div className="relative w-full h-full" data-map-id={map.id}>
+                      <Image
+                        src={safeImageUrl}
+                        alt={map.name || "Harita"}
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      />
+                    </div>
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Map className="h-12 w-12 text-white/20" />
@@ -218,14 +220,15 @@ export function MapGallery({
                 {/* Thumbnail */}
                 <div className="relative w-20 h-14 rounded-md overflow-hidden bg-gradient-to-br from-emerald-900/60 via-teal-900/40 to-emerald-950/60 flex-shrink-0">
                   {safeImageUrl ? (
-                    <img
-                      src={safeImageUrl}
-                      alt={map.name || "Harita"}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).style.display = 'none';
-                      }}
-                    />
+                    <div className="relative w-full h-full" data-map-list-id={map.id}>
+                      <Image
+                        src={safeImageUrl}
+                        alt={map.name || "Harita"}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      />
+                    </div>
                   ) : (
                     <div className="absolute inset-0 flex items-center justify-center">
                       <Map className="h-6 w-6 text-white/20" />

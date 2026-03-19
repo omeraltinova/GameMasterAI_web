@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { normalizeImageUrl } from "@/lib/security/imageUrl";
 import type { Message, GMAction } from "@/types";
@@ -256,10 +257,12 @@ export function ChatWindow({
                   </div>
                   {safeLocationImageUrl ? (
                     <div className="relative aspect-[16/9] w-full">
-                      <img
+                      <Image
                         src={safeLocationImageUrl}
                         alt={message.locationName || "Mekan görseli"}
-                        className="w-full h-full object-cover"
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                       />
                     </div>
                   ) : (
@@ -308,11 +311,13 @@ export function ChatWindow({
           onClick={() => setExpandedImage(null)}
         >
           <div className="relative w-full h-full flex items-center justify-center">
-            <img
+            <Image
               src={safeExpandedImageUrl}
               alt={expandedImage.name}
-              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              fill
+              className="object-contain rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
             <div className="absolute top-4 left-4 px-3 py-2 rounded-lg bg-black/70 backdrop-blur-sm border border-white/20">
               <div className="flex items-center gap-2">

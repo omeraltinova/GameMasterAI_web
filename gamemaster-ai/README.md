@@ -160,7 +160,7 @@ Production ortamına deploy ederken aşağıdaki adımlar uygulanmalıdır:
 
 ### Performans
 
-- [ ] Image optimization (Next.js Image component)
+- [x] Image optimization (Next.js Image component)
 - [ ] Bundle size analizi
 - [ ] Veritabanı index'lerini kontrol et
 - [ ] CDN konfigürasyonu

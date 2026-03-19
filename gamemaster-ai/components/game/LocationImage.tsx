@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { normalizeImageUrl } from "@/lib/security/imageUrl";
 import { MapPin, Loader2, X, Maximize2 } from "lucide-react";
@@ -89,12 +90,14 @@ export function LocationImage({
               </div>
             </div>
           ) : safeImageUrl && !imageError ? (
-            <img
+            <Image
               src={safeImageUrl}
               alt={locationName || "Mekan görseli"}
-              className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+              fill
+              className="object-cover cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => setIsExpanded(true)}
               onError={() => setImageError(true)}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           ) : imageError ? (
             <div className="absolute inset-0 flex items-center justify-center bg-muted">
@@ -114,11 +117,13 @@ export function LocationImage({
         >
           <div className="relative w-full h-full flex items-center justify-center">
             <div className="relative max-w-full max-h-full bg-gradient-to-br from-indigo-900 via-violet-900 to-indigo-950 rounded-lg shadow-2xl overflow-hidden">
-              <img
+              <Image
                 src={safeImageUrl}
                 alt={locationName || "Mekan görseli"}
-                className="max-w-full max-h-full object-contain"
+                fill
+                className="object-contain"
                 onClick={(e) => e.stopPropagation()}
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               />
             </div>
             <div className="absolute top-4 left-4 px-3 py-2 rounded-lg bg-black/70 backdrop-blur-sm border border-white/20">

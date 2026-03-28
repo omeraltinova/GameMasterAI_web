@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
 import { generateLocationImage, getLocationStyleHints } from '@/lib/ai/imageGenerator';
+import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
+import { normalizeImageUrl } from '@/lib/security/imageUrl';
 
 const MAX_DESCRIPTION_LENGTH = 1200;
 const MAX_MESSAGE_LENGTH = 240;
@@ -106,14 +108,14 @@ export async function POST(req: NextRequest) {
     // Validation
     if (!sessionId) {
       return NextResponse.json(
-        { message: 'sessionId gerekli' },
+        { success: false, error: 'sessionId gerekli' },
         { status: 400 }
       );
     }
 
     if (!locationName || !description) {
       return NextResponse.json(
-        { message: 'locationName ve description gerekli' },
+        { success: false, error: 'locationName ve description gerekli' },
         { status: 400 }
       );
     }
@@ -122,6 +124,14 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return unauthorizedResponse();
+    }
+
+    const rateLimit = await checkAIRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { status: 429 }
+      );
     }
 
     // Session kontrolü
@@ -169,7 +179,7 @@ export async function POST(req: NextRequest) {
 
     if (!session) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -315,13 +325,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const normalizedImageUrl = normalizeImageUrl(result.imageUrl);
+    if (!normalizedImageUrl) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Üretilen görsel URL’i güvenlik kurallarını karşılamıyor',
+        },
+        { status: 502 }
+      );
+    }
+
     // Session'ın currentState'ini güncelle (lokasyon bilgisi ve görsel URL'i)
     // Update session currentState with location and image info
     const updatedState = {
       ...currentState,
       location: locationName,
       locationType: locationType || 'other',
-      locationImage: result.imageUrl,
+      locationImage: normalizedImageUrl,
       locationImagePrompt: fullPrompt,
     };
 
@@ -349,7 +370,7 @@ export async function POST(req: NextRequest) {
           senderType: 'GM',
           senderName: 'Game Master',
           content: safeContent,
-          locationImageUrl: result.imageUrl,
+          locationImageUrl: normalizedImageUrl,
           locationName,
           metadata: JSON.stringify(metadata),
         },
@@ -358,7 +379,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      imageUrl: result.imageUrl,
+      imageUrl: normalizedImageUrl,
       revisedPrompt: result.revisedPrompt,
       location: {
         name: locationName,
@@ -382,7 +403,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Generate location image error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

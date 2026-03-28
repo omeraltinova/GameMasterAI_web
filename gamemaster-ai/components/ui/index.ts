@@ -51,4 +51,4 @@ export {
 
 export { ToastProvider, useToast } from "./Toast";
 
-
+export { ThemeSelector } from "./ThemeSelector";

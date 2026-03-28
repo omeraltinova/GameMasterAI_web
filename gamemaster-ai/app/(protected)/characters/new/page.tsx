@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Badge, Progress } from "@/components/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, Input, Textarea, Badge, Progress, Avatar, Tabs, TabsContent, TabsList, TabsTrigger, Modal } from "@/components/ui";
 import { races, classes, backgrounds } from "@/lib/mock-data";
 import { rollAbilityScore, formatModifier, calculateModifier } from "@/lib/utils";
 import { post } from "@/lib/api/client";
 import type { CharacterStats } from "@/types";
-import { ArrowLeft, ArrowRight, Dices, Check, User, Swords, Sparkles, BookOpen, Loader2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Dices, Check, User, Swords, Sparkles, BookOpen, Loader2, Wand2, ChevronDown, ChevronUp, X, Palette } from "lucide-react";
 
 type WizardStep = "race" | "class" | "stats" | "details";
 
@@ -35,15 +35,121 @@ export default function NewCharacterPage() {
     name: "",
     race: "",
     class: "",
+    appearance: "",
     stats: initialStats,
     background: "",
     backstory: "",
+    imageUrl: "",
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // AI oluşturma state'leri
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiRace, setAiRace] = useState("");
+  const [aiClass, setAiClass] = useState("");
+  const [aiConcept, setAiConcept] = useState("");
+  const [aiAppearance, setAiAppearance] = useState("");
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [portraitError, setPortraitError] = useState<string | null>(null);
+  const [isGeneratingPortrait, setIsGeneratingPortrait] = useState(false);
+  const [activeAIPanelTab, setActiveAIPanelTab] = useState<"character" | "appearance">("character");
+  const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+
+  const handleGenerateWithAI = async () => {
+    setIsGenerating(true);
+    setAiError(null);
+
+    try {
+      const res = await fetch("/api/gm/generate-character", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          race: aiRace || undefined,
+          characterClass: aiClass || undefined,
+          concept: aiConcept || undefined,
+          appearance: aiAppearance || undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setAiError(data.message || "AI karakter oluşturamadı");
+        return;
+      }
+
+      if (data.success && data.character) {
+        const ch = data.character;
+        const generatedAppearance = typeof ch.appearance === 'string' ? ch.appearance : '';
+
+        setFormData({
+          name: ch.name || "",
+          race: ch.race || "",
+          class: ch.class || "",
+          appearance: generatedAppearance,
+          stats: ch.stats || initialStats,
+          background: ch.background || "",
+          backstory: ch.backstory || "",
+          imageUrl: "",
+        });
+        setAiAppearance(generatedAppearance);
+        // Detaylar adımına atla, kullanıcı gözden geçirsin
+        setCurrentStep("details");
+        setShowAIPanel(false);
+      }
+    } catch {
+      setAiError("AI ile bağlantı kurulamadı");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleGeneratePortrait = async () => {
+    setIsGeneratingPortrait(true);
+    setPortraitError(null);
+
+    const portraitSource = formData.appearance || aiAppearance || aiConcept;
+    if (!portraitSource) {
+      setPortraitError("Önce bir görünüş metni yazmalısınız.");
+      setIsGeneratingPortrait(false);
+      return;
+    }
+
+    try {
+      const response = await post<{
+        success: boolean;
+        imageUrl?: string;
+        message?: string;
+      }>("/gm/generate-character-portrait", {
+        name: formData.name || "Karakter",
+        race: formData.race || aiRace || "",
+        characterClass: formData.class || aiClass || "",
+        background: formData.background,
+        appearance: portraitSource,
+      });
+
+      if (response?.success && response.imageUrl) {
+        setFormData((prev) => ({ ...prev, imageUrl: response.imageUrl || prev.imageUrl }));
+        setCurrentStep("details");
+      } else {
+        setPortraitError(response?.message || "Portre üretilemedi.");
+      }
+    } catch (error: unknown) {
+      const portraitErrorMessage = error instanceof Error
+        ? error.message
+        : "Portre üretimi sırasında hata oluştu.";
+      setPortraitError(portraitErrorMessage);
+    } finally {
+      setIsGeneratingPortrait(false);
+    }
+  };
+
   const currentStepIndex = steps.findIndex((s) => s.id === currentStep);
   const progress = ((currentStepIndex + 1) / steps.length) * 100;
+  // AI ile doldurulduysa tüm adımlara tıklanabilir olsun
+  const allStepsReachable = !!(formData.name && formData.race && formData.class);
 
   const canProceed = () => {
     switch (currentStep) {
@@ -107,6 +213,9 @@ export default function NewCharacterPage() {
         maxHp: maxHp,
         stats: formData.stats,
         background: formData.background || undefined,
+        appearance: formData.appearance || undefined,
+        backstory: formData.backstory || undefined,
+        imageUrl: formData.imageUrl || undefined,
       });
 
       if (response.success && response.character) {
@@ -115,9 +224,9 @@ export default function NewCharacterPage() {
       } else {
         setError('Karakter oluşturulamadı');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Karakter oluşturma hatası:', err);
-      setError(err?.message || 'Bir hata oluştu');
+      setError(err instanceof Error ? err.message : 'Bir hata oluştu');
     } finally {
       setIsLoading(false);
     }
@@ -141,6 +250,145 @@ export default function NewCharacterPage() {
         </p>
       </div>
 
+      {/* AI ile Oluştur Paneli */}
+      <Card className={showAIPanel ? "border-primary/30" : ""}>
+        <CardContent className="p-4">
+          <button
+            onClick={() => setShowAIPanel(!showAIPanel)}
+            className="w-full flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Wand2 className="h-5 w-5 text-primary" />
+              </div>
+              <div className="text-left">
+                <h3 className="font-semibold text-sm">AI ile Oluştur</h3>
+                <p className="text-xs text-foreground-muted">Konseptini anlat, AI karakteri tasarlasın</p>
+              </div>
+            </div>
+            {showAIPanel ? (
+              <ChevronUp className="h-4 w-4 text-foreground-muted" />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-foreground-muted" />
+            )}
+          </button>
+
+          {showAIPanel && (
+            <div className="mt-4 pt-4 border-t border-border space-y-4">
+              <Tabs
+                value={activeAIPanelTab}
+                onValueChange={(val) => setActiveAIPanelTab(val as "character" | "appearance")}
+              >
+                <TabsList className="w-full">
+                  <TabsTrigger value="character">AI Talebi</TabsTrigger>
+                  <TabsTrigger value="appearance">Görünüş</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="character" className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">
+                        Irk Tercihi (Opsiyonel)
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={aiRace}
+                          onChange={(e) => setAiRace(e.target.value)}
+                          className="w-full h-9 px-3 pr-8 rounded-lg appearance-none bg-input border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        >
+                          <option value="">AI Seçsin</option>
+                          {races.map((r) => (
+                            <option key={r.name} value={r.name}>{r.name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-muted pointer-events-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">
+                        Sınıf Tercihi (Opsiyonel)
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={aiClass}
+                          onChange={(e) => setAiClass(e.target.value)}
+                          className="w-full h-9 px-3 pr-8 rounded-lg appearance-none bg-input border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                        >
+                          <option value="">AI Seçsin</option>
+                          {classes.map((c) => (
+                            <option key={c.name} value={c.name}>{c.name}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-muted pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">
+                      Karakter Konsepti (Opsiyonel)
+                    </label>
+                    <input
+                      type="text"
+                      value={aiConcept}
+                      onChange={(e) => setAiConcept(e.target.value)}
+                      placeholder="ör: Gizemli bir geçmişe sahip yaşlı büyücü, lanetlenmiş bir şövalye..."
+                      className="w-full h-9 px-3 rounded-lg bg-input border border-border text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="appearance" className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">
+                      Karakter Görünüşünü Tarif Et
+                    </label>
+                    <textarea
+                      value={aiAppearance}
+                      onChange={(e) => setAiAppearance(e.target.value)}
+                      placeholder="ör: Uzun mor saçlı, yarı-elf kadın, gümüş gömlek, siyah deri zırh, yağmurlu bir yüz"
+                      className="w-full min-h-24 rounded-lg bg-input border border-border p-3 text-sm text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+                  <p className="text-xs text-foreground-muted">
+                    Bu alana yazdığınız görünüm, portre üretiminde kullanılacak.
+                  </p>
+                </TabsContent>
+              </Tabs>
+
+              {aiError && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-danger/10 border border-danger/20 text-danger text-xs">
+                  <X className="h-3.5 w-3.5 shrink-0" />
+                  <span>{aiError}</span>
+                </div>
+              )}
+
+              <Button
+                onClick={handleGenerateWithAI}
+                disabled={isGenerating}
+                className="w-full gap-2"
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    AI Karakter Oluşturuyor...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    Karakter Oluştur
+                  </>
+                )}
+              </Button>
+
+              <p className="text-xs text-foreground-muted text-center">
+                AI karakteri oluşturacak, ardından detayları gözden geçirip düzenleyebilirsiniz.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Progress */}
       <div className="space-y-4">
         <Progress value={progress} max={100} size="md" />
@@ -152,10 +400,10 @@ export default function NewCharacterPage() {
             return (
               <button
                 key={step.id}
-                onClick={() => i <= currentStepIndex && setCurrentStep(step.id)}
-                disabled={i > currentStepIndex}
+                onClick={() => (i <= currentStepIndex || allStepsReachable) && setCurrentStep(step.id)}
+                disabled={i > currentStepIndex && !allStepsReachable}
                 className={`flex flex-col items-center gap-1 transition-colors ${
-                  isCompleted
+                  isCompleted || (allStepsReachable && !isCurrent)
                     ? "text-primary cursor-pointer"
                     : isCurrent
                     ? "text-foreground"
@@ -164,7 +412,7 @@ export default function NewCharacterPage() {
               >
                 <div
                   className={`p-2 rounded-full ${
-                    isCompleted || isCurrent
+                    isCompleted || isCurrent || allStepsReachable
                       ? "bg-primary/20"
                       : "bg-background-elevated"
                   }`}
@@ -290,6 +538,14 @@ export default function NewCharacterPage() {
               <CardHeader className="p-0">
                 <CardTitle>Karakter Detayları</CardTitle>
               </CardHeader>
+
+              {/* AI ile oluşturulmuş bilgi notu */}
+              {formData.name && formData.race && formData.class && formData.backstory && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-primary text-xs">
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                  <span>AI tarafından oluşturuldu - alanları dilediğiniz gibi düzenleyebilirsiniz.</span>
+                </div>
+              )}
               <div className="space-y-4">
                 <Input
                   label="Karakter Adı"
@@ -299,6 +555,90 @@ export default function NewCharacterPage() {
                     setFormData({ ...formData, name: e.target.value })
                   }
                 />
+
+                <div className="grid gap-4 sm:grid-cols-[120px,1fr] items-start">
+                  <div className="flex flex-col items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => formData.imageUrl && setIsImagePreviewOpen(true)}
+                      disabled={!formData.imageUrl}
+                      className={formData.imageUrl ? "cursor-zoom-in" : "cursor-default"}
+                    >
+                      <Avatar
+                        src={formData.imageUrl || undefined}
+                        fallback={formData.name || "?"}
+                        size="xl"
+                        className="w-24 h-24"
+                      />
+                    </button>
+                    <label className="text-xs text-foreground-muted">
+                      Görsel
+                    </label>
+                    {formData.imageUrl && (
+                      <p className="text-[10px] text-foreground-muted">Büyütmek için tıkla</p>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <Input
+                      label="Görsel URL (Opsiyonel)"
+                      placeholder="https://..."
+                      value={formData.imageUrl}
+                      onChange={(e) =>
+                        setFormData({ ...formData, imageUrl: e.target.value })
+                      }
+                    />
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1.5">
+                        Görsel Yükle (Opsiyonel)
+                      </label>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="block w-full text-sm text-foreground-muted file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const result = reader.result;
+                            if (typeof result === "string") {
+                              setFormData((prev) => ({ ...prev, imageUrl: result }));
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                      <p className="mt-1 text-xs text-foreground-muted">
+                        Yüklenen görsel tarayıcıda base64 olarak kaydedilir.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2 w-full gap-2"
+                      onClick={handleGeneratePortrait}
+                      disabled={isGeneratingPortrait}
+                    >
+                      {isGeneratingPortrait ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Portre Oluşturuluyor...
+                        </>
+                      ) : (
+                        <>
+                          <Palette className="h-3.5 w-3.5" />
+                          Görünüşten Portre Oluştur
+                        </>
+                      )}
+                    </Button>
+                    {portraitError && (
+                      <div className="mt-2 text-xs text-danger">
+                        {portraitError}
+                      </div>
+                    )}
+                  </div>
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-foreground mb-1.5">
@@ -319,6 +659,16 @@ export default function NewCharacterPage() {
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Görünüş</label>
+                  <Textarea
+                    value={formData.appearance}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, appearance: e.target.value }))}
+                    placeholder="Karakterin görünüşünü yaz..."
+                    className="min-h-[120px]"
+                  />
                 </div>
 
                 <Textarea
@@ -352,6 +702,24 @@ export default function NewCharacterPage() {
           )}
         </CardContent>
       </Card>
+
+      <Modal
+        open={isImagePreviewOpen}
+        onOpenChange={setIsImagePreviewOpen}
+        title={`${formData.name || "Karakter"} - Portre`}
+        size="full"
+      >
+        {formData.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={formData.imageUrl}
+            alt={`${formData.name || "Karakter"} portresi`}
+            className="max-h-[75vh] w-full rounded-lg object-contain"
+          />
+        ) : (
+          <p className="text-sm text-foreground-muted">Önizlenecek görsel bulunamadı.</p>
+        )}
+      </Modal>
 
       {/* Navigation */}
       <div className="flex justify-between">
@@ -397,5 +765,4 @@ export default function NewCharacterPage() {
     </div>
   );
 }
-
 

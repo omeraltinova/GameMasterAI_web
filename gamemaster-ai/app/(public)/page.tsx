@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui";
 import { FadeInView, StaggerContainer, StaggerItem } from "@/components/layout/PageTransition";
@@ -16,10 +17,95 @@ import {
   Play,
   Flame,
   Shield,
+  MessageSquare,
+  Swords,
+  UserCheck,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+const GM_TYPING_TEXT = "Rünlerden birini çözmeyi başarıyorsun: 'Ateşin koruyucusu burada uyuyor. Onu uyandırmak cesaretten fazlasını gerektirir...'";
+
+function useTypewriter(text: string, delay: number = 1500, speed: number = 35) {
+  const [displayedText, setDisplayedText] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const [isDone, setIsDone] = useState(false);
+
+  useEffect(() => {
+    // Önce noktaları göster, sonra yazmaya başla
+    const startTimer = setTimeout(() => {
+      setIsTyping(true);
+    }, delay);
+
+    return () => clearTimeout(startTimer);
+  }, [delay]);
+
+  useEffect(() => {
+    if (!isTyping || isDone) return;
+
+    if (displayedText.length >= text.length) {
+      setIsDone(true);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      setDisplayedText(text.slice(0, displayedText.length + 1));
+    }, speed);
+
+    return () => clearTimeout(timer);
+  }, [isTyping, isDone, displayedText, text, speed]);
+
+  return { displayedText, isTyping, isDone };
+}
+
+function useCountUp(end: number, duration: number = 1500, start: boolean = true) {
+  const [count, setCount] = useState(0);
+  const frameRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!start || end === 0) { setCount(0); return; }
+    const startTime = performance.now();
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      // easeOutExpo
+      const eased = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
+      setCount(Math.floor(eased * end));
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(animate);
+      }
+    };
+    frameRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frameRef.current);
+  }, [end, duration, start]);
+
+  return count;
+}
+
+function formatNumber(n: number): string {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return n.toString();
+}
+
+interface PlatformStats {
+  totalUsers: number;
+  totalCampaigns: number;
+  totalCharacters: number;
+  totalMessages: number;
+  totalScenarios: number;
+  totalDiceRolls: number;
+}
+
 export default function HomePage() {
+  const { displayedText, isTyping, isDone } = useTypewriter(GM_TYPING_TEXT, 1800, 35);
+
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+  useEffect(() => {
+    fetch('/api/system/stats')
+      .then((res) => res.json())
+      .then((data) => { if (data.success) setPlatformStats(data.stats); })
+      .catch(() => {});
+  }, []);
   return (
     <div className="relative overflow-hidden">
       {/* Atmospheric Background */}
@@ -64,7 +150,7 @@ export default function HomePage() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="text-lg text-foreground-secondary mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed"
             >
-              Sınırsız hayal gücü, dinamik hikaye anlatımı ve D&D 5e kurallarına tam sadakat.
+              Sınırsız hayal gücü, dinamik hikaye anlatımı ve 5e SRD kurallarına tam sadakat.
               Masaüstü rol yapma oyunlarını yeniden keşfet.
             </motion.p>
 
@@ -165,14 +251,23 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                {/* Typing indicator */}
-                <div className="flex gap-3 items-center">
+                {/* Typing GM message */}
+                <div className="flex gap-3">
                   <span className="text-primary font-bold shrink-0 w-12">GM:</span>
-                  <div className="flex gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
-                  </div>
+                  {!isTyping ? (
+                    <div className="flex gap-1 items-center pt-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  ) : (
+                    <span className="text-foreground-secondary leading-relaxed">
+                      {displayedText}
+                      {!isDone && (
+                        <span className="inline-block w-[2px] h-[1em] bg-primary/80 ml-0.5 align-middle animate-pulse" />
+                      )}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -197,7 +292,7 @@ export default function HomePage() {
           <StaggerContainer className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto" delay={0.1}>
             {[
               { step: 1, title: "Kahraman Yarat", desc: "Irk, sınıf ve yeteneklerini seç. Hikayeni şekillendir.", icon: Shield },
-              { step: 2, title: "Kampanya Seç", desc: "Hazır senaryolar veya AI'dan yeni bir macera iste.", icon: Map },
+              { step: 2, title: "Oturum Seç", desc: "Hazır senaryolar veya AI'dan yeni bir macera iste.", icon: Map },
               { step: 3, title: "Oyna", desc: "AI Game Master rehberliğinde epik hikayeler yaz.", icon: Sword },
             ].map((item, i) => (
               <StaggerItem key={i} className="relative group">
@@ -222,6 +317,38 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Platform Stats */}
+      {platformStats && (
+        <section className="py-16 lg:py-24 relative">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-secondary/[0.02] to-transparent" />
+          <div className="container mx-auto px-4 relative">
+            <FadeInView className="text-center mb-12">
+              <h2 className="text-3xl md:text-4xl font-bold font-serif">
+                Büyüyen Bir <span className="text-primary">Topluluk</span>
+              </h2>
+              <p className="text-foreground-secondary mt-3 max-w-lg mx-auto">
+                Her gün yeni maceraperestler katılıyor
+              </p>
+            </FadeInView>
+
+            <StaggerContainer className="flex flex-wrap justify-center gap-4 max-w-5xl mx-auto" delay={0.08}>
+              {[
+                { label: "Oyuncu", value: platformStats.totalUsers, icon: Users, color: "text-primary" },
+                { label: "Oturum", value: platformStats.totalCampaigns, icon: Swords, color: "text-secondary" },
+                { label: "Karakter", value: platformStats.totalCharacters, icon: UserCheck, color: "text-accent" },
+                { label: "Mesaj", value: platformStats.totalMessages, icon: MessageSquare, color: "text-info" },
+                { label: "Senaryo", value: platformStats.totalScenarios, icon: Scroll, color: "text-warning" },
+                { label: "Zar Atışı", value: platformStats.totalDiceRolls, icon: Dice6, color: "text-success" },
+              ].filter((stat) => stat.value > 0).map((stat) => (
+                <StaggerItem key={stat.label}>
+                  <StatCard stat={stat} />
+                </StaggerItem>
+              ))}
+            </StaggerContainer>
+          </div>
+        </section>
+      )}
+
       {/* CTA Section */}
       <section className="py-20 lg:py-28 relative">
         <div className="container mx-auto px-4">
@@ -239,7 +366,7 @@ export default function HomePage() {
                   Kendi Efsaneni Yaz
                 </h2>
                 <p className="text-foreground-secondary mb-8 max-w-lg mx-auto text-lg">
-                  Hesabını oluştur, karakterini yarat ve ilk kampanyanı dakikalar içinde başlat.
+                  Hesabını oluştur, karakterini yarat ve ilk oturumunu dakikalar içinde başlat.
                 </p>
                 <Link href="/register">
                   <Button size="lg" className="h-14 px-12 text-base font-semibold gap-2">
@@ -252,6 +379,38 @@ export default function HomePage() {
           </FadeInView>
         </div>
       </section>
+    </div>
+  );
+}
+
+function StatCard({ stat }: { stat: { label: string; value: number; icon: React.ElementType; color: string } }) {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const count = useCountUp(stat.value, 1800, visible);
+  const Icon = stat.icon;
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
+      { threshold: 0.3 }
+    );
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className="w-36 sm:w-40 bg-background-elevated/50 rounded-xl border border-border/30 p-5 text-center hover:border-primary/20 transition-all duration-300"
+    >
+      <Icon className={`h-6 w-6 mx-auto mb-3 ${stat.color}`} />
+      <div className="text-2xl lg:text-3xl font-bold font-serif">
+        {formatNumber(count)}
+      </div>
+      <div className="text-xs text-foreground-muted uppercase tracking-wider mt-1">
+        {stat.label}
+      </div>
     </div>
   );
 }

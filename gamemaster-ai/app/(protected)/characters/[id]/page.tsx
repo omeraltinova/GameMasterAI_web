@@ -1,12 +1,12 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar, Progress } from "@/components/ui";
+import { Button, Card, CardContent, CardHeader, CardTitle, Badge, Avatar, Progress, ConfirmDialog, Modal } from "@/components/ui";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui";
 import { formatModifier, calculateModifier, getProficiencyBonus } from "@/lib/utils";
-import { get } from "@/lib/api/client";
+import { get, put, del } from "@/lib/api/client";
 import type { Character as CharacterType, InventoryItem, ItemProperties } from "@/types";
 import {
   ArrowLeft,
@@ -15,11 +15,17 @@ import {
   Shield,
   Sparkles,
   Sword,
+  Minus,
+  Plus,
   Backpack,
   BookOpen,
   User,
   Loader2,
+  ExternalLink,
+  Trash2,
 } from "lucide-react";
+import { EquipmentSlots } from "@/components/character/EquipmentSlots";
+import { ItemDetailModal } from "@/components/character/ItemDetailModal";
 
 const abilityNames: Record<string, string> = {
   strength: "STR",
@@ -53,6 +59,7 @@ const defaultStats = {
 
 export default function CharacterDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const characterId = Array.isArray(params.id) ? params.id[0] : params.id;
   const [character, setCharacter] = useState<Character | null>(null);
   const [equippedItems, setEquippedItems] = useState<InventoryItemData[]>([]);
@@ -60,6 +67,39 @@ export default function CharacterDetailPage() {
   const [totalWeight, setTotalWeight] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [hpInput, setHpInput] = useState<number>(0);
+  const [isUpdatingHp, setIsUpdatingHp] = useState(false);
+  const [hpUpdateError, setHpUpdateError] = useState<string | null>(null);
+const [isLevelingUp, setIsLevelingUp] = useState(false);
+  const [levelUpError, setLevelUpError] = useState<string | null>(null);
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItemData | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isImagePreviewOpen, setIsImagePreviewOpen] = useState(false);
+
+  // Item tipi emojileri
+  const getItemEmoji = (type: string): string => {
+    const emojis: Record<string, string> = {
+      Weapon: '⚔️',
+      Armor: '🛡️',
+      Shield: '🛡️',
+      Helmet: '🪖',
+      Boots: '👢',
+      Gloves: '🧤',
+      Cloak: '🧥',
+      Ring: '💍',
+      Amulet: '📿',
+      Accessory: '🎀',
+      Potion: '🧪',
+      Scroll: '📜',
+      Tool: '🔧',
+      Consumable: '🍖',
+      Treasure: '💎',
+      Misc: '📦',
+    };
+    return emojis[type] || '📦';
+  };
 
   useEffect(() => {
     if (!characterId) return;
@@ -69,9 +109,18 @@ export default function CharacterDetailPage() {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const characterResponse = await get<{ success: boolean; characters: Character[] }>("/characters");
-        const foundCharacter =
-          characterResponse?.characters?.find((item) => item.id === characterId) || null;
+        let foundCharacter: Character | null = null;
+
+        const singleResponse = await get<{ success: boolean; character: Character }>(
+          `/characters/${characterId}`
+        );
+
+        if (singleResponse?.success && singleResponse.character) {
+          foundCharacter = singleResponse.character;
+        } else {
+          const listResponse = await get<{ success: boolean; characters: Character[] }>("/characters");
+          foundCharacter = listResponse?.characters?.find((item) => item.id === characterId) || null;
+        }
 
         if (!isMounted) return;
 
@@ -85,6 +134,7 @@ export default function CharacterDetailPage() {
         }
 
         setCharacter(foundCharacter);
+        setHpInput(foundCharacter.hp ?? 0);
 
         try {
           const inventoryResponse = await get<{
@@ -131,6 +181,12 @@ export default function CharacterDetailPage() {
     };
   }, [characterId]);
 
+  useEffect(() => {
+    if (character) {
+      setHpInput(character.hp);
+    }
+  }, [character]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -160,64 +216,89 @@ export default function CharacterDetailPage() {
   const baseAC = 10 + calculateModifier(stats.dexterity);
   const experience = character.experience || 0;
   const nextLevelProgress = 1000 - (experience % 1000);
+  const canLevelUp = character.level < 20 && experience >= character.level * 1000;
+  const hasHistoryContent = Boolean(
+    character.background || character.appearance || character.backstory
+  );
 
-  const hasItems = equippedItems.length > 0 || inventoryItems.length > 0;
+  const handleHpUpdate = async () => {
+    if (!character) return;
+    setIsUpdatingHp(true);
+    setHpUpdateError(null);
+    try {
+      const response = await put<{
+        success: boolean;
+        character: { hp: number; maxHp: number; level: number; experience: number };
+      }>(`/characters/${character.id}/hp`, {
+        hp: hpInput,
+      });
 
-  const getItemProperties = (item: InventoryItemData): ItemProperties | undefined => {
-    if (!item.properties) return undefined;
-    if (typeof item.properties === "string") {
-      try {
-        return JSON.parse(item.properties) as ItemProperties;
-      } catch (error) {
-        return undefined;
+      if (response?.success && response.character) {
+        setCharacter((prev) =>
+          prev ? { ...prev, hp: response.character.hp, maxHp: response.character.maxHp } : prev
+        );
+      } else {
+        setHpUpdateError("HP guncellenemedi.");
       }
+    } catch (error) {
+      console.error("HP update error:", error);
+      setHpUpdateError("HP guncellenemedi.");
+    } finally {
+      setIsUpdatingHp(false);
     }
-    return item.properties;
   };
 
-  const renderItem = (item: InventoryItemData) => {
-    const properties = getItemProperties(item);
-    return (
-      <div
-        key={item.id}
-        className="flex items-start gap-4 p-4 rounded-lg bg-background-elevated"
-      >
-        <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h4 className="font-medium">{item.name}</h4>
-            {item.quantity > 1 && (
-              <Badge variant="outline" size="sm">
-                x{item.quantity}
-              </Badge>
-            )}
-            {item.equipped && (
-              <Badge variant="success" size="sm">
-                Kuşanıldı
-              </Badge>
-            )}
-          </div>
-          <p className="text-sm text-foreground-secondary">{item.type}</p>
-          {item.description && (
-            <p className="text-xs text-foreground-muted mt-1">
-              {item.description}
-            </p>
-          )}
-        </div>
-        <div className="text-right text-xs text-foreground-muted">
-          {properties?.damage && (
-            <p className="text-primary font-mono text-sm">
-              {properties.damage}
-            </p>
-          )}
-          {properties?.armorClass && (
-            <p className="text-primary font-mono text-sm">
-              AC +{properties.armorClass}
-            </p>
-          )}
-          {item.weight > 0 && <p>{item.weight} lb</p>}
-        </div>
-      </div>
-    );
+  const handleLevelUp = async () => {
+    if (!character) return;
+    setIsLevelingUp(true);
+    setLevelUpError(null);
+    try {
+      const response = await put<{
+        success: boolean;
+        hpGain: number;
+        character: { level: number; hp: number; maxHp: number; experience: number };
+      }>(`/characters/${character.id}/levelup`, {});
+
+      if (response?.success && response.character) {
+        setCharacter((prev) =>
+          prev
+            ? {
+                ...prev,
+                level: response.character.level,
+                hp: response.character.hp,
+                maxHp: response.character.maxHp,
+              }
+            : prev
+        );
+      } else {
+        setLevelUpError("Seviye atlanamadi.");
+      }
+    } catch (error) {
+      console.error("Level up error:", error);
+      setLevelUpError("Seviye atlanamadi.");
+  } finally {
+      setIsLevelingUp(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!character) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const response = await del<{ success: boolean; message: string }>(`/characters/${character.id}`);
+
+      if (response?.success) {
+        router.push("/characters");
+      } else {
+        setDeleteError("Karakter silinemedi.");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      setDeleteError("Karakter silinemedi.");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -236,12 +317,22 @@ export default function CharacterDetailPage() {
           <div className="flex flex-col md:flex-row gap-6">
             {/* Avatar */}
             <div className="flex-shrink-0">
-              <Avatar
-                src={character.imageUrl}
-                fallback={character.name}
-                size="xl"
-                className="w-32 h-32"
-              />
+              <button
+                type="button"
+                onClick={() => character.imageUrl && setIsImagePreviewOpen(true)}
+                disabled={!character.imageUrl}
+                className={character.imageUrl ? "cursor-zoom-in" : "cursor-default"}
+              >
+                <Avatar
+                  src={character.imageUrl}
+                  fallback={character.name}
+                  size="xl"
+                  className="w-32 h-32"
+                />
+              </button>
+              {character.imageUrl && (
+                <p className="mt-2 text-[10px] text-foreground-muted text-center">Büyütmek için tıkla</p>
+              )}
             </div>
 
             {/* Info */}
@@ -256,18 +347,32 @@ export default function CharacterDetailPage() {
                     <div className="mt-2">
                       <Link href={`/campaigns/${character.campaign.id}`}>
                         <Badge variant="outline">
-                          Kampanya: {character.campaign.name}
+                          Oturum: {character.campaign.name}
                         </Badge>
                       </Link>
                     </div>
                   )}
                 </div>
-                <Link href={`/characters/${character.id}/edit`}>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Edit className="h-4 w-4" />
-                    Düzenle
+                <div className="flex gap-2">
+                  <Link href={`/characters/${character.id}/edit`}>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Edit className="h-4 w-4" />
+                      Düzenle
+                    </Button>
+                  </Link>
+                  <Button 
+                    variant="danger" 
+                    size="sm" 
+                    className="gap-2"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Sil
                   </Button>
-                </Link>
+                </div>
+                {deleteError && (
+                  <p className="mt-2 text-xs text-danger">{deleteError}</p>
+                )}
               </div>
 
               {/* Quick Stats */}
@@ -365,6 +470,45 @@ export default function CharacterDetailPage() {
                     variant={hpVariant}
                     size="lg"
                   />
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setHpInput((prev) => Math.max(0, prev - 1))}
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <input
+                      type="number"
+                      min={0}
+                      max={character.maxHp}
+                      value={hpInput}
+                      onChange={(event) => {
+                        const nextValue = Number.parseInt(event.target.value, 10);
+                        setHpInput(Number.isFinite(nextValue) ? nextValue : 0);
+                      }}
+                      className="h-8 w-20 rounded-lg bg-input border border-border px-2 text-sm text-foreground"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setHpInput((prev) => Math.min(character.maxHp, prev + 1))
+                      }
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      isLoading={isUpdatingHp}
+                      onClick={handleHpUpdate}
+                    >
+                      Guncelle
+                    </Button>
+                  </div>
+                  {hpUpdateError && (
+                    <p className="text-xs text-danger mt-2">{hpUpdateError}</p>
+                  )}
                 </div>
 
                 {/* XP */}
@@ -392,6 +536,21 @@ export default function CharacterDetailPage() {
                   <p className="text-4xl font-bold text-primary">
                     {character.level}
                   </p>
+                  {canLevelUp && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="mt-3 gap-2"
+                      isLoading={isLevelingUp}
+                      onClick={handleLevelUp}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Seviye Atla
+                    </Button>
+                  )}
+                  {levelUpError && (
+                    <p className="text-xs text-danger mt-2">{levelUpError}</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -400,49 +559,136 @@ export default function CharacterDetailPage() {
 
         {/* Inventory Tab */}
         <TabsContent value="inventory">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Backpack className="h-5 w-5 text-primary" />
-                Envanter
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {hasItems ? (
-                <div className="space-y-6">
-                  {typeof totalWeight === "number" && (
-                    <div className="flex items-center justify-between text-xs text-foreground-muted">
-                      <span>Toplam Ağırlık</span>
-                      <span>{totalWeight} lb</span>
-                    </div>
-                  )}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Equipment Slots */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Shield className="h-5 w-5 text-primary" />
+                  Ekipman Slotları
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <EquipmentSlots
+                  equippedItems={equippedItems.map(item => ({
+                    ...item,
+                    properties: typeof item.properties === 'string' 
+                      ? JSON.parse(item.properties) 
+                      : item.properties || null
+                  }))}
+                  onSlotClick={(slot, item) => {
+                    if (item) {
+                      // Find the original item from equippedItems
+                      const originalItem = equippedItems.find(i => i.id === item.id);
+                      if (originalItem) {
+                        setSelectedInventoryItem(originalItem);
+                      }
+                    }
+                  }}
+                />
+              </CardContent>
+            </Card>
 
-                  {equippedItems.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-3">Kuşanılanlar</h4>
-                      <div className="space-y-3">
-                        {equippedItems.map((item) => renderItem(item))}
-                      </div>
-                    </div>
-                  )}
+            {/* Quick Inventory */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center justify-between">
+                  <span className="flex items-center gap-2 text-base">
+                    <Backpack className="h-5 w-5 text-primary" />
+                    Çanta
+                  </span>
+                  <Badge variant="secondary" size="sm">
+                    {inventoryItems.length} item
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {inventoryItems.length > 0 ? (
+                  <div className="space-y-2">
+                    {inventoryItems.slice(0, 5).map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => setSelectedInventoryItem(item)}
+                        className="w-full flex items-center gap-3 p-2 rounded-lg bg-background-elevated hover:bg-border/50 transition-all text-left"
+                      >
+                        <span className="text-lg">
+                          {getItemEmoji(item.type)}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{item.name}</p>
+                          <p className="text-xs text-foreground-muted">{item.type}</p>
+                        </div>
+                        {item.quantity > 1 && (
+                          <Badge variant="outline" size="sm">x{item.quantity}</Badge>
+                        )}
+                      </button>
+                    ))}
+                    {inventoryItems.length > 5 && (
+                      <p className="text-xs text-foreground-muted text-center pt-2">
+                        +{inventoryItems.length - 5} daha fazla item
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="py-8 text-center">
+                    <Backpack className="h-10 w-10 text-foreground-muted mx-auto mb-2 opacity-30" />
+                    <p className="text-sm text-foreground-secondary">Çanta boş</p>
+                  </div>
+                )}
 
-                  {inventoryItems.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold mb-3">Envanter</h4>
-                      <div className="space-y-3">
-                        {inventoryItems.map((item) => renderItem(item))}
-                      </div>
+                {/* Weight info */}
+                {typeof totalWeight === "number" && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-foreground-muted">Toplam Ağırlık</span>
+                      <span className="font-medium">{totalWeight} lb</span>
                     </div>
-                  )}
-                </div>
-              ) : (
-                <div className="py-12 text-center">
-                  <Backpack className="h-12 w-12 text-foreground-muted mx-auto mb-3" />
-                  <p className="text-foreground-secondary">Envanter boş</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                  </div>
+                )}
+
+                {/* Full Inventory Link */}
+                <Link href={`/characters/${characterId}/inventory`} className="block mt-4">
+                  <Button variant="outline" className="w-full gap-2">
+                    <ExternalLink className="h-4 w-4" />
+                    Tam Envanteri Görüntüle
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Item Detail Modal */}
+          <ItemDetailModal
+            item={selectedInventoryItem ? {
+              ...selectedInventoryItem,
+              properties: typeof selectedInventoryItem.properties === 'string'
+                ? JSON.parse(selectedInventoryItem.properties)
+                : selectedInventoryItem.properties || null
+            } : null}
+            isOpen={!!selectedInventoryItem}
+            onClose={() => setSelectedInventoryItem(null)}
+            onEquip={async (itemId, equip) => {
+              try {
+                await put(`/characters/${characterId}/inventory/${itemId}/equip`, { equipped: equip });
+                // Refresh inventory
+                const inventoryResponse = await get<{
+                  success: boolean;
+                  equipped: InventoryItemData[];
+                  inventory: InventoryItemData[];
+                  totalWeight: number;
+                }>(`/characters/${characterId}/inventory`);
+                if (inventoryResponse?.success) {
+                  setEquippedItems(inventoryResponse.equipped ?? []);
+                  setInventoryItems(inventoryResponse.inventory ?? []);
+                  setTotalWeight(inventoryResponse.totalWeight ?? null);
+                }
+                setSelectedInventoryItem(null);
+              } catch (error) {
+                console.error("Equip error:", error);
+              }
+            }}
+            editable={false}
+          />
         </TabsContent>
 
         {/* Background Tab */}
@@ -455,10 +701,32 @@ export default function CharacterDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {character.background ? (
-                <p className="text-foreground-secondary leading-relaxed">
-                  {character.background}
-                </p>
+              {hasHistoryContent ? (
+                <div className="space-y-4">
+                  {character.background && (
+                    <div>
+                      <Badge variant="outline" className="mb-2">
+                        {character.background}
+                      </Badge>
+                    </div>
+                  )}
+                  {character.appearance && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-foreground-muted mb-1">Görünüş</p>
+                      <p className="text-foreground-secondary leading-relaxed whitespace-pre-wrap">
+                        {character.appearance}
+                      </p>
+                    </div>
+                  )}
+                  {character.backstory && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-foreground-muted mb-1">Geçmiş</p>
+                      <p className="text-foreground-secondary leading-relaxed whitespace-pre-wrap">
+                        {character.backstory}
+                      </p>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="py-12 text-center">
                   <User className="h-12 w-12 text-foreground-muted mx-auto mb-3" />
@@ -471,8 +739,37 @@ export default function CharacterDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Modal
+        open={isImagePreviewOpen}
+        onOpenChange={setIsImagePreviewOpen}
+        title={`${character.name} - Portre`}
+        size="full"
+      >
+        {character.imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={character.imageUrl}
+            alt={`${character.name} portresi`}
+            className="max-h-[75vh] w-full rounded-lg object-contain"
+          />
+        ) : (
+          <p className="text-sm text-foreground-muted">Önizlenecek görsel bulunamadı.</p>
+        )}
+      </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={handleDelete}
+        title="Karakteri Sil"
+        description={`"${character?.name}" karakterini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`}
+        confirmText="Sil"
+        cancelText="İptal"
+        variant="danger"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }
-
-

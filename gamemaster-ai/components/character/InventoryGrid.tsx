@@ -6,28 +6,23 @@ import { cn } from "@/lib/utils";
 import { Plus, Package, Weight, RefreshCw, Loader2 } from "lucide-react";
 import { ItemCard } from "./ItemCard";
 import { AddItemModal } from "./AddItemModal";
-
-interface InventoryItem {
-    id: string;
-    name: string;
-    type: string;
-    description?: string | null;
-    quantity: number;
-    weight: number;
-    equipped: boolean;
-    properties?: Record<string, any> | null;
-}
+import { ItemDetailModal } from "./ItemDetailModal";
+import type { InventoryItem } from "@/types";
 
 interface InventoryGridProps {
     characterId: string;
     className?: string;
     editable?: boolean;
+    showEquipmentSlots?: boolean;
+    onItemClick?: (item: InventoryItem) => void;
 }
 
 export function InventoryGrid({
     characterId,
     className,
     editable = true,
+    showEquipmentSlots = false,
+    onItemClick,
 }: InventoryGridProps) {
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [equipped, setEquipped] = useState<InventoryItem[]>([]);
@@ -37,6 +32,7 @@ export function InventoryGrid({
     const [isActionLoading, setIsActionLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [showAddModal, setShowAddModal] = useState(false);
+    const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
 
     const fetchInventory = useCallback(async () => {
         try {
@@ -64,7 +60,7 @@ export function InventoryGrid({
         fetchInventory();
     }, [fetchInventory]);
 
-    const handleAddItem = async (itemData: any) => {
+    const handleAddItem = async (itemData: Omit<InventoryItem, 'id' | 'equipped'>) => {
         setIsActionLoading(true);
         try {
             const response = await fetch(`/api/characters/${characterId}/inventory`, {
@@ -103,8 +99,6 @@ export function InventoryGrid({
     };
 
     const handleDelete = async (itemId: string) => {
-        if (!confirm('Bu item\'ı silmek istediğinize emin misiniz?')) return;
-
         setIsActionLoading(true);
         try {
             const response = await fetch(`/api/characters/${characterId}/inventory/${itemId}`, {
@@ -117,6 +111,32 @@ export function InventoryGrid({
             }
         } finally {
             setIsActionLoading(false);
+        }
+    };
+
+    const handleUpdate = async (itemId: string, updateData: Partial<InventoryItem>) => {
+        setIsActionLoading(true);
+        try {
+            const response = await fetch(`/api/characters/${characterId}/inventory/${itemId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateData),
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                await fetchInventory();
+            }
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleItemClick = (item: InventoryItem) => {
+        if (onItemClick) {
+            onItemClick(item);
+        } else {
+            setSelectedItem(item);
         }
     };
 
@@ -177,8 +197,8 @@ export function InventoryGrid({
                             <ItemCard
                                 key={item.id}
                                 item={item}
-                                onEquip={editable ? handleEquip : undefined}
-                                onDelete={editable ? handleDelete : undefined}
+                                onClick={handleItemClick}
+                                showActions={false}
                                 isLoading={isActionLoading}
                             />
                         ))}
@@ -202,7 +222,7 @@ export function InventoryGrid({
                                 className="mt-3 gap-2"
                             >
                                 <Plus className="h-4 w-4" />
-                                İlk Item'ını Ekle
+                                İlk Eşyanı Ekle
                             </Button>
                         )}
                     </div>
@@ -212,8 +232,8 @@ export function InventoryGrid({
                             <ItemCard
                                 key={item.id}
                                 item={item}
-                                onEquip={editable ? handleEquip : undefined}
-                                onDelete={editable ? handleDelete : undefined}
+                                onClick={handleItemClick}
+                                showActions={false}
                                 isLoading={isActionLoading}
                             />
                         ))}
@@ -226,6 +246,28 @@ export function InventoryGrid({
                 isOpen={showAddModal}
                 onClose={() => setShowAddModal(false)}
                 onAdd={handleAddItem}
+            />
+
+            {/* Item Detail Modal */}
+            <ItemDetailModal
+                item={selectedItem}
+                isOpen={!!selectedItem}
+                onClose={() => setSelectedItem(null)}
+                onEquip={editable ? async (itemId, equip) => {
+                    await handleEquip(itemId, equip);
+                    // Update selected item state
+                    setSelectedItem(prev => prev ? { ...prev, equipped: equip } : null);
+                } : undefined}
+                onUpdate={editable ? async (itemId, data) => {
+                    await handleUpdate(itemId, data);
+                    // Update selected item state
+                    setSelectedItem(prev => prev ? { ...prev, ...data } : null);
+                } : undefined}
+                onDelete={editable ? async (itemId) => {
+                    await handleDelete(itemId);
+                    setSelectedItem(null);
+                } : undefined}
+                editable={editable}
             />
         </div>
     );

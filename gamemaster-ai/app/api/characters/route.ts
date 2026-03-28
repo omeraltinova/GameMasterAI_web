@@ -1,20 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { characterCreateSchema } from '@/lib/validators/characters';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/characters
  * Kullanıcının karakterleri endpoint'i
  */
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "GET:/api/characters", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     // Kullanıcının karakterlerini al
     const characters = await prisma.character.findMany({
@@ -36,29 +41,37 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      characters: characters.map((char: any) => ({
-        id: char.id,
-        name: char.name,
-        race: char.race,
-        class: char.class,
-        level: char.level,
-        experience: char.experience,
-        hp: char.hp,
-        maxHp: char.maxHp,
-        stats: JSON.parse(char.stats),
-        background: char.background,
-        imageUrl: char.imageUrl,
-        campaignId: char.campaignId,
-        campaign: char.campaign,
-        inventoryCount: char.inventoryItems.length,
-        createdAt: char.createdAt,
-        updatedAt: char.updatedAt,
-      })),
+      characters: characters.map((char) => {
+        const characterAppearance =
+          (char as unknown as { appearance?: string | null }).appearance ?? null;
+
+        return {
+          id: char.id,
+          name: char.name,
+          race: char.race,
+          class: char.class,
+          level: char.level,
+          experience: char.experience,
+          hp: char.hp,
+          maxHp: char.maxHp,
+          gold: char.gold,
+          stats: JSON.parse(char.stats),
+          background: char.background,
+          appearance: characterAppearance,
+          backstory: char.backstory,
+          imageUrl: char.imageUrl,
+          campaignId: char.campaignId,
+          campaign: char.campaign,
+          inventoryCount: char.inventoryItems.length,
+          createdAt: char.createdAt,
+          updatedAt: char.updatedAt,
+        };
+      }),
     });
   } catch (error) {
     console.error('Characters get error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }
@@ -73,62 +86,78 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
 
+    const limited = rateLimitResponse(userId, "POST:/api/characters", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
     const body = await req.json();
-    const { name, race, class: charClass, level, experience, hp, maxHp, stats, background, imageUrl } = body;
-    const characterClass = charClass; // 'class' TypeScript'te rezerve kelime
+    const parsed = characterCreateSchema.safeParse(body);
 
-    // Validation
-    if (!name || typeof name !== 'string') {
+    if (!parsed.success) {
       return NextResponse.json(
-        { message: 'Karakter adı gerekiyor' },
+        { success: false, error: 'Gecersiz karakter verisi', errors: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
 
-    if (!race || typeof race !== 'string') {
-      return NextResponse.json(
-        { message: 'Irk gerekiyor' },
-        { status: 400 }
-      );
-    }
+    const {
+      name,
+      race,
+      class: characterClass,
+      level,
+      experience,
+      hp,
+      maxHp,
+      gold,
+      stats,
+      background,
+      appearance,
+      backstory,
+      imageUrl,
+    } = parsed.data;
 
-    if (!charClass || typeof charClass !== 'string') {
-      return NextResponse.json(
-        { message: 'Sınıf gerekiyor' },
-        { status: 400 }
-      );
+    const createData: Parameters<typeof prisma.character.create>[0]['data'] & {
+      appearance?: string | null;
+    } = {
+      userId,
+      name,
+      race,
+      class: characterClass,
+      level: level || 1,
+      experience: experience || 0,
+      hp: hp || 10,
+      maxHp: maxHp || 10,
+      gold: gold ?? 0,
+      stats: typeof stats === 'object'
+        ? JSON.stringify(stats)
+        : JSON.stringify({
+          strength: 10,
+          dexterity: 10,
+          constitution: 10,
+          intelligence: 10,
+          wisdom: 10,
+          charisma: 10,
+        }),
+      background,
+      backstory,
+      imageUrl,
+    };
+
+    if (appearance !== undefined) {
+      createData.appearance = appearance;
     }
 
     // Yeni karakter oluştur
     const character = await prisma.character.create({
-      data: {
-        userId,
-        name,
-        race,
-        class: characterClass,
-        level: level || 1,
-        experience: experience || 0,
-        hp: hp || 10,
-        maxHp: maxHp || 10,
-        stats: typeof stats === 'object' 
-          ? JSON.stringify(stats)
-          : JSON.stringify({
-              strength: 10,
-              dexterity: 10,
-              constitution: 10,
-              intelligence: 10,
-              wisdom: 10,
-              charisma: 10,
-            }),
-        background,
-        imageUrl,
-      },
+      data: createData as Parameters<typeof prisma.character.create>[0]['data'],
     });
+
+    const characterAppearance =
+      (character as unknown as { appearance?: string | null }).appearance ?? null;
 
     return NextResponse.json({
       success: true,
@@ -141,8 +170,11 @@ export async function POST(req: NextRequest) {
         experience: character.experience,
         hp: character.hp,
         maxHp: character.maxHp,
+        gold: character.gold,
         stats: JSON.parse(character.stats),
         background: character.background,
+        appearance: characterAppearance,
+        backstory: character.backstory,
         imageUrl: character.imageUrl,
         createdAt: character.createdAt,
       },
@@ -151,7 +183,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Character creation error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

@@ -10,6 +10,17 @@ import { post } from "@/lib/api/client";
 export default function JoinCampaignPage() {
   const router = useRouter();
   const [inviteCode, setInviteCode] = useState("");
+
+  // Format invite code: ABCD-1234
+  const formatInviteCode = (value: string) => {
+    const cleaned = value.replace(/[^A-Z0-9]/g, "").slice(0, 8);
+    if (cleaned.length > 4) {
+      return cleaned.slice(0, 4) + "-" + cleaned.slice(4);
+    }
+    return cleaned;
+  };
+
+  const rawCode = inviteCode.replace(/-/g, "");
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState("");
   const [foundCampaign, setFoundCampaign] = useState<any>(null);
@@ -21,7 +32,7 @@ export default function JoinCampaignPage() {
     setFoundCampaign(null);
 
     try {
-      const response = await post('/campaigns/join', { inviteCode }) as any;
+      const response = await post('/campaigns/join', { inviteCode: rawCode }) as any;
       
       if (response && response.success) {
         setFoundCampaign(response.campaign);
@@ -37,7 +48,7 @@ export default function JoinCampaignPage() {
 
   const handleJoinCampaign = () => {
     if (foundCampaign) {
-      router.push(`/campaigns/${foundCampaign.id}`);
+      router.push(`/campaigns/${foundCampaign.id}?inviteCode=${encodeURIComponent(rawCode)}`);
     }
   };
 
@@ -73,22 +84,24 @@ export default function JoinCampaignPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              placeholder="ABCD1234"
+              placeholder="ABCD-1234"
               value={inviteCode}
               onChange={(e) => {
-                setInviteCode(e.target.value.toUpperCase());
+                const formatted = formatInviteCode(e.target.value.toUpperCase());
+                setInviteCode(formatted);
                 setError("");
                 setFoundCampaign(null);
               }}
+              maxLength={9}
               error={error}
-              className="text-center font-mono text-lg tracking-widest uppercase"
+              className="text-center font-mono text-2xl tracking-[0.3em] uppercase"
             />
 
             <Button
               type="submit"
               className="w-full gap-2"
               isLoading={isSearching}
-              disabled={!inviteCode || inviteCode.length < 4}
+              disabled={!rawCode || rawCode.length < 4}
             >
               <Search className="h-4 w-4" />
               Oturumu Bul

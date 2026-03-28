@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { MapPin, Loader2, X, Maximize2, Minimize2 } from "lucide-react";
+import { normalizeImageUrl } from "@/lib/security/imageUrl";
+import { MapPin, Loader2, X, Maximize2 } from "lucide-react";
 import { Button } from "@/components/ui";
 
 interface LocationImageProps {
@@ -23,8 +25,9 @@ export function LocationImage({
   const [isExpanded, setIsExpanded] = useState(false);
   const [imageError, setImageError] = useState(false);
   const useFullHeight = fillHeight;
+  const safeImageUrl = normalizeImageUrl(imageUrl);
 
-  if (!imageUrl && !isLoading) {
+  if (!safeImageUrl && !isLoading) {
     return null;
   }
 
@@ -47,7 +50,7 @@ export function LocationImage({
             </span>
           </div>
           <div className="flex items-center gap-1">
-            {imageUrl && !imageError && !isLoading && (
+            {safeImageUrl && !imageError && !isLoading && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -86,13 +89,15 @@ export function LocationImage({
                 </span>
               </div>
             </div>
-          ) : imageUrl && !imageError ? (
-            <img
-              src={imageUrl}
+          ) : safeImageUrl && !imageError ? (
+            <Image
+              src={safeImageUrl}
               alt={locationName || "Mekan görseli"}
-              className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+              fill
+              className="object-cover cursor-pointer hover:opacity-90 transition-opacity"
               onClick={() => setIsExpanded(true)}
               onError={() => setImageError(true)}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
           ) : imageError ? (
             <div className="absolute inset-0 flex items-center justify-center bg-muted">
@@ -105,18 +110,20 @@ export function LocationImage({
       </div>
 
       {/* Expanded modal */}
-      {isExpanded && imageUrl && !imageError && (
+      {isExpanded && safeImageUrl && !imageError && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
           onClick={() => setIsExpanded(false)}
         >
           <div className="relative w-full h-full flex items-center justify-center">
             <div className="relative max-w-full max-h-full bg-gradient-to-br from-indigo-900 via-violet-900 to-indigo-950 rounded-lg shadow-2xl overflow-hidden">
-              <img
-                src={imageUrl}
+              <Image
+                src={safeImageUrl}
                 alt={locationName || "Mekan görseli"}
-                className="max-w-full max-h-full object-contain"
+                fill
+                className="object-contain"
                 onClick={(e) => e.stopPropagation()}
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               />
             </div>
             <div className="absolute top-4 left-4 px-3 py-2 rounded-lg bg-black/70 backdrop-blur-sm border border-white/20">

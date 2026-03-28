@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
+import { canManageCampaign, getCampaignActorRole, hasCampaignAccess } from '@/lib/auth/permissions';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/sessions/:id/messages
@@ -13,14 +15,19 @@ export async function GET(
   try {
     const { id: sessionId } = await params;
     const searchParams = req.nextUrl.searchParams;
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    const parsedLimit = Number.parseInt(searchParams.get('limit') || '50', 10);
+    const parsedOffset = Number.parseInt(searchParams.get('offset') || '0', 10);
+    const limit = Number.isFinite(parsedLimit) ? Math.min(Math.max(parsedLimit, 1), 100) : 50;
+    const offset = Number.isFinite(parsedOffset) ? Math.max(parsedOffset, 0) : 0;
 
     // Auth kontrolü (NextAuth session)
     const userId = await getUserId();
     if (!userId) {
       return unauthorizedResponse();
     }
+
+    const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/messages", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     // Session'ı kontrol et
     const session = await prisma.gameSession.findUnique({
@@ -41,24 +48,19 @@ export async function GET(
 
     if (!session) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
 
-    // Kullanıcının yetkisi var mı? (creator veya player olabilir)
-    const isCreator = session.campaign.creatorId === userId;
-    const isPlayer = session.campaign.players.some(
-      (player: any) => player.userId === userId
-    );
-
-    if (!isCreator && !isPlayer) {
+    const actorRole = getCampaignActorRole(session.campaign, userId);
+    if (!hasCampaignAccess(actorRole)) {
       return forbiddenResponse('Bu session\'a erişim yetkiniz yok');
     }
 
     // Mesajları al
     const messages = await prisma.message.findMany({
-      where: { sessionId },
+      where: { sessionId, isSoftDeleted: false },
       orderBy: { timestamp: 'desc' },
       take: limit,
       skip: offset,
@@ -66,20 +68,24 @@ export async function GET(
 
     // Toplam mesaj sayısı
     const totalCount = await prisma.message.count({
-      where: { sessionId },
+      where: { sessionId, isSoftDeleted: false },
     });
 
-    // Mesajları işle - metadata'dan gmPrompt'u çıkar
+// Mesajları işle - metadata'dan gmPrompt ve suggestions çıkar
     const processedMessages = messages.map((msg) => {
       let gmPrompt = undefined;
+      let suggestions = undefined;
       let metadata: Record<string, unknown> | undefined = undefined;
       if (msg.metadata) {
         try {
           metadata = JSON.parse(msg.metadata);
-          if (metadata.gmPrompt) {
+          if (metadata && metadata.gmPrompt) {
             gmPrompt = metadata.gmPrompt;
           }
-        } catch (e) {
+          if (metadata && metadata.suggestions) {
+            suggestions = metadata.suggestions;
+          }
+        } catch {
           // metadata parse edilemezse ignore et
         }
       }
@@ -87,6 +93,7 @@ export async function GET(
         ...msg,
         metadata,
         gmPrompt,
+        suggestions,
         locationImageUrl: msg.locationImageUrl,
         locationName: msg.locationName,
       };
@@ -105,7 +112,7 @@ export async function GET(
   } catch (error) {
     console.error('Messages get error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }
@@ -122,19 +129,12 @@ export async function POST(
   try {
     const { id: sessionId } = await params;
     const body = await req.json();
-    const { content, senderType } = body;
+    const { content, senderType, senderName: requestSenderName } = body;
 
     // Validation
     if (!content || typeof content !== 'string') {
       return NextResponse.json(
-        { message: 'Mesaj içeriği gerekiyor' },
-        { status: 400 }
-      );
-    }
-
-    if (!senderType || typeof senderType !== 'string') {
-      return NextResponse.json(
-        { message: 'Gönderen tipi gerekiyor' },
+        { success: false, error: 'Mesaj içeriği gerekiyor' },
         { status: 400 }
       );
     }
@@ -144,6 +144,9 @@ export async function POST(
     if (!userId) {
       return unauthorizedResponse();
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/sessions/[id]/messages", RATE_LIMIT_TIERS.GAME_ACTION);
+    if (limited) return limited;
 
     // Session'ı kontrol et (karakter bilgisi için players'ı dahil et)
     const session = await prisma.gameSession.findUnique({
@@ -165,33 +168,44 @@ export async function POST(
 
     if (!session) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
 
-    // Kullanıcının yetkisi var mı? (creator veya player olabilir)
-    const isCreator = session.campaign.creatorId === userId;
-    const currentPlayer = session.campaign.players.find(
-      (player: any) => player.userId === userId
-    );
-    const isPlayer = !!currentPlayer;
+    const actorRole = getCampaignActorRole(session.campaign, userId);
+    const currentPlayer = session.campaign.players.find((player) => player.userId === userId);
 
-    if (!isCreator && !isPlayer) {
+    if (!hasCampaignAccess(actorRole)) {
       return forbiddenResponse('Bu session\'a mesaj gönderme yetkiniz yok');
     }
 
-    // Oyuncunun karakter veya kullanıcı adını al
-    const senderName = currentPlayer?.character?.name || 
-                       currentPlayer?.user?.username || 
-                       'Oyuncu';
+    // GM/Player ayrımına göre senderType belirle
+    let resolvedSenderType: 'PLAYER' | 'GM' | 'SYSTEM' | 'DICE' = 'PLAYER';
+    if (canManageCampaign(actorRole)) {
+      if (senderType === 'GM' || senderType === 'SYSTEM' || senderType === 'DICE') {
+        resolvedSenderType = senderType;
+      } else {
+        resolvedSenderType = 'GM';
+      }
+    } else {
+      if (senderType && senderType !== 'PLAYER' && senderType !== 'DICE') {
+        return forbiddenResponse('Oyuncular yalnızca PLAYER veya DICE tipinde mesaj gönderebilir');
+      }
+      resolvedSenderType = senderType === 'DICE' ? 'DICE' : 'PLAYER';
+    }
+
+    // Oyuncu için ad sahteciliğini engelle; GM tarafında requestSenderName opsiyonel.
+    const senderName = canManageCampaign(actorRole)
+      ? (requestSenderName || (resolvedSenderType === 'GM' ? 'Game Master' : 'System'))
+      : (currentPlayer?.character?.name || currentPlayer?.user?.username || 'Oyuncu');
 
     // Mesaj oluştur
     const message = await prisma.message.create({
       data: {
         sessionId,
-        senderId: userId,
-        senderType: senderType || 'PLAYER',
+        senderId: resolvedSenderType === 'PLAYER' ? userId : null,
+        senderType: resolvedSenderType,
         senderName,
         content,
         timestamp: new Date(),
@@ -221,7 +235,7 @@ export async function POST(
   } catch (error) {
     console.error('Message send error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

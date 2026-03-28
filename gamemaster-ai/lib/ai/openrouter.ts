@@ -2,6 +2,8 @@
 // GameMaster AI için AI entegrasyonu
 
 import { logAIResponse, generateRequestId } from './logger';
+import { getSystemSettings } from '@/lib/admin/systemSettings';
+import { consumeAITokens } from '@/lib/security/aiRateLimit';
 
 export interface OpenRouterMessage {
   role: 'system' | 'user' | 'assistant';
@@ -35,6 +37,70 @@ export interface OpenRouterError {
 // Retry configuration
 const MAX_RETRIES = 3;
 const INITIAL_RETRY_DELAY = 1000; // 1 second
+const SETTINGS_CACHE_MS = 30_000;
+
+type AIModelConfig = {
+  primaryModel: string;
+  fallbackModel?: string;
+  suggestionsModel?: string;
+};
+
+let cachedConfig: AIModelConfig | null = null;
+let cachedAt = 0;
+
+async function trackTokenUsage(userId: string | undefined, tokenCount: number | undefined) {
+  if (!userId || typeof tokenCount !== 'number' || !Number.isFinite(tokenCount)) {
+    return;
+  }
+
+  const normalized = Math.max(0, Math.floor(tokenCount));
+  if (normalized <= 0) {
+    return;
+  }
+
+  await consumeAITokens(userId, normalized);
+}
+
+async function resolveAIModelConfig(): Promise<AIModelConfig> {
+  const now = Date.now();
+  if (cachedConfig && now - cachedAt < SETTINGS_CACHE_MS) {
+    return cachedConfig;
+  }
+
+  try {
+    const settings = await getSystemSettings();
+    cachedConfig = {
+      primaryModel:
+        settings?.aiPrimaryModel ||
+        process.env.OPENROUTER_MODEL ||
+        'anthropic/claude-3-sonnet',
+      fallbackModel: settings?.aiFallbackModel || process.env.OPENROUTER_FALLBACK_MODEL,
+      suggestionsModel:
+        settings?.aiSuggestionsModel ||
+        process.env.OPENROUTER_SUGGESTIONS_MODEL ||
+        undefined, // undefined ise primaryModel kullanılır
+    };
+  } catch (error) {
+    console.error('Failed to load AI model settings:', error);
+    cachedConfig = {
+      primaryModel: process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet',
+      fallbackModel: process.env.OPENROUTER_FALLBACK_MODEL,
+      suggestionsModel: process.env.OPENROUTER_SUGGESTIONS_MODEL || undefined,
+    };
+  }
+
+  cachedAt = now;
+  return cachedConfig;
+}
+
+/**
+ * Suggestions için model çözümler
+ * Admin paneli > env variable > primary model sıralamasıyla
+ */
+export async function resolveSuggestionsModel(): Promise<string> {
+  const config = await resolveAIModelConfig();
+  return config.suggestionsModel || config.primaryModel;
+}
 
 /**
  * Sleep helper for retry delays
@@ -64,6 +130,7 @@ export async function callOpenRouter(
     temperature?: number;
     maxTokens?: number;
     skipFallback?: boolean;
+    userId?: string;
   }
 ): Promise<OpenRouterResponse> {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -72,8 +139,9 @@ export async function callOpenRouter(
     throw new Error('OPENROUTER_API_KEY environment variable is not set');
   }
 
-  const primaryModel = options?.model || process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet';
-  const fallbackModel = process.env.OPENROUTER_FALLBACK_MODEL;
+  const modelConfig = await resolveAIModelConfig();
+  const primaryModel = options?.model || modelConfig.primaryModel;
+  const fallbackModel = modelConfig.fallbackModel;
   const temperature = options?.temperature || 0.7;
   const maxTokens = options?.maxTokens || 10000;
   const requestId = generateRequestId();
@@ -85,7 +153,8 @@ export async function callOpenRouter(
     temperature,
     maxTokens,
     apiKey,
-    requestId
+    requestId,
+    options?.userId,
   );
 
   if (primaryResult.success) {
@@ -102,7 +171,8 @@ export async function callOpenRouter(
       temperature,
       maxTokens,
       apiKey,
-      requestId + '-fallback'
+      requestId + '-fallback',
+      options?.userId,
     );
 
     if (fallbackResult.success) {
@@ -126,7 +196,8 @@ async function callWithRetry(
   temperature: number,
   maxTokens: number,
   apiKey: string,
-  requestId: string
+  requestId: string,
+  userId?: string,
 ): Promise<{ success: boolean; response?: OpenRouterResponse; error?: string }> {
   let lastError: string = '';
 
@@ -187,6 +258,7 @@ async function callWithRetry(
       }
 
       const data: OpenRouterResponse = await response.json();
+      await trackTokenUsage(userId, data.usage?.total_tokens);
 
       // Log success
       logAIResponse({
@@ -244,7 +316,8 @@ export async function callOpenRouterStream(
     throw new Error('OPENROUTER_API_KEY environment variable is not set');
   }
 
-  const model = options?.model || process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet';
+  const modelConfig = await resolveAIModelConfig();
+  const model = options?.model || modelConfig.primaryModel;
   const temperature = options?.temperature || 0.7;
   const maxTokens = options?.maxTokens || 10000;
 
@@ -283,6 +356,7 @@ export async function getAIResponse(
     model?: string;
     temperature?: number;
     maxTokens?: number;
+    userId?: string;
   }
 ): Promise<string> {
   const messages: OpenRouterMessage[] = [
@@ -310,6 +384,7 @@ export async function getAIResponseWithContext(
     model?: string;
     temperature?: number;
     maxTokens?: number;
+    userId?: string;
   }
 ): Promise<string> {
   const messages: OpenRouterMessage[] = [
@@ -360,6 +435,7 @@ export async function callOpenRouterWithTools(
     tools?: ToolDefinition[];
     sessionId?: string;
     characterId?: string;
+    userId?: string;
   }
 ): Promise<{
   content: string;
@@ -372,7 +448,8 @@ export async function callOpenRouterWithTools(
     throw new Error('OPENROUTER_API_KEY environment variable is not set');
   }
 
-  const model = options?.model || process.env.OPENROUTER_MODEL || 'anthropic/claude-3-sonnet';
+  const modelConfig = await resolveAIModelConfig();
+  const model = options?.model || modelConfig.primaryModel;
   const temperature = options?.temperature || 0.7;
   const maxTokens = options?.maxTokens || 10000;
   const tools = options?.tools || gmTools;
@@ -402,6 +479,7 @@ export async function callOpenRouterWithTools(
     }
 
     const data: OpenRouterResponseWithTools = await response.json();
+    await trackTokenUsage(options?.userId, data.usage?.total_tokens);
     const choice = data.choices[0];
 
     if (!choice) {
@@ -470,6 +548,7 @@ export async function callOpenRouterWithTools(
 
         if (followUpResponse.ok) {
           const followUpData: OpenRouterResponseWithTools = await followUpResponse.json();
+          await trackTokenUsage(options?.userId, followUpData.usage?.total_tokens);
           content = followUpData.choices[0]?.message?.content || '';
           console.log('[AI] Got follow-up response with content');
         }
@@ -483,7 +562,7 @@ export async function callOpenRouterWithTools(
     }
 
     return { content };
-  } catch (error: any) {
+  } catch (error) {
     console.error('callOpenRouterWithTools error:', error);
     throw error;
   }

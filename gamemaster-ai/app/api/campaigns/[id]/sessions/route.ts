@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { canManageCampaign, getCampaignActorRole, hasCampaignAccess } from '@/lib/auth/permissions';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/campaigns/:id/sessions
@@ -14,39 +16,43 @@ export async function GET(
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "GET:/api/campaigns/[id]/sessions", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     const { id: campaignId } = await params;
     
     // Campaign'ı kontrol et
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
-      include: {
-        creator: true,
+      select: {
+        id: true,
+        creatorId: true,
+        isSoftDeleted: true,
         players: true,
       },
     });
 
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json(
-        { message: 'Kampanya bulunamadı' },
+        { success: false, error: 'Oturum bulunamadı' },
         { status: 404 }
       );
     }
 
     // Kullanıcının yetkisi var mı?
-    const hasAccess = campaign.creatorId === userId ||
-                     campaign.players.some((p: any) => p.userId === userId);
-
-    if (!hasAccess) {
+    const actorRole = getCampaignActorRole(campaign, userId);
+    if (!hasCampaignAccess(actorRole)) {
       return NextResponse.json(
-        { message: 'Bu kampanyaya erişim yetkiniz yok' },
+        { success: false, error: 'Bu oturuma erişim yetkiniz yok' },
         { status: 403 }
       );
     }
+    const shouldExposeInviteCode = canManageCampaign(actorRole);
 
     // Session'ları listele
     const sessions = await prisma.gameSession.findMany({
@@ -59,7 +65,6 @@ export async function GET(
               select: {
                 id: true,
                 username: true,
-                email: true,
                 avatar: true,
               },
             },
@@ -69,11 +74,31 @@ export async function GET(
       },
     });
 
-    return NextResponse.json(sessions);
+    return NextResponse.json(
+      sessions.map((session: any) => ({
+        ...session,
+        campaign: session.campaign
+          ? {
+              ...session.campaign,
+              inviteCode:
+                shouldExposeInviteCode && session.campaign.isMultiplayer
+                  ? session.campaign.inviteCode
+                  : null,
+              creator: session.campaign.creator
+                ? {
+                    id: session.campaign.creator.id,
+                    username: session.campaign.creator.username,
+                    avatar: session.campaign.creator.avatar,
+                  }
+                : null,
+            }
+          : null,
+      }))
+    );
   } catch (error) {
     console.error('Sessions fetch error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }
@@ -91,10 +116,13 @@ export async function POST(
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/sessions", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id: campaignId } = await params;
     
@@ -109,18 +137,16 @@ export async function POST(
 
     if (!campaign) {
       return NextResponse.json(
-        { message: 'Kampanya bulunamadı' },
+        { success: false, error: 'Oturum bulunamadı' },
         { status: 404 }
       );
     }
 
     // Kullanıcının yetkisi var mı?
-    const hasAccess = campaign.creatorId === userId ||
-                     campaign.players.some((p: any) => p.userId === userId);
-
-    if (!hasAccess) {
+    const actorRole = getCampaignActorRole(campaign, userId);
+    if (!canManageCampaign(actorRole)) {
       return NextResponse.json(
-        { message: 'Bu kampanyaya erişim yetkiniz yok' },
+        { success: false, error: 'Sadece Game Master yeni session başlatabilir' },
         { status: 403 }
       );
     }
@@ -155,7 +181,7 @@ export async function POST(
       data: {
         sessionId: session.id,
         senderType: 'SYSTEM',
-        content: `🎮 Oyun başladı! ${campaign.name} kampanyasına hoş geldiniz.`,
+        content: `🎮 Oyun başladı! ${campaign.name} oturumuna hoş geldiniz.`,
       },
     });
 
@@ -172,7 +198,7 @@ export async function POST(
   } catch (error) {
     console.error('Session creation error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

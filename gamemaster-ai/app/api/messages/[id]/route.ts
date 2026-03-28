@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse } from '@/lib/auth/server';
+import { normalizeImageUrl } from '@/lib/security/imageUrl';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * Update message handler
@@ -15,9 +17,40 @@ async function updateMessage(
       return unauthorizedResponse();
     }
 
+    const limited = rateLimitResponse(userId, "PATCH:/api/messages/[id]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
     const { id: messageId } = await params;
     const body = await req.json();
     const { locationImageUrl, locationName } = body;
+
+    let normalizedLocationImageUrl: string | null | undefined = undefined;
+    if (locationImageUrl !== undefined) {
+      if (locationImageUrl === null || locationImageUrl === "") {
+        normalizedLocationImageUrl = null;
+      } else if (typeof locationImageUrl === "string") {
+        const safeImageUrl = normalizeImageUrl(locationImageUrl);
+        if (!safeImageUrl) {
+          return NextResponse.json(
+            { success: false, error: "Geçersiz görsel URL" },
+            { status: 400 }
+          );
+        }
+        normalizedLocationImageUrl = safeImageUrl;
+      } else {
+        return NextResponse.json(
+          { success: false, error: "Geçersiz görsel URL" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (locationName !== undefined && locationName !== null && typeof locationName !== "string") {
+      return NextResponse.json(
+        { success: false, error: "Geçersiz konum adı" },
+        { status: 400 }
+      );
+    }
 
     // Mesajı kontrol et
     const message = await prisma.message.findUnique({
@@ -40,18 +73,18 @@ async function updateMessage(
 
     if (!message) {
       return NextResponse.json(
-        { message: 'Mesaj bulunamadı' },
+        { success: false, error: 'Mesaj bulunamadı' },
         { status: 404 }
       );
     }
 
     // Yetki kontrolü
     const isCreator = message.session.campaign.creatorId === userId;
-    const isPlayer = message.session.campaign.players.some(p => p.userId === userId);
+    const isSender = message.senderId === userId;
 
-    if (!isCreator && !isPlayer) {
+    if (!isCreator && !isSender) {
       return NextResponse.json(
-        { message: 'Bu mesajı güncelleme yetkiniz yok' },
+        { success: false, error: 'Bu mesajı güncelleme yetkiniz yok' },
         { status: 403 }
       );
     }
@@ -60,8 +93,10 @@ async function updateMessage(
     const updatedMessage = await prisma.message.update({
       where: { id: messageId },
       data: {
-        locationImageUrl: locationImageUrl || undefined,
-        locationName: locationName || undefined,
+        locationImageUrl: normalizedLocationImageUrl,
+        locationName: locationName === null
+          ? null
+          : (typeof locationName === "string" ? locationName : undefined),
       },
     });
 
@@ -73,7 +108,7 @@ async function updateMessage(
   } catch (error) {
     console.error('Update message error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

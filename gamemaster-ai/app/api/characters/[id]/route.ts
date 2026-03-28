@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
+import { normalizeImageUrl } from "@/lib/security/imageUrl";
 
 const defaultStats = {
   strength: 10,
@@ -15,7 +17,7 @@ const parseStats = (stats: string | null) => {
   if (!stats) return defaultStats;
   try {
     return JSON.parse(stats);
-  } catch (error) {
+  } catch {
     return defaultStats;
   }
 };
@@ -28,10 +30,13 @@ export async function GET(
     const userId = await getUserId(req);
     if (!userId) {
       return NextResponse.json(
-        { success: false, message: "Oturum açmanız gerekiyor" },
+        { success: false, error: "Oturum açmanız gerekiyor" },
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "GET:/api/characters/[id]", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
 
     const { id } = await params;
     const character = await prisma.character.findUnique({
@@ -49,17 +54,20 @@ export async function GET(
 
     if (!character) {
       return NextResponse.json(
-        { success: false, message: "Karakter bulunamadı" },
+        { success: false, error: "Karakter bulunamadı" },
         { status: 404 }
       );
     }
 
     if (character.userId !== userId) {
       return NextResponse.json(
-        { success: false, message: "Bu karaktere erişim yetkiniz yok" },
+        { success: false, error: "Bu karaktere erişim yetkiniz yok" },
         { status: 403 }
       );
     }
+
+    const characterAppearance =
+      (character as unknown as { appearance?: string | null }).appearance ?? null;
 
     return NextResponse.json({
       success: true,
@@ -72,8 +80,11 @@ export async function GET(
         experience: character.experience,
         hp: character.hp,
         maxHp: character.maxHp,
+        gold: character.gold,
         stats: parseStats(character.stats),
         background: character.background,
+        appearance: characterAppearance,
+        backstory: character.backstory,
         imageUrl: character.imageUrl,
         campaignId: character.campaignId,
         campaign: character.campaign,
@@ -84,7 +95,7 @@ export async function GET(
   } catch (error) {
     console.error("Character get error:", error);
     return NextResponse.json(
-      { success: false, message: "Sunucu hatası oluştu" },
+      { success: false, error: "Sunucu hatası oluştu" },
       { status: 500 }
     );
   }
@@ -98,10 +109,13 @@ export async function PUT(
     const userId = await getUserId(req);
     if (!userId) {
       return NextResponse.json(
-        { success: false, message: "Oturum açmanız gerekiyor" },
+        { success: false, error: "Oturum açmanız gerekiyor" },
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "PUT:/api/characters/[id]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id } = await params;
     const character = await prisma.character.findUnique({
@@ -111,30 +125,40 @@ export async function PUT(
 
     if (!character) {
       return NextResponse.json(
-        { success: false, message: "Karakter bulunamadı" },
+        { success: false, error: "Karakter bulunamadı" },
         { status: 404 }
       );
     }
 
     if (character.userId !== userId) {
       return NextResponse.json(
-        { success: false, message: "Bu karaktere erişim yetkiniz yok" },
+        { success: false, error: "Bu karaktere erişim yetkiniz yok" },
         { status: 403 }
       );
     }
 
     const body = await req.json();
+    const blockedProgressionFields = ["hp", "maxHp", "level", "experience"] as const;
+    const blockedFieldProvided = blockedProgressionFields.find((field) =>
+      Object.prototype.hasOwnProperty.call(body, field)
+    );
+    if (blockedFieldProvided) {
+      return NextResponse.json(
+        { success: false, error: "Bu endpoint ile hp/maxHp/level/experience alanları güncellenemez" },
+        { status: 400 }
+      );
+    }
+
     const {
       name,
       race,
       class: characterClass,
       stats,
       background,
+      appearance,
+      backstory,
       imageUrl,
-      hp,
-      maxHp,
-      level,
-      experience,
+      gold,
     } = body;
 
     const data: Record<string, unknown> = {};
@@ -157,35 +181,51 @@ export async function PUT(
       data.background = background;
     }
 
+    if (appearance === null) {
+      data.appearance = null;
+    } else if (typeof appearance === "string") {
+      data.appearance = appearance;
+    }
+
+    if (backstory === null) {
+      data.backstory = null;
+    } else if (typeof backstory === "string") {
+      data.backstory = backstory;
+    }
+
     if (imageUrl === null) {
       data.imageUrl = null;
     } else if (typeof imageUrl === "string") {
-      data.imageUrl = imageUrl;
+      const normalizedImageUrl = normalizeImageUrl(imageUrl, {
+        allowDataUrl: true,
+      });
+      if (!normalizedImageUrl) {
+        return NextResponse.json(
+          { success: false, error: "Geçersiz görsel URL'i" },
+          { status: 400 }
+        );
+      }
+      data.imageUrl = normalizedImageUrl;
     }
 
     if (stats && typeof stats === "object") {
       data.stats = JSON.stringify(stats);
     }
 
-    if (Number.isFinite(hp)) {
-      data.hp = hp;
-    }
-
-    if (Number.isFinite(maxHp)) {
-      data.maxHp = maxHp;
-    }
-
-    if (Number.isFinite(level)) {
-      data.level = level;
-    }
-
-    if (Number.isFinite(experience)) {
-      data.experience = experience;
+    if (gold !== undefined) {
+      const numericGold = Number(gold);
+      if (!Number.isInteger(numericGold) || numericGold < 0) {
+        return NextResponse.json(
+          { success: false, error: "Gold alanı 0 veya daha büyük tam sayı olmalıdır" },
+          { status: 400 }
+        );
+      }
+      data.gold = numericGold;
     }
 
     if (Object.keys(data).length === 0) {
       return NextResponse.json(
-        { success: false, message: "Güncellenecek veri bulunamadı" },
+        { success: false, error: "Güncellenecek veri bulunamadı" },
         { status: 400 }
       );
     }
@@ -194,6 +234,9 @@ export async function PUT(
       where: { id },
       data,
     });
+
+    const updatedAppearance =
+      (updatedCharacter as unknown as { appearance?: string | null }).appearance ?? null;
 
     return NextResponse.json({
       success: true,
@@ -206,8 +249,11 @@ export async function PUT(
         experience: updatedCharacter.experience,
         hp: updatedCharacter.hp,
         maxHp: updatedCharacter.maxHp,
+        gold: updatedCharacter.gold,
         stats: parseStats(updatedCharacter.stats),
         background: updatedCharacter.background,
+        appearance: updatedAppearance,
+        backstory: updatedCharacter.backstory,
         imageUrl: updatedCharacter.imageUrl,
         campaignId: updatedCharacter.campaignId,
         createdAt: updatedCharacter.createdAt,
@@ -217,7 +263,7 @@ export async function PUT(
   } catch (error) {
     console.error("Character update error:", error);
     return NextResponse.json(
-      { success: false, message: "Sunucu hatası oluştu" },
+      { success: false, error: "Sunucu hatası oluştu" },
       { status: 500 }
     );
   }
@@ -231,10 +277,13 @@ export async function DELETE(
     const userId = await getUserId(req);
     if (!userId) {
       return NextResponse.json(
-        { success: false, message: "Oturum açmanız gerekiyor" },
+        { success: false, error: "Oturum açmanız gerekiyor" },
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "DELETE:/api/characters/[id]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id } = await params;
     const character = await prisma.character.findUnique({
@@ -244,14 +293,14 @@ export async function DELETE(
 
     if (!character) {
       return NextResponse.json(
-        { success: false, message: "Karakter bulunamadı" },
+        { success: false, error: "Karakter bulunamadı" },
         { status: 404 }
       );
     }
 
     if (character.userId !== userId) {
       return NextResponse.json(
-        { success: false, message: "Bu karaktere erişim yetkiniz yok" },
+        { success: false, error: "Bu karaktere erişim yetkiniz yok" },
         { status: 403 }
       );
     }
@@ -265,7 +314,7 @@ export async function DELETE(
   } catch (error) {
     console.error("Character delete error:", error);
     return NextResponse.json(
-      { success: false, message: "Sunucu hatası oluştu" },
+      { success: false, error: "Sunucu hatası oluştu" },
       { status: 500 }
     );
   }

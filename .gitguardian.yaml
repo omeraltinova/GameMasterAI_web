@@ -1,0 +1,51 @@
+# Required, otherwise ggshield considers the file to use the deprecated v1 format
+version: 2
+
+secret:
+  # Exclude test files and paths by globbing
+  ignored_paths:
+    - '**/e2e/**'
+    - '**/__tests__/**'
+    - '**/tests/**'
+    - '**/*.test.ts'
+    - '**/*.test.tsx'
+    - '**/*.test.js'
+    - '**/*.test.jsx'
+    - '**/*.spec.ts'
+    - '**/*.spec.tsx'
+    - '**/*.spec.js'
+    - '**/*.spec.jsx'
+    - '**/test-utils/**'
+    - '**/fixtures/**'
+    - '**/__mocks__/**'
+
+  # Ignore specific test fixture passwords by their plaintext value
+  ignored_matches:
+    - name: e2e-helpers-test-password
+      match: "TestP@ss123"
+    - name: e2e-gameplay-test-password
+      match: "PlayP@ss123"
+    - name: e2e-host-test-password
+      match: "HostP@ss123"
+    - name: e2e-guest-test-password
+      match: "GuestP@ss123"
+    - name: unit-test-strong-password
+      match: "StrongP@ss1"
+    - name: unit-test-different-password
+      match: "DifferentP@ss2"
+    - name: unit-test-old-password
+      match: "OldP@ssw0rd"
+    - name: unit-test-new-password
+      match: "NewP@ssw0rd1"
+    - name: unit-test-same-password
+      match: "SameP@ssw0rd1"
+    - name: validator-test-password
+      match: "password123"
+    - name: validator-test-old-password
+      match: "oldpass123"
+    - name: validator-test-new-password
+      match: "newpass456"
+
+  # Optionally ignore the Generic Password detector entirely
+  ignored_detectors:
+    - Generic Password

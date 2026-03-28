@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { randomBytes } from 'crypto';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 // POST /api/campaigns/:id/invite - Yeni davet kodu oluştur
 export async function POST(
@@ -16,17 +18,27 @@ export async function POST(
       );
     }
 
+    const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/invite", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
     const { id: campaignId } = await params;
 
-    // Kampanyayı bul
+    // Oturumu bul
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
     });
 
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json(
-        { success: false, error: 'Kampanya bulunamadı' },
+        { success: false, error: 'Oturum bulunamadı' },
         { status: 404 }
+      );
+    }
+
+    if (!campaign.isMultiplayer) {
+      return NextResponse.json(
+        { success: false, error: 'Solo oturumlarda davet kodu kullanılamaz' },
+        { status: 400 }
       );
     }
 
@@ -39,9 +51,9 @@ export async function POST(
     }
 
     // Yeni benzersiz davet kodu oluştur
-    const newInviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const newInviteCode = randomBytes(4).toString('hex').toUpperCase();
 
-    // Kampanyayı güncelle
+    // Oturumu güncelle
     const updatedCampaign = await prisma.campaign.update({
       where: { id: campaignId },
       data: { inviteCode: newInviteCode },

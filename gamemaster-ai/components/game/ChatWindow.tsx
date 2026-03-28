@@ -1,7 +1,9 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { normalizeImageUrl } from "@/lib/security/imageUrl";
 import type { Message, GMAction } from "@/types";
 import { Bot, User, Dice6, Swords, AlertCircle, RotateCcw, MoreVertical, RefreshCw, MapPin } from "lucide-react";
 import { ActionButtons } from "./ActionButtons";
@@ -74,6 +76,7 @@ export function ChatWindow({
   const scrollRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [expandedImage, setExpandedImage] = useState<{ url: string; name: string } | null>(null);
+  const safeExpandedImageUrl = expandedImage ? normalizeImageUrl(expandedImage.url) : null;
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -82,10 +85,13 @@ export function ChatWindow({
     }
   }, [messages]);
   
-  // En son GM mesajını bul (aksiyon butonları için)
-  const lastGMMessageWithPrompt = [...messages].reverse().find(
-    m => m.senderType === 'GM' && m.gmPrompt && m.gmPrompt.actions && m.gmPrompt.actions.length > 0
-  );
+  // En son GM mesajını bul — sadece o mesajda gmPrompt varsa butonları göster
+  // Böylece yeni bir GM yanıtı (prompt'suz) geldiğinde eski butonlar kaybolur
+  const lastGMMessage = [...messages].reverse().find(m => m.senderType === 'GM');
+  const lastGMMessageWithPrompt = 
+    lastGMMessage?.gmPrompt?.actions && lastGMMessage.gmPrompt.actions.length > 0
+      ? lastGMMessage 
+      : null;
 
   // Empty state
   if (!messages || messages.length === 0) {
@@ -111,7 +117,11 @@ export function ChatWindow({
       className="flex-1 overflow-y-auto p-4 space-y-4"
     >
       {messages.map((message, index) => {
-        const isImageSystemMessage = message.senderType === 'SYSTEM' && !!message.locationImageUrl;
+        const rawLocationImageUrl =
+          typeof message.locationImageUrl === "string" ? message.locationImageUrl.trim() : "";
+        const safeLocationImageUrl = normalizeImageUrl(rawLocationImageUrl || null);
+        const hasLocationImageMetadata = rawLocationImageUrl.length > 0 || Boolean(message.locationName);
+        const isImageSystemMessage = message.senderType === 'SYSTEM' && hasLocationImageMetadata;
         const senderType = isImageSystemMessage ? 'GM' : message.senderType;
         const config = senderConfig[senderType];
         const Icon = config.icon;
@@ -228,10 +238,16 @@ export function ChatWindow({
               </div>
               
               {/* Mekan Görseli - GM mesajlarında */}
-              {message.locationImageUrl && (
-                <div 
-                  className="mt-2 rounded-lg overflow-hidden border border-border cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => setExpandedImage({ url: message.locationImageUrl!, name: message.locationName || 'Mekan Görseli' })}
+              {hasLocationImageMetadata && (
+                <div
+                  className={cn(
+                    "mt-2 rounded-lg overflow-hidden border border-border transition-opacity",
+                    safeLocationImageUrl && "cursor-pointer hover:opacity-90"
+                  )}
+                  onClick={() => {
+                    if (!safeLocationImageUrl) return;
+                    setExpandedImage({ url: safeLocationImageUrl, name: message.locationName || 'Mekan Görseli' });
+                  }}
                 >
                   <div className="flex items-center gap-2 px-3 py-2 bg-background-secondary border-b border-border">
                     <MapPin className="h-3 w-3 text-primary" />
@@ -239,13 +255,21 @@ export function ChatWindow({
                       {message.locationName || 'Mekan Görseli'}
                     </span>
                   </div>
-                  <div className="relative aspect-[16/9] w-full">
-                    <img
-                      src={message.locationImageUrl}
-                      alt={message.locationName || "Mekan görseli"}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+                  {safeLocationImageUrl ? (
+                    <div className="relative aspect-[16/9] w-full">
+                      <Image
+                        src={safeLocationImageUrl}
+                        alt={message.locationName || "Mekan görseli"}
+                        fill
+                        className="object-cover"
+                        sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                      />
+                    </div>
+                  ) : (
+                    <p className="px-3 py-2 text-xs text-foreground-muted bg-background">
+                      Görsel güvenlik nedeniyle gösterilemiyor.
+                    </p>
+                  )}
                 </div>
               )}
               
@@ -281,17 +305,19 @@ export function ChatWindow({
       <div ref={messagesEndRef} />
       
       {/* Full Screen Image Modal */}
-      {expandedImage && (
+      {expandedImage && safeExpandedImageUrl && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
           onClick={() => setExpandedImage(null)}
         >
           <div className="relative w-full h-full flex items-center justify-center">
-            <img
-              src={expandedImage.url}
+            <Image
+              src={safeExpandedImageUrl}
               alt={expandedImage.name}
-              className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
+              fill
+              className="object-contain rounded-lg shadow-2xl"
               onClick={(e) => e.stopPropagation()}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             />
             <div className="absolute top-4 left-4 px-3 py-2 rounded-lg bg-black/70 backdrop-blur-sm border border-white/20">
               <div className="flex items-center gap-2">
@@ -316,5 +342,3 @@ export function ChatWindow({
     </div>
   );
 }
-
-

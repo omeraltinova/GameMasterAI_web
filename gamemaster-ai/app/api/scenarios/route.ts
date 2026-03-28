@@ -3,18 +3,30 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { rateLimitResponse, getClientIp, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
+import { Prisma } from "@prisma/client";
 
 // GET /api/scenarios
 // List scenarios with filters (search, genre)
 export async function GET(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const limited = rateLimitResponse(ip, "GET:/api/scenarios", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
+
     const { searchParams } = new URL(req.url);
     const query = searchParams.get("query");
     const genre = searchParams.get("genre");
-    const limit = parseInt(searchParams.get("limit") || "20");
-    const offset = parseInt(searchParams.get("offset") || "0");
+    const limitParam = parseInt(searchParams.get("limit") || "20");
+    const offsetParam = parseInt(searchParams.get("offset") || "0");
+    const limitBase = Number.isFinite(limitParam) ? limitParam : 20;
+    const offsetBase = Number.isFinite(offsetParam) ? offsetParam : 0;
+    const limit = Math.min(Math.max(limitBase, 1), 50);
+    const offset = Math.max(offsetBase, 0);
 
-    const where: any = {};
+    const where: Prisma.ScenarioWhereInput = {
+      isSoftDeleted: false,
+    };
 
     // Search filter
     if (query) {
@@ -73,6 +85,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const limited = rateLimitResponse(session.user.email, "POST:/api/scenarios", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
     const body = await req.json();
     const { title, description, genre, difficulty, startingPrompt, tags, isAIGenerated, worldSettings } = body;
 
@@ -86,10 +101,21 @@ export async function POST(req: Request) {
     // Get user ID
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
+      select: {
+        id: true,
+        role: true,
+        isSoftDeleted: true,
+        isSuspended: true,
+        suspendedUntil: true,
+      },
     });
 
-    if (!user) {
+    if (!user || user.isSoftDeleted) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    if (user.isSuspended && (!user.suspendedUntil || user.suspendedUntil > new Date())) {
+      return NextResponse.json({ error: "Hesabınız askıda olduğu için işlem yapılamaz" }, { status: 403 });
     }
 
     const scenario = await prisma.scenario.create({

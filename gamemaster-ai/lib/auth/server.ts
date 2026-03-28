@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import type { Session } from 'next-auth';
+import { prisma } from '@/lib/db/prisma';
 
 /**
  * Kullanıcı session'ını al
@@ -14,7 +15,6 @@ import type { Session } from 'next-auth';
 export async function getUserSession(req?: NextRequest): Promise<Session | null> {
   try {
     const session = await getServerSession(authOptions);
-    console.log('🔍 Session retrieved:', JSON.stringify(session, null, 2));
     return session as Session | null;
   } catch (error) {
     console.error('Session alınamadı:', error);
@@ -29,8 +29,30 @@ export async function getUserId(req?: NextRequest): Promise<string | null> {
   const session = await getUserSession(req);
   // NextAuth 5'te user objesinden ID'yi al
   const userId = session?.user?.id || null;
-  console.log('🔍 User ID from session:', userId);
-  return userId;
+  if (!userId) {
+    return null;
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      isSoftDeleted: true,
+      isSuspended: true,
+      suspendedUntil: true,
+    },
+  });
+
+  if (!user || user.isSoftDeleted) {
+    return null;
+  }
+
+  const now = new Date();
+  if (user.isSuspended && (!user.suspendedUntil || user.suspendedUntil > now)) {
+    return null;
+  }
+
+  return user.id;
 }
 
 /**
@@ -38,11 +60,11 @@ export async function getUserId(req?: NextRequest): Promise<string | null> {
  */
 export async function requireAuth(req?: NextRequest): Promise<string> {
   const userId = await getUserId(req);
-  
+
   if (!userId) {
     throw new Error('Oturum açmanız gerekiyor');
   }
-  
+
   return userId;
 }
 
@@ -51,7 +73,7 @@ export async function requireAuth(req?: NextRequest): Promise<string> {
  */
 export function unauthorizedResponse(message: string = 'Oturum açmanız gerekiyor') {
   return NextResponse.json(
-    { message },
+    { success: false, error: message, code: 'UNAUTHORIZED' },
     { status: 401 }
   );
 }
@@ -61,7 +83,7 @@ export function unauthorizedResponse(message: string = 'Oturum açmanız gerekiy
  */
 export function forbiddenResponse(message: string = 'Bu işlem için yetkiniz yok') {
   return NextResponse.json(
-    { message },
+    { success: false, error: message, code: 'FORBIDDEN' },
     { status: 403 }
   );
 }

@@ -3,6 +3,7 @@
 import { Badge, Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { Shield, Swords, Trash2, Check, X } from "lucide-react";
+import type { InventoryItem } from "@/types";
 
 // Item tipi emojileri
 const TYPE_EMOJI: Record<string, string> = {
@@ -27,24 +28,15 @@ const TYPE_EMOJI: Record<string, string> = {
 // Kuşanılabilir tipler
 const EQUIPPABLE_TYPES = ['Weapon', 'Armor', 'Shield', 'Accessory', 'Ring', 'Amulet', 'Helmet', 'Boots', 'Gloves', 'Cloak'];
 
-interface InventoryItem {
-    id: string;
-    name: string;
-    type: string;
-    description?: string | null;
-    quantity: number;
-    weight: number;
-    equipped: boolean;
-    properties?: Record<string, any> | null;
-}
-
 interface ItemCardProps {
     item: InventoryItem;
     onEquip?: (itemId: string, equip: boolean) => void;
     onDelete?: (itemId: string) => void;
     onUpdate?: (itemId: string, data: Partial<InventoryItem>) => void;
+    onClick?: (item: InventoryItem) => void;
     isLoading?: boolean;
     compact?: boolean;
+    showActions?: boolean;
 }
 
 export function ItemCard({
@@ -52,25 +44,36 @@ export function ItemCard({
     onEquip,
     onDelete,
     onUpdate,
+    onClick,
     isLoading,
     compact = false,
+    showActions = true,
 }: ItemCardProps) {
     const isEquippable = EQUIPPABLE_TYPES.includes(item.type);
     const emoji = TYPE_EMOJI[item.type] || '📦';
+    const isClickable = !!onClick;
 
     // Parse properties if string
     const properties = typeof item.properties === 'string'
         ? JSON.parse(item.properties)
         : item.properties;
 
+    const handleCardClick = () => {
+        if (onClick) {
+            onClick(item);
+        }
+    };
+
     if (compact) {
         return (
             <div
+                onClick={handleCardClick}
                 className={cn(
                     "flex items-center gap-2 p-2 rounded-lg transition-all",
                     item.equipped
                         ? "bg-primary/10 border border-primary/30"
-                        : "bg-background-elevated hover:bg-border/50"
+                        : "bg-background-elevated hover:bg-border/50",
+                    isClickable && "cursor-pointer"
                 )}
             >
                 <span className="text-lg">{emoji}</span>
@@ -87,11 +90,13 @@ export function ItemCard({
 
     return (
         <div
+            onClick={handleCardClick}
             className={cn(
                 "p-3 rounded-lg transition-all",
                 item.equipped
                     ? "bg-primary/10 border border-primary/30"
-                    : "bg-background-elevated hover:bg-border/50"
+                    : "bg-background-elevated hover:bg-border/50",
+                isClickable && "cursor-pointer"
             )}
         >
             {/* Header */}
@@ -152,7 +157,8 @@ export function ItemCard({
             )}
 
             {/* Actions */}
-            <div className="flex items-center gap-2 mt-3">
+            {showActions && (onEquip || onDelete) && (
+            <div className="flex items-center gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
                 {isEquippable && onEquip && (
                     <Button
                         variant={item.equipped ? "outline" : "primary"}
@@ -187,6 +193,7 @@ export function ItemCard({
                     </Button>
                 )}
             </div>
+            )}
         </div>
     );
 }

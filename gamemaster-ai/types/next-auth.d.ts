@@ -8,6 +8,8 @@ declare module "next-auth" {
       email: string;
       name: string;
       role: string;
+      isSuspended?: boolean;
+      isSoftDeleted?: boolean;
       image?: string | null;
     };
   }
@@ -17,6 +19,9 @@ declare module "next-auth" {
     email: string;
     name: string;
     role: string;
+    isSuspended?: boolean;
+    isSoftDeleted?: boolean;
+    passwordSignature?: string;
   }
 }
 
@@ -26,5 +31,9 @@ declare module "next-auth/jwt" {
     email: string;
     name: string;
     role: string;
+    isSuspended?: boolean;
+    isSoftDeleted?: boolean;
+    passwordSignature?: string;
+    sessionRevoked?: boolean;
   }
 }

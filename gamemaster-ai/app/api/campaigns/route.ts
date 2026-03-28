@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse } from '@/lib/auth/server';
+import { randomBytes } from 'crypto';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/campaigns
- * Kullanıcının kampanyaları endpoint'i
+ * Kullanıcının oturumları endpoint'i
  */
 export async function GET(req: NextRequest) {
   try {
@@ -14,9 +16,13 @@ export async function GET(req: NextRequest) {
       return unauthorizedResponse();
     }
 
-    // Kullanıcının kampanyalarını al
+    const limited = rateLimitResponse(userId, "GET:/api/campaigns", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
+
+    // Kullanıcının oturumlarını al
     const campaigns = await prisma.campaign.findMany({
       where: {
+        isSoftDeleted: false,
         OR: [
           { creatorId: userId },
           {
@@ -34,10 +40,24 @@ export async function GET(req: NextRequest) {
           select: {
             id: true,
             username: true,
-            email: true,
           },
         },
-        scenario: true,
+        scenario: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            genre: true,
+            difficulty: true,
+            startingPrompt: true,
+            isOfficial: true,
+            isFeatured: true,
+            tags: true,
+            worldSettings: true,
+            isSoftDeleted: true,
+            createdAt: true,
+          },
+        },
         characters: {
           where: {
             campaignId: {
@@ -71,11 +91,19 @@ export async function GET(req: NextRequest) {
         name: camp.name,
         description: camp.description,
         creatorId: camp.creatorId,
-        creator: camp.creator,
-        scenario: camp.scenario,
+        creator: camp.creator
+          ? {
+              id: camp.creator.id,
+              username: camp.creator.username,
+            }
+          : null,
+        scenario: camp.scenario?.isSoftDeleted ? null : camp.scenario,
         isMultiplayer: camp.isMultiplayer,
         maxPlayers: camp.maxPlayers,
-        inviteCode: camp.inviteCode,
+        inviteCode:
+          camp.isMultiplayer && camp.creatorId === userId
+            ? camp.inviteCode
+            : null,
         status: camp.status,
         characterCount: camp.characters.length,
         playerCount: camp.players.length,
@@ -88,7 +116,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error('Campaigns get error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }
@@ -96,7 +124,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/campaigns
- * Yeni kampanya endpoint'i
+ * Yeni oturum endpoint'i
  */
 export async function POST(req: NextRequest) {
   try {
@@ -106,7 +134,7 @@ export async function POST(req: NextRequest) {
     // Validation
     if (!name || typeof name !== 'string') {
       return NextResponse.json(
-        { message: 'Kampanya adı gerekiyor' },
+        { success: false, error: 'Oturum adı gerekiyor' },
         { status: 400 }
       );
     }
@@ -117,19 +145,36 @@ export async function POST(req: NextRequest) {
       return unauthorizedResponse();
     }
 
-    // Benzersiz davet kodu oluştur
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const limited = rateLimitResponse(userId, "POST:/api/campaigns", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
-    // Yeni kampanya oluştur
+    const multiplayer = Boolean(isMultiplayer);
+    const inviteCode = multiplayer ? randomBytes(4).toString('hex').toUpperCase() : null;
+
+    // Yeni oturum oluştur
     // Not: CampaignPlayer kaydı karakter seçildikten sonra oluşturulacak
-    // Creator'ın kampanyayı görmesi için creatorId yeterli
+    // Creator'ın oturumu görmesi için creatorId yeterli
+    if (scenarioId) {
+      const scenario = await prisma.scenario.findFirst({
+        where: { id: scenarioId, isSoftDeleted: false },
+        select: { id: true },
+      });
+
+      if (!scenario) {
+        return NextResponse.json(
+          { success: false, error: 'Senaryo bulunamadı veya pasif durumda' },
+          { status: 404 }
+        );
+      }
+    }
+
     const campaign = await prisma.campaign.create({
       data: {
         name,
         description,
         creatorId: userId,
         scenarioId,
-        isMultiplayer: isMultiplayer || false,
+        isMultiplayer: multiplayer,
         maxPlayers: maxPlayers || 4,
         inviteCode,
         status: 'DRAFT',
@@ -150,12 +195,12 @@ export async function POST(req: NextRequest) {
         status: campaign.status,
         createdAt: campaign.createdAt,
       },
-      message: 'Kampanya başarıyla oluşturuldu',
+      message: 'Oturum başarıyla oluşturuldu',
     });
   } catch (error) {
     console.error('Campaign creation error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

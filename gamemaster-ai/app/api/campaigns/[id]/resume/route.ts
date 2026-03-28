@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
-// POST /api/campaigns/:id/resume - Kampanyayı devam ettir (PAUSED → ACTIVE)
+// POST /api/campaigns/:id/resume - Oturumu devam ettir (PAUSED → ACTIVE)
 export async function POST(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -16,16 +17,19 @@ export async function POST(
             );
         }
 
+        const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/resume", RATE_LIMIT_TIERS.WRITE);
+        if (limited) return limited;
+
         const { id: campaignId } = await params;
 
-        // Kampanyayı bul
+        // Oturumu bul
         const campaign = await prisma.campaign.findUnique({
             where: { id: campaignId },
         });
 
         if (!campaign) {
             return NextResponse.json(
-                { success: false, error: 'Kampanya bulunamadı' },
+                { success: false, error: 'Oturum bulunamadı' },
                 { status: 404 }
             );
         }
@@ -38,15 +42,15 @@ export async function POST(
             );
         }
 
-        // Sadece PAUSED kampanya devam ettirilebilir
+        // Sadece PAUSED oturum devam ettirilebilir
         if (campaign.status !== 'PAUSED') {
             return NextResponse.json(
-                { success: false, error: 'Sadece duraklatılmış kampanyalar devam ettirilebilir' },
+                { success: false, error: 'Sadece duraklatılmış oturumlar devam ettirilebilir' },
                 { status: 400 }
             );
         }
 
-        // Kampanyayı ACTIVE yap
+        // Oturumu ACTIVE yap
         await prisma.campaign.update({
             where: { id: campaignId },
             data: { status: 'ACTIVE' },
@@ -54,7 +58,7 @@ export async function POST(
 
         return NextResponse.json({
             success: true,
-            message: 'Kampanya devam ettiriliyor',
+            message: 'Oturum devam ettiriliyor',
         });
     } catch (error) {
         console.error('Resume campaign error:', error);

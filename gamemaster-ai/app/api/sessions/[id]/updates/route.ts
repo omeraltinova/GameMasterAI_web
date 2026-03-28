@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
+import { getCampaignActorRole, hasCampaignAccess } from '@/lib/auth/permissions';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
+
+const MAX_MESSAGES_PER_POLL = 20;
 
 /**
  * GET /api/sessions/:id/updates
@@ -21,6 +26,9 @@ export async function GET(
       return unauthorizedResponse();
     }
 
+    const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/updates", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
+
     // Session'ı kontrol et
     const session = await prisma.gameSession.findUnique({
       where: { id: sessionId },
@@ -35,33 +43,32 @@ export async function GET(
 
     if (!session) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
 
-    // Kullanıcının yetkisi var mı?
-    const hasAccess = session.campaign.players.some(
-      (player: any) => player.userId === userId
-    );
-
-    if (!hasAccess) {
+    const actorRole = getCampaignActorRole(session.campaign, userId);
+    if (!hasCampaignAccess(actorRole)) {
       return forbiddenResponse('Bu session\'a erişim yetkiniz yok');
     }
 
     // Since parametresini parse et
     let since: Date | null = null;
     if (sinceParam) {
-      try {
-        since = new Date(sinceParam);
-      } catch (error) {
-        console.error('Invalid since parameter:', error);
+      const parsedSince = new Date(sinceParam);
+      if (!Number.isNaN(parsedSince.getTime())) {
+        since = parsedSince;
+      } else {
         since = null;
       }
     }
 
     // Güncellemeleri al
-    const whereClause: any = { sessionId };
+    const whereClause: Prisma.MessageWhereInput = {
+      sessionId,
+      isSoftDeleted: false,
+    };
 
     if (since) {
       whereClause.timestamp = {
@@ -73,7 +80,36 @@ export async function GET(
     const updates = await prisma.message.findMany({
       where: whereClause,
       orderBy: { timestamp: 'desc' },
-      take: 20,
+      take: MAX_MESSAGES_PER_POLL,
+    });
+
+    const sanitizedUpdates = updates.map((msg) => {
+      let gmPrompt: unknown = undefined;
+      let suggestions: unknown = undefined;
+      if (msg.metadata) {
+        try {
+          const parsed = JSON.parse(msg.metadata);
+          if (parsed && typeof parsed === 'object') {
+            gmPrompt = (parsed as { gmPrompt?: unknown }).gmPrompt;
+            suggestions = (parsed as { suggestions?: unknown }).suggestions;
+          }
+        } catch {
+          gmPrompt = undefined;
+        }
+      }
+
+      const metadata: Record<string, unknown> = {};
+      if (gmPrompt) metadata.gmPrompt = gmPrompt;
+      if (suggestions) metadata.suggestions = suggestions;
+
+      return {
+        ...msg,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
+        gmPrompt,
+        suggestions,
+        locationImageUrl: msg.locationImageUrl,
+        locationName: msg.locationName,
+      };
     });
 
     // Session güncelleme zamanını kontrol et
@@ -85,8 +121,8 @@ export async function GET(
     return NextResponse.json({
       success: true,
       updates: {
-        hasNewMessages: updates.length > 0,
-        messages: updates,
+        hasNewMessages: sanitizedUpdates.length > 0,
+        messages: sanitizedUpdates,
         gameStateChanged,
         lastUpdate: lastUpdate,
         timestamp: new Date().toISOString(),
@@ -95,7 +131,7 @@ export async function GET(
   } catch (error) {
     console.error('Updates get error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

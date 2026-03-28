@@ -8,7 +8,7 @@ export const metadata = {
 const values = [
   {
     icon: Heart,
-    title: "D&D Tutkusu",
+    title: "TTRPG Tutkusu",
     description: "Masa üstü rol yapma oyunlarına olan sevgimiz bu projenin temelini oluşturuyor.",
     color: "secondary",
   },
@@ -107,7 +107,7 @@ export default function AboutPage() {
                 <div className="space-y-4 font-mono text-sm">
                   <div className="flex justify-between items-center py-2 border-b border-border/30">
                     <span className="text-foreground-muted">Tür</span>
-                    <span className="text-primary font-medium">Ana Kampanya</span>
+                    <span className="text-primary font-medium">Ana Oturum</span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-border/30">
                     <span className="text-foreground-muted">Zorluk</span>
@@ -201,7 +201,7 @@ export default function AboutPage() {
                     { name: "GPT-4o", highlight: true },
                     { name: "Vector DB" },
                     { name: "Next.js 15" },
-                    { name: "D&D 5e SRD" },
+                    { name: "5e SRD" },
                     { name: "WebGL" },
                   ].map((tech) => (
                     <span

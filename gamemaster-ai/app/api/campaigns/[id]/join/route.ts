@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
+import { Prisma } from "@prisma/client";
+
+const MAX_JOIN_RETRIES = 3;
+
+type JoinAttemptResult =
+  | { success: true }
+  | { success: false; status: number; error: string };
+
+function failJoin(status: number, error: string): JoinAttemptResult {
+  return { success: false, status, error };
+}
+
+function isSerializationFailure(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "P2034"
+  );
+}
 
 // POST /api/campaigns/:id/join - Lobiye karakter ile katıl
 export async function POST(
@@ -16,9 +37,12 @@ export async function POST(
       );
     }
 
+    const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/join", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
     const { id: campaignId } = await params;
     const body = await req.json();
-    const { characterId } = body;
+    const { characterId, inviteCode } = body as { characterId?: string; inviteCode?: string };
 
     if (!characterId) {
       return NextResponse.json(
@@ -27,88 +51,159 @@ export async function POST(
       );
     }
 
-    // Kampanyayı kontrol et
-    const campaign = await prisma.campaign.findUnique({
-      where: { id: campaignId },
-      include: {
-        players: true,
-      },
-    });
+    const normalizedInviteCode = typeof inviteCode === "string" ? inviteCode.trim().toUpperCase() : "";
+    let joinResult: JoinAttemptResult | null = null;
 
-    if (!campaign) {
+    for (let attempt = 0; attempt < MAX_JOIN_RETRIES; attempt += 1) {
+      try {
+        joinResult = await prisma.$transaction(async (tx) => {
+          const campaign = await tx.campaign.findUnique({
+            where: { id: campaignId },
+            select: {
+              id: true,
+              creatorId: true,
+              inviteCode: true,
+              status: true,
+              maxPlayers: true,
+              isMultiplayer: true,
+              isSoftDeleted: true,
+            },
+          });
+
+          if (!campaign || campaign.isSoftDeleted) {
+            return failJoin(404, "Oturum bulunamadı");
+          }
+
+          if (campaign.status === "COMPLETED") {
+            return failJoin(400, "Bu oturum tamamlanmış");
+          }
+
+          const existingPlayer = await tx.campaignPlayer.findUnique({
+            where: {
+              campaignId_userId: {
+                campaignId,
+                userId,
+              },
+            },
+            select: {
+              id: true,
+              isActive: true,
+              characterId: true,
+            },
+          });
+
+          const isCreator = campaign.creatorId === userId;
+
+          if (!campaign.isMultiplayer && !isCreator) {
+            return failJoin(403, "Solo oturuma sadece kurucu katılabilir");
+          }
+
+          const campaignInviteCode = campaign.inviteCode?.toUpperCase() || "";
+          const hasValidInvite = Boolean(
+            normalizedInviteCode &&
+            campaignInviteCode &&
+            normalizedInviteCode === campaignInviteCode
+          );
+
+          // Creator ve mevcut oyuncular haricinde davet kanıtı zorunlu.
+          if (!isCreator && !existingPlayer && !hasValidInvite) {
+            return failJoin(403, "Bu oturuma katılmak için geçerli davet kodu gerekli");
+          }
+
+          const character = await tx.character.findFirst({
+            where: {
+              id: characterId,
+              userId,
+            },
+            select: {
+              id: true,
+              campaignId: true,
+            },
+          });
+
+          if (!character) {
+            return failJoin(403, "Bu karakter size ait değil");
+          }
+
+          if (character.campaignId && character.campaignId !== campaignId) {
+            return failJoin(400, "Bu karakter başka bir oturumda");
+          }
+
+          const activePlayerCount = await tx.campaignPlayer.count({
+            where: {
+              campaignId,
+              isActive: true,
+            },
+          });
+
+          const willConsumeSeat = !existingPlayer || !existingPlayer.isActive;
+          if (willConsumeSeat && activePlayerCount >= campaign.maxPlayers) {
+            return failJoin(400, "Oturum dolu");
+          }
+
+          if (existingPlayer) {
+            await tx.campaignPlayer.update({
+              where: { id: existingPlayer.id },
+              data: {
+                characterId,
+                isActive: true,
+              },
+            });
+
+            if (existingPlayer.characterId !== characterId) {
+              await tx.character.updateMany({
+                where: {
+                  id: existingPlayer.characterId,
+                  campaignId,
+                },
+                data: {
+                  campaignId: null,
+                },
+              });
+            }
+          } else {
+            await tx.campaignPlayer.create({
+              data: {
+                campaignId,
+                userId,
+                characterId,
+                isActive: true,
+                joinedAt: new Date(),
+              },
+            });
+          }
+
+          await tx.character.update({
+            where: { id: characterId },
+            data: { campaignId },
+          });
+
+          return { success: true } as const;
+        }, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+
+        break;
+      } catch (error) {
+        if (isSerializationFailure(error) && attempt < MAX_JOIN_RETRIES - 1) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    if (!joinResult) {
       return NextResponse.json(
-        { success: false, error: "Kampanya bulunamadı" },
-        { status: 404 }
+        { success: false, error: "Yoğunluk nedeniyle katılım doğrulanamadı. Lütfen tekrar deneyin." },
+        { status: 409 }
       );
     }
 
-    // Karakteri kontrol et - kullanıcının olmalı
-    const character = await prisma.character.findFirst({
-      where: {
-        id: characterId,
-        userId: userId,
-      },
-    });
-
-    if (!character) {
+    if (!joinResult.success) {
       return NextResponse.json(
-        { success: false, error: "Bu karakter size ait değil" },
-        { status: 403 }
+        { success: false, error: joinResult.error },
+        { status: joinResult.status }
       );
-    }
-
-    // Karakterin başka kampanyada olup olmadığını kontrol et
-    if (character.campaignId && character.campaignId !== campaignId) {
-      return NextResponse.json(
-        { success: false, error: "Bu karakter başka bir kampanyada" },
-        { status: 400 }
-      );
-    }
-
-    // Kampanya dolu mu kontrol et
-    const activePlayerCount = campaign.players.filter((p) => p.isActive).length;
-    if (activePlayerCount >= campaign.maxPlayers) {
-      return NextResponse.json(
-        { success: false, error: "Kampanya dolu" },
-        { status: 400 }
-      );
-    }
-
-    // Kullanıcı zaten lobide mi kontrol et
-    const existingPlayer = campaign.players.find((p) => p.userId === userId);
-
-    if (existingPlayer) {
-      // Player kaydı var, karakteri güncelle
-      await prisma.campaignPlayer.update({
-        where: { id: existingPlayer.id },
-        data: {
-          characterId: characterId,
-          isActive: true,
-        },
-      });
-
-      // Karakterin campaignId'sini güncelle
-      await prisma.character.update({
-        where: { id: characterId },
-        data: { campaignId: campaignId },
-      });
-    } else {
-      // Yeni player kaydı oluştur
-      await prisma.campaignPlayer.create({
-        data: {
-          campaignId: campaignId,
-          userId: userId,
-          characterId: characterId,
-          isActive: true,
-          joinedAt: new Date(),
-        },
-      });
-
-      // Karakterin campaignId'sini güncelle
-      await prisma.character.update({
-        where: { id: characterId },
-        data: { campaignId: campaignId },
-      });
     }
 
     return NextResponse.json({
@@ -137,6 +232,9 @@ export async function DELETE(
         { status: 401 }
       );
     }
+
+    const limited = rateLimitResponse(userId, "DELETE:/api/campaigns/[id]/join", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id: campaignId } = await params;
 
@@ -183,5 +281,3 @@ export async function DELETE(
     );
   }
 }
-
-

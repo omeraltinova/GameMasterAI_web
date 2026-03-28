@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse, forbiddenResponse } from '@/lib/auth/server';
+import { getCampaignActorRole, hasCampaignAccess } from '@/lib/auth/permissions';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/sessions/:id/state
@@ -19,21 +21,25 @@ export async function GET(
       return unauthorizedResponse();
     }
 
+    const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/state", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
+
     // Session'ı al
     const session = await prisma.gameSession.findUnique({
       where: { id: sessionId },
-      include: {
+      select: {
+        id: true,
+        campaignId: true,
+        currentState: true,
+        turnOrder: true,
+        activePlayer: true,
+        updatedAt: true,
         campaign: {
-          include: {
+          select: {
+            creatorId: true,
             players: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    username: true,
-                  },
-                },
-                character: true,
+              select: {
+                userId: true,
               },
             },
           },
@@ -43,17 +49,13 @@ export async function GET(
 
     if (!session) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
 
-    // Kullanıcının yetkisi var mı?
-    const hasAccess = session.campaign.players.some(
-      (player: any) => player.userId === userId
-    );
-
-    if (!hasAccess) {
+    const actorRole = getCampaignActorRole(session.campaign, userId);
+    if (!hasCampaignAccess(actorRole)) {
       return forbiddenResponse('Bu session\'a erişim yetkiniz yok');
     }
 
@@ -80,7 +82,7 @@ export async function GET(
   } catch (error) {
     console.error('Session state get error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

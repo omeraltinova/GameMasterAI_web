@@ -4,6 +4,7 @@ import { callOpenRouterWithTools, OpenRouterMessage } from '@/lib/ai/openrouter'
 import { SYSTEM_PROMPT, getNarrationPrompt } from '@/lib/ai/prompts';
 import { buildSessionContext } from '@/lib/ai/context';
 import { getUserId } from '@/lib/auth/server';
+import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 import type { GMPrompt, GMAction, LocationChange } from '@/types';
 
 /**
@@ -16,8 +17,16 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
+      );
+    }
+
+    const rateLimit = await checkAIRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { status: 429 }
       );
     }
 
@@ -27,14 +36,14 @@ export async function POST(req: NextRequest) {
     // Validation
     if (!sessionId) {
       return NextResponse.json(
-        { message: 'Session ID gerekiyor' },
+        { success: false, error: 'Session ID gerekiyor' },
         { status: 400 }
       );
     }
 
     if (!playerAction || typeof playerAction !== 'string') {
       return NextResponse.json(
-        { message: 'Geçersiz oyuncu aksiyonu' },
+        { success: false, error: 'Geçersiz oyuncu aksiyonu' },
         { status: 400 }
       );
     }
@@ -59,7 +68,7 @@ export async function POST(req: NextRequest) {
 
     if (!gameSession) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -72,7 +81,7 @@ export async function POST(req: NextRequest) {
 
     if (!isCreator && !isPlayer) {
       return NextResponse.json(
-        { message: 'Bu session\'a erişim yetkiniz yok' },
+        { success: false, error: 'Bu session\'a erişim yetkiniz yok' },
         { status: 403 }
       );
     }
@@ -101,6 +110,7 @@ export async function POST(req: NextRequest) {
       temperature: 0.8,
       sessionId,
       characterId,
+      userId,
     });
 
     const aiResponse = aiResult.content;
@@ -211,8 +221,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Tool results'tan ek bilgiler
-    let newNPCs: any[] = [];
-    let givenItems: any[] = [];
+    const newNPCs: any[] = [];
+    const givenItems: any[] = [];
     let diceRollRequest: any = null;
 
     if (toolResults && toolResults.length > 0) {
@@ -235,8 +245,11 @@ export async function POST(req: NextRequest) {
       'Oyuncu';
 
     // Oyuncu mesajını kaydet (eğer regenerate değilse)
+    let playerMessageId: string | null = null;
+    let playerMessageTimestamp: Date | null = null;
+
     if (!skipPlayerMessageSave) {
-      await prisma.message.create({
+      const playerMessage = await prisma.message.create({
         data: {
           sessionId,
           senderId: userId,
@@ -245,6 +258,8 @@ export async function POST(req: NextRequest) {
           content: playerAction,
         },
       });
+      playerMessageId = playerMessage.id;
+      playerMessageTimestamp = playerMessage.timestamp;
     }
 
     // GM yanıtını kaydet (metadata'da gmPrompt ve locationChange)
@@ -292,6 +307,10 @@ export async function POST(req: NextRequest) {
       locationChange,
       messageId: gmMessage.id,
       timestamp: gmMessage.timestamp,
+      // Oyuncu mesajı bilgileri
+      playerMessageId,
+      playerMessageTimestamp,
+      playerName,
       // Tool results
       toolResults: {
         newNPCs,
@@ -302,7 +321,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Narration error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

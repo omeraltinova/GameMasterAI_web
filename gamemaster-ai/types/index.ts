@@ -10,6 +10,7 @@ export interface User {
   username: string;
   role: UserRole;
   avatar?: string;
+  bio?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,8 +64,11 @@ export interface Character {
   experience: number;
   hp: number;
   maxHp: number;
+  gold?: number;
   stats: CharacterStats;
   background?: string;
+  appearance?: string;
+  backstory?: string;
   imageUrl?: string;
   createdAt: string;
   updatedAt: string;
@@ -75,7 +79,24 @@ export interface Character {
 // Inventory Types
 // ==========================================
 
-export type ItemType = "Weapon" | "Armor" | "Potion" | "Scroll" | "Tool" | "Misc" | "Quest";
+export type ItemType = 
+  | "Weapon" 
+  | "Armor" 
+  | "Shield"
+  | "Helmet"
+  | "Boots"
+  | "Gloves"
+  | "Cloak"
+  | "Ring"
+  | "Amulet"
+  | "Accessory"
+  | "Potion" 
+  | "Scroll" 
+  | "Tool" 
+  | "Consumable"
+  | "Treasure"
+  | "Misc" 
+  | "Quest";
 
 export interface ItemProperties {
   damage?: string;
@@ -84,16 +105,21 @@ export interface ItemProperties {
   healing?: string;
   range?: string;
   properties?: string[];
+  [key: string]: unknown; // Allow additional properties
 }
 
+/**
+ * InventoryItem type for character inventory
+ * Note: `properties` can be a JSON string from DB or parsed object
+ */
 export interface InventoryItem {
   id: string;
-  characterId: string;
+  characterId?: string;
   name: string;
-  type: ItemType;
-  description?: string;
+  type: string; // Using string for flexibility, but should match ItemType values
+  description?: string | null;
   quantity: number;
-  properties?: ItemProperties;
+  properties?: Record<string, unknown> | string | null;
   equipped: boolean;
   weight: number;
 }
@@ -134,6 +160,7 @@ export interface Scenario {
   difficulty: ScenarioDifficulty;
   startingPrompt: string;
   isOfficial: boolean;
+  isFeatured?: boolean;
   isAIGenerated: boolean;
   creatorId?: string;
   tags?: string[];
@@ -141,16 +168,34 @@ export interface Scenario {
 }
 
 // ==========================================
+// Scenario Collection Types
+// ==========================================
+
+export interface ScenarioCollection {
+  id: string;
+  name: string;
+  description?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  scenarios?: Scenario[];
+}
+
+// ==========================================
 // Game Session Types
 // ==========================================
 
 export interface GameState {
+  sessionId?: string;
+  campaignId?: string;
   location: string;
   timeOfDay: string;
   weather?: string;
+  inCombat?: boolean;
   activeNPCs: string[];
   activeQuests: string[];
   notes?: string;
+  turnOrder?: string[] | null;
+  activePlayer?: string | null;
 }
 
 export interface GameSession {
@@ -213,6 +258,12 @@ export interface LocationChange {
   description?: string; // İngilizce görsel açıklaması
 }
 
+export interface Suggestion {
+  id: string;
+  shortLabel: string;
+  detailedAction: string;
+}
+
 export interface Message {
   id: string;
   sessionId: string;
@@ -224,6 +275,8 @@ export interface Message {
   timestamp: string;
   // GM aksiyonları için
   gmPrompt?: GMPrompt;
+  // AI önerilen aksiyonlar
+  suggestions?: Suggestion[];
   // Mekan görseli için
   locationImageUrl?: string;
   locationName?: string;
@@ -299,6 +352,24 @@ export interface Combat {
 // Map Types
 // ==========================================
 
+export type MapType = 
+  | "dungeon"
+  | "tavern" 
+  | "forest"
+  | "cave"
+  | "castle"
+  | "town"
+  | "port"
+  | "road"
+  | "camp"
+  | "battlefield"
+  | "temple"
+  | "underground"
+  | "mountain"
+  | "desert"
+  | "swamp"
+  | "other";
+
 export interface GameMap {
   id: string;
   sessionId: string;
@@ -308,6 +379,23 @@ export interface GameMap {
   isAIGenerated: boolean;
   prompt?: string;
   createdAt: string;
+}
+
+export interface CreateMapInput {
+  name: string;
+  description?: string;
+  locationType: MapType;
+  atmosphere?: string;
+  details?: string[];
+  imageUrl?: string; // For manual upload
+}
+
+export interface GenerateMapInput {
+  sessionId: string;
+  locationName: string;
+  locationType: MapType;
+  atmosphere?: string;
+  details?: string[];
 }
 
 // ==========================================
@@ -375,5 +463,3 @@ export interface RegisterInput {
   password: string;
   confirmPassword: string;
 }
-
-

@@ -33,6 +33,7 @@ interface DiceHistoryProps {
     characterId?: string;
     limit?: number;
     showStats?: boolean;
+    refreshSignal?: number;
     className?: string;
 }
 
@@ -41,6 +42,7 @@ export function DiceHistory({
     characterId,
     limit = 10,
     showStats = true,
+    refreshSignal = 0,
     className,
 }: DiceHistoryProps) {
     const [rolls, setRolls] = useState<DiceRoll[]>([]);
@@ -49,6 +51,14 @@ export function DiceHistory({
     const [error, setError] = useState<string | null>(null);
 
     const fetchHistory = useCallback(async () => {
+        if (!sessionId) {
+            setRolls([]);
+            setStats(null);
+            setError('Session bulunamadı');
+            setIsLoading(false);
+            return;
+        }
+
         try {
             const params = new URLSearchParams({ limit: limit.toString() });
             if (characterId) params.set('characterId', characterId);
@@ -72,12 +82,7 @@ export function DiceHistory({
 
     useEffect(() => {
         fetchHistory();
-    }, [fetchHistory]);
-
-    // Add a new roll to the history (can be called from parent)
-    const addRoll = (roll: DiceRoll) => {
-        setRolls(prev => [roll, ...prev].slice(0, limit));
-    };
+    }, [fetchHistory, refreshSignal]);
 
     const formatTime = (timestamp: string) => {
         const date = new Date(timestamp);

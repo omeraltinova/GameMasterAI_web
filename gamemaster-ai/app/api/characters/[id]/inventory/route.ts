@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
+
+const MIN_ITEM_QUANTITY = 1;
+const MAX_ITEM_QUANTITY = 999;
+const MIN_ITEM_WEIGHT = 0;
+const MAX_ITEM_WEIGHT = 1000;
 
 /**
  * GET /api/characters/:id/inventory
@@ -18,6 +24,9 @@ export async function GET(
                 { status: 401 }
             );
         }
+
+        const limited = rateLimitResponse(userId, "GET:/api/characters/[id]/inventory", RATE_LIMIT_TIERS.READ);
+        if (limited) return limited;
 
         const { id: characterId } = await params;
 
@@ -93,6 +102,9 @@ export async function POST(
             );
         }
 
+        const limited = rateLimitResponse(userId, "POST:/api/characters/[id]/inventory", RATE_LIMIT_TIERS.WRITE);
+        if (limited) return limited;
+
         const { id: characterId } = await params;
         const body = await req.json();
         const { name, type, description, quantity, properties, weight } = body;
@@ -108,6 +120,30 @@ export async function POST(
         if (!type || typeof type !== 'string') {
             return NextResponse.json(
                 { success: false, error: 'Item tipi gerekiyor' },
+                { status: 400 }
+            );
+        }
+
+        const parsedQuantity =
+            quantity === undefined || quantity === null ? MIN_ITEM_QUANTITY : Number(quantity);
+        if (!Number.isInteger(parsedQuantity) || parsedQuantity < MIN_ITEM_QUANTITY || parsedQuantity > MAX_ITEM_QUANTITY) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: `Item adedi ${MIN_ITEM_QUANTITY}-${MAX_ITEM_QUANTITY} arasında tam sayı olmalı`,
+                },
+                { status: 400 }
+            );
+        }
+
+        const parsedWeight =
+            weight === undefined || weight === null ? MIN_ITEM_WEIGHT : Number(weight);
+        if (!Number.isFinite(parsedWeight) || parsedWeight < MIN_ITEM_WEIGHT || parsedWeight > MAX_ITEM_WEIGHT) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: `Item ağırlığı ${MIN_ITEM_WEIGHT}-${MAX_ITEM_WEIGHT} arasında olmalı`,
+                },
                 { status: 400 }
             );
         }
@@ -139,9 +175,9 @@ export async function POST(
                 name,
                 type,
                 description: description || null,
-                quantity: quantity || 1,
+                quantity: parsedQuantity,
                 properties: properties ? JSON.stringify(properties) : null,
-                weight: weight || 0,
+                weight: parsedWeight,
                 equipped: false,
             },
         });

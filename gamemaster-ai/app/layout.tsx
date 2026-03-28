@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
+import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { ToastProvider } from "@/components/ui";
 
 const geistSans = Geist({
@@ -23,9 +24,9 @@ const libreBaskerville = Libre_Baskerville({
 });
 
 export const metadata: Metadata = {
-  title: "GameMaster AI - AI-Powered D&D Game Master",
-  description: "Experience D&D 5e adventures with an AI-powered Game Master. Create characters, join campaigns, and embark on epic quests.",
-  keywords: ["D&D", "Dungeons & Dragons", "AI Game Master", "TTRPG", "Role Playing Game"],
+  title: "GameMaster AI - AI-Powered TTRPG Game Master",
+  description: "Experience 5e SRD adventures with an AI-powered Game Master. Create characters, join campaigns, and embark on epic quests.",
+  keywords: ["AI Game Master", "TTRPG", "Role Playing Game", "5e SRD", "Tabletop RPG"],
 };
 
 export default function RootLayout({
@@ -34,15 +35,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr" className="dark">
+    <html lang="tr" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${libreBaskerville.variable} antialiased min-h-screen bg-background text-foreground`}
       >
-        <AuthProvider>
-          <ToastProvider>
-            {children}
-          </ToastProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <ToastProvider>
+              {children}
+            </ToastProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

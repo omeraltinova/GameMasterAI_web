@@ -1,15 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = await getUserId();
   const { id: campaignId } = await params;
 
   try {
+    const userId = await getUserId();
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'Oturum açmanız gerekiyor' },
+        { status: 401 }
+      );
+    }
+
+    const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/pause", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
     // Verify ownership
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
@@ -17,7 +28,7 @@ export async function POST(
 
     if (!campaign) {
       return NextResponse.json(
-        { error: 'Kampanya bulunamadı' },
+        { error: 'Oturum bulunamadı' },
         { status: 404 }
       );
     }
@@ -40,7 +51,7 @@ export async function POST(
 
       if (!creatorPlayer) {
         return NextResponse.json(
-          { error: 'Kampanyayi baslatmak icin once karakter secmelisiniz' },
+          { error: 'Oturumu baslatmak icin once karakter secmelisiniz' },
           { status: 400 }
         );
       }
@@ -54,7 +65,7 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: 'Kampanya duraklatıldı',
+      message: 'Oturum duraklatıldı',
     });
   } catch (error) {
     console.error('Pause hatası:', error);

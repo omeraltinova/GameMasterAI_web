@@ -8,12 +8,13 @@ import {
   Users,
   Swords,
   Map,
-  TrendingUp,
-  Clock,
+  MessageSquare,
+  BookOpen,
   ArrowRight,
   Plus,
   Play,
   Loader2,
+  User,
 } from "lucide-react";
 import { get } from "@/lib/api/client";
 
@@ -148,9 +149,9 @@ export default function DashboardPage() {
     {
       title: "Toplam Mesaj",
       value: totalMessages,
-      icon: TrendingUp,
+      icon: MessageSquare,
       color: "info",
-      href: "#",
+      href: "",
     },
   ];
 
@@ -176,7 +177,7 @@ export default function DashboardPage() {
           <Link href="/campaigns/new">
             <Button className="gap-2">
               <Swords className="h-4 w-4" />
-              Yeni Kampanya
+              Yeni Oturum
             </Button>
           </Link>
         </div>
@@ -186,9 +187,18 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((stat, i) => {
           const Icon = stat.icon;
+          const colorMap: Record<string, { bg: string; text: string; border: string }> = {
+            primary: { bg: "bg-primary/10", text: "text-primary", border: "hover:border-primary/50" },
+            secondary: { bg: "bg-secondary/10", text: "text-secondary", border: "hover:border-secondary/50" },
+            success: { bg: "bg-success/10", text: "text-success", border: "hover:border-success/50" },
+            info: { bg: "bg-info/10", text: "text-info", border: "hover:border-info/50" },
+          };
+          const colors = colorMap[stat.color] || colorMap.primary;
+          const Wrapper = stat.href ? Link : "div";
+          const wrapperProps = stat.href ? { href: stat.href } : {};
           return (
-            <Link key={i} href={stat.href}>
-              <Card className="hover:border-primary/50 transition-colors h-full cursor-pointer">
+            <Wrapper key={i} {...(wrapperProps as any)}>
+              <Card className={`${colors.border} transition-colors h-full ${stat.href ? "cursor-pointer" : ""}`}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -197,13 +207,13 @@ export default function DashboardPage() {
                       </p>
                       <p className="text-3xl font-bold">{stat.value}</p>
                     </div>
-                    <div className={`p-3 rounded-xl bg-primary/10`}>
-                      <Icon className={`h-6 w-6 text-primary`} />
+                    <div className={`p-3 rounded-xl ${colors.bg}`}>
+                      <Icon className={`h-6 w-6 ${colors.text}`} />
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            </Link>
+            </Wrapper>
           );
         })}
       </div>
@@ -231,7 +241,7 @@ export default function DashboardPage() {
                   Karakterler yükleniyor...
                 </div>
               ) : userCharacters.length > 0 ? (
-                userCharacters.map((character) => (
+                userCharacters.slice(0, 4).map((character) => (
                   <Link
                     key={character.id}
                     href={`/characters/${character.id}`}
@@ -326,10 +336,10 @@ export default function DashboardPage() {
               <div className="p-6 text-center">
                 <Swords className="h-10 w-10 text-foreground-muted mx-auto mb-3" />
                 <p className="text-foreground-secondary text-sm mb-4">
-                  Aktif kampanya yok
+                  Aktif oturum yok
                 </p>
                 <Link href="/campaigns/new">
-                  <Button size="sm" variant="outline">Kampanya Başlat</Button>
+                  <Button size="sm" variant="outline">Oturum Başlat</Button>
                 </Link>
               </div>
             )}
@@ -345,10 +355,10 @@ export default function DashboardPage() {
         <CardContent>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {[
-              { href: "/campaigns/join", icon: Users, label: "Kampanyaya Katıl", desc: "Davet koduyla katıl" },
+              { href: "/campaigns/join", icon: Users, label: "Oturuma Katıl", desc: "Davet koduyla katıl" },
               { href: "/scenarios", icon: Map, label: "Senaryolar", desc: "Macera senaryolarını keşfet" },
-              { href: "/rules", icon: Clock, label: "Kurallar", desc: "D&D 5e kurallarını incele" },
-              { href: "/profile", icon: TrendingUp, label: "Profil", desc: "Ayarlarını düzenle" },
+              { href: "/rules", icon: BookOpen, label: "Kurallar", desc: "5e SRD kurallarını incele" },
+              { href: "/profile", icon: User, label: "Profil", desc: "Ayarlarını düzenle" },
             ].map((action, i) => {
               const Icon = action.icon;
               return (

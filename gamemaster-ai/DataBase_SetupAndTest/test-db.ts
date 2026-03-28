@@ -30,7 +30,7 @@ async function main() {
         const character = await prisma.character.create({
             data: {
                 userId: user.id,
-                name: "Thorin Testforge",
+                name: "Borin Testforge",
                 race: "Dwarf",
                 class: "Fighter",
                 level: 5,

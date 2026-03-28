@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAIResponseWithContext } from '@/lib/ai/openrouter';
 import { getUserId } from '@/lib/auth/server';
+import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 
 /**
  * POST /api/gm/generate-world
@@ -12,8 +13,16 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
+      );
+    }
+
+    const rateLimit = await checkAIRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { status: 429 }
       );
     }
 
@@ -42,16 +51,16 @@ ${JSON.stringify(currentSettings, null, 2)}
 Bu ayarları daha detaylı ve ilgi çekici hale getir:`;
     } else {
       // Sıfırdan öner
-      userPrompt = `"${campaignName}" adlı bir D&D kampanyası için dünya ayarları öner.
-${campaignDescription ? `Kampanya açıklaması: ${campaignDescription}` : ''}
+      userPrompt = `"${campaignName}" adlı bir TTRPG oturumu için dünya ayarları öner.
+${campaignDescription ? `Oturum açıklaması: ${campaignDescription}` : ''}
 ${worldType ? `İstenen dünya tipi: ${worldType}` : ''}
 
 Yaratıcı ve ilgi çekici bir dünya tasarla:`;
     }
 
-    const systemPrompt = `Sen yaratıcı bir D&D Game Master'sın. Görevin oyuncular için ilgi çekici ve sürükleyici dünya ayarları oluşturmak.
+    const systemPrompt = `Sen yaratıcı bir TTRPG Game Master'sın. Görevin oyuncular için ilgi çekici ve sürükleyici dünya ayarları oluşturmak.
 
-GÖREV: Bir D&D kampanyası için dünya ayarları oluştur.
+GÖREV: Bir TTRPG oturumu için dünya ayarları oluştur.
 
 ÇIKTI FORMATI: Aşağıdaki JSON formatında yanıt ver (sadece JSON, başka bir şey yazma):
 {
@@ -77,7 +86,7 @@ GÖREV: Bir D&D kampanyası için dünya ayarları oluştur.
 ÖNEMLİ:
 - Türkçe yaz
 - Yaratıcı ve özgün ol
-- D&D 5e kurallarına uygun ol
+- 5e SRD kurallarına uygun ol
 - Sadece JSON döndür, açıklama ekleme`;
 
     const aiResponse = await getAIResponseWithContext(
@@ -86,6 +95,7 @@ GÖREV: Bir D&D kampanyası için dünya ayarları oluştur.
       userPrompt,
       {
         temperature: 0.9,
+        userId,
       }
     );
 
@@ -136,10 +146,8 @@ GÖREV: Bir D&D kampanyası için dünya ayarları oluştur.
   } catch (error) {
     console.error('Generate world error:', error);
     return NextResponse.json(
-      { message: 'Dünya oluşturulurken hata oluştu' },
+      { success: false, error: 'Dünya oluşturulurken hata oluştu' },
       { status: 500 }
     );
   }
 }
-
-

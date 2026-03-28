@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId, unauthorizedResponse } from '@/lib/auth/server';
+import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * POST /api/sessions/:id/reset
@@ -20,6 +21,9 @@ export async function POST(
     if (!userId) {
       return unauthorizedResponse();
     }
+
+    const limited = rateLimitResponse(userId, "POST:/api/sessions/[id]/reset", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
 
     const { id: sessionId } = await params;
     const body = await req.json();
@@ -42,7 +46,7 @@ export async function POST(
 
     if (!session) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -51,7 +55,7 @@ export async function POST(
     const isCreator = session.campaign.creatorId === userId;
     if (!isCreator) {
       return NextResponse.json(
-        { message: 'Sadece kampanya yaratıcısı oyunu sıfırlayabilir' },
+        { success: false, error: 'Sadece oturum yaratıcısı oyunu sıfırlayabilir' },
         { status: 403 }
       );
     }
@@ -63,7 +67,7 @@ export async function POST(
       });
 
       // Session state'i sıfırla
-      let newState: any = {
+      const newState: any = {
         location: 'Başlangıç',
         timeOfDay: 'morning',
         weather: 'clear',
@@ -131,7 +135,7 @@ export async function POST(
       // Belirli bir mesajdan itibaren sil
       if (!messageId) {
         return NextResponse.json(
-          { message: 'messageId gerekli' },
+          { success: false, error: 'messageId gerekli' },
           { status: 400 }
         );
       }
@@ -143,7 +147,7 @@ export async function POST(
 
       if (!targetMessage || targetMessage.sessionId !== sessionId) {
         return NextResponse.json(
-          { message: 'Mesaj bulunamadı' },
+          { success: false, error: 'Mesaj bulunamadı' },
           { status: 404 }
         );
       }
@@ -187,7 +191,7 @@ export async function POST(
 
     } else {
       return NextResponse.json(
-        { message: 'Geçersiz reset tipi. "full" veya "from_message" kullanın.' },
+        { success: false, error: 'Geçersiz reset tipi. "full" veya "from_message" kullanın.' },
         { status: 400 }
       );
     }
@@ -195,10 +199,9 @@ export async function POST(
   } catch (error) {
     console.error('Session reset error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }
 }
-
 

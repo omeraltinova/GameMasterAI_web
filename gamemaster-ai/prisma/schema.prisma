@@ -1,13 +1,13 @@
 // GameMaster AI - Prisma Schema
-// D&D 5e tabanlı AI Game Master uygulaması için veritabanı şeması
+// 5e SRD tabanlı AI Game Master uygulaması için veritabanı şeması
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ==========================================
@@ -20,9 +20,27 @@ model User {
   username  String   @unique
   password  String
   role      String   @default("MEMBER") // VISITOR, MEMBER, ADMIN
+  isSuspended      Boolean  @default(false)
+  suspendedUntil   DateTime?
+  suspensionReason String?
+  adminNote        String?
+  isSoftDeleted    Boolean  @default(false)
+  softDeletedAt    DateTime?
+  softDeleteReason String?
   avatar    String?
+  bio       String?
+  aiDailyTokenLimit Int      @default(120000) // 0 = sınırsız
+  aiTokensUsedToday Int      @default(0)
+  aiUsageResetAt    DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // Profil gizlilik ayarları
+  profilePublic  Boolean @default(true)
+  showCharacters Boolean @default(true)
+  showCampaigns  Boolean @default(true)
+  showScenarios  Boolean @default(true)
+  showStats      Boolean @default(true)
 
   // İlişkiler
   characters      Character[]
@@ -30,6 +48,11 @@ model User {
   scenarios       Scenario[]
   campaignPlayers CampaignPlayer[]
   messages        Message[]
+  achievements    UserAchievement[]
+  submittedReports ModerationReport[] @relation("ModerationReportReporter")
+  reviewedReports  ModerationReport[] @relation("ModerationReportReviewer")
+  updatedSystemSettings SystemSetting[] @relation("SystemSettingUpdatedBy")
+  adminActionLogs      AdminActionLog[] @relation("AdminActionLogAdmin")
 }
 
 // ==========================================
@@ -47,8 +70,11 @@ model Character {
   experience Int      @default(0)
   hp         Int
   maxHp      Int
+  gold       Int      @default(0)
   stats      String   // JSON olarak saklanacak
   background String?
+  appearance String?
+  backstory  String?  // Karakterin detaylı geçmiş hikayesi
   imageUrl   String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -75,6 +101,8 @@ model Campaign {
   maxPlayers    Int      @default(4)
   inviteCode    String?  @unique
   status        String   @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED
+  isSoftDeleted Boolean  @default(false)
+  softDeletedAt DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -124,6 +152,8 @@ model Message {
   locationImageUrl String?  // Mekan görseli URL'i
   locationName     String?  // Mekan adı
   timestamp        DateTime @default(now())
+  isSoftDeleted    Boolean  @default(false)
+  softDeletedAt    DateTime?
 
   // İlişkiler
   session GameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -163,15 +193,51 @@ model Scenario {
   difficulty     String   @default("Medium")
   startingPrompt String
   isOfficial     Boolean  @default(false)
+  isFeatured     Boolean  @default(false)
   isAIGenerated  Boolean  @default(false)
   creatorId      String?
   tags           String?  // JSON array
   worldSettings  String?  // JSON object for WorldSettings
+  isSoftDeleted  Boolean  @default(false)
+  softDeletedAt  DateTime?
   createdAt      DateTime @default(now())
 
   // İlişkiler
   creator   User?      @relation(fields: [creatorId], references: [id])
   campaigns Campaign[]
+  collections ScenarioCollectionItem[]
+}
+
+// ==========================================
+// ScenarioCollection - Senaryo Koleksiyonları
+// ==========================================
+
+model ScenarioCollection {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items ScenarioCollectionItem[]
+}
+
+// ==========================================
+// ScenarioCollectionItem - Koleksiyon-Senaryo İlişkisi
+// ==========================================
+
+model ScenarioCollectionItem {
+  id           String   @id @default(cuid())
+  collectionId String
+  scenarioId   String
+  position     Int      @default(0)
+  addedAt      DateTime @default(now())
+
+  collection ScenarioCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  scenario   Scenario           @relation(fields: [scenarioId], references: [id], onDelete: Cascade)
+
+  @@unique([collectionId, scenarioId])
+  @@index([collectionId, position])
 }
 
 // ==========================================
@@ -270,4 +336,82 @@ model CampaignPlayer {
 
   // Unique constraint
   @@unique([campaignId, userId])
+}
+
+// ==========================================
+// ModerationReport - İçerik Moderasyon Kuyruğu
+// ==========================================
+
+model ModerationReport {
+  id             String   @id @default(cuid())
+  reporterId     String
+  entityType     String   // SCENARIO, CAMPAIGN, MESSAGE
+  entityId       String
+  reason         String
+  details        String?
+  status         String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  reviewedById   String?
+  reviewedAt     DateTime?
+  resolutionNote String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  reporter   User  @relation("ModerationReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("ModerationReportReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([entityType, entityId])
+  @@index([reporterId, status])
+}
+
+// ==========================================
+// SystemSetting - Sistem Ayarları (Singleton)
+// ==========================================
+
+model SystemSetting {
+  id                  String   @id
+  maintenanceMode     Boolean  @default(false)
+  maintenanceMessage  String?
+  aiPrimaryModel      String?
+  aiFallbackModel     String?
+  aiSuggestionsModel  String?
+  aiRequestsPerMinute Int?
+  updatedAt           DateTime @updatedAt
+  updatedById         String?
+
+  // İlişkiler
+  updatedBy User? @relation("SystemSettingUpdatedBy", fields: [updatedById], references: [id])
+}
+
+// ==========================================
+// AdminActionLog - Admin Denetim Kaydı
+// ==========================================
+
+model AdminActionLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  action     String
+  entityType String?
+  entityId   String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  // İlişkiler
+  admin User @relation("AdminActionLogAdmin", fields: [adminId], references: [id], onDelete: Cascade)
+}
+
+// ==========================================
+// UserAchievement - Kullanıcı Başarımları
+// ==========================================
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  // İlişkiler
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
 }

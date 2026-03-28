@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
+import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 // GET /api/campaigns/:id - Get campaign details
 export async function GET(
@@ -13,6 +14,9 @@ export async function GET(
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const limited = rateLimitResponse(userId, "GET:/api/campaigns/[id]", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
+
     const { id } = await params;
 
     // Fetch campaign with full relations
@@ -23,11 +27,25 @@ export async function GET(
           select: {
             id: true,
             username: true,
-            email: true,
             avatar: true,
           },
         },
-        scenario: true,
+        scenario: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            genre: true,
+            difficulty: true,
+            startingPrompt: true,
+            tags: true,
+            worldSettings: true,
+            isOfficial: true,
+            isFeatured: true,
+            isSoftDeleted: true,
+            createdAt: true,
+          },
+        },
         characters: {
           include: {
             user: {
@@ -66,7 +84,7 @@ export async function GET(
       },
     });
 
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json(
         { success: false, error: "Campaign not found" },
         { status: 404 }
@@ -87,11 +105,21 @@ export async function GET(
 
     // Calculate player count
     const playerCount = campaign.players.filter((p: any) => p.isActive).length;
+    const shouldExposeInviteCode = campaign.creatorId === userId && campaign.isMultiplayer;
 
     return NextResponse.json({
       success: true,
       campaign: {
         ...campaign,
+        inviteCode: shouldExposeInviteCode ? campaign.inviteCode : null,
+        creator: campaign.creator
+          ? {
+              id: campaign.creator.id,
+              username: campaign.creator.username,
+              avatar: campaign.creator.avatar,
+            }
+          : null,
+        scenario: campaign.scenario?.isSoftDeleted ? null : campaign.scenario,
         playerCount,
       },
     });
@@ -115,6 +143,9 @@ export async function PUT(
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const limited = rateLimitResponse(userId, "PUT:/api/campaigns/[id]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
     const { id } = await params;
     const body = await req.json();
 
@@ -123,7 +154,7 @@ export async function PUT(
       where: { id },
     });
 
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json(
         { success: false, error: "Campaign not found" },
         { status: 404 }
@@ -138,25 +169,36 @@ export async function PUT(
     if (body.name !== undefined) updateData.name = body.name;
     if (body.description !== undefined) updateData.description = body.description;
     if (body.maxPlayers !== undefined) updateData.maxPlayers = body.maxPlayers;
-    if (body.isMultiplayer !== undefined) updateData.isMultiplayer = body.isMultiplayer;
+    if (body.isMultiplayer !== undefined) {
+      updateData.isMultiplayer = body.isMultiplayer;
+      if (body.isMultiplayer === false) {
+        // Solo modda davet kodu olmamalı
+        updateData.inviteCode = null;
+      }
+    }
+
+    // Davet kodunu kapatma (null olarak set etme)
+    if (body.inviteCode === null) {
+      updateData.inviteCode = null;
+    }
 
     if (body.scenarioId !== undefined) {
       if (campaign.status !== "DRAFT") {
         return NextResponse.json(
-          { success: false, error: "Senaryo sadece taslak kampanyada degistirilebilir" },
+          { success: false, error: "Senaryo sadece taslak oturumda degistirilebilir" },
           { status: 400 }
         );
       }
 
       const nextScenarioId = body.scenarioId || null;
       if (nextScenarioId) {
-        const scenarioExists = await prisma.scenario.findUnique({
-          where: { id: nextScenarioId },
+        const scenarioActive = await prisma.scenario.findFirst({
+          where: { id: nextScenarioId, isSoftDeleted: false },
           select: { id: true },
         });
-        if (!scenarioExists) {
+        if (!scenarioActive) {
           return NextResponse.json(
-            { success: false, error: "Senaryo bulunamadi" },
+            { success: false, error: "Senaryo bulunamadi veya pasif durumda" },
             { status: 404 }
           );
         }
@@ -195,6 +237,9 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const limited = rateLimitResponse(userId, "DELETE:/api/campaigns/[id]", RATE_LIMIT_TIERS.WRITE);
+    if (limited) return limited;
+
     const { id } = await params;
 
     // Check if campaign exists and user is creator
@@ -202,7 +247,7 @@ export async function DELETE(
       where: { id },
     });
 
-    if (!campaign) {
+    if (!campaign || campaign.isSoftDeleted) {
       return NextResponse.json(
         { success: false, error: "Campaign not found" },
         { status: 404 }
@@ -213,14 +258,19 @@ export async function DELETE(
       return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
     }
 
-    // Delete campaign (cascade will delete related records)
-    await prisma.campaign.delete({
+    // Soft delete campaign
+    await prisma.campaign.update({
       where: { id },
+      data: {
+        isSoftDeleted: true,
+        softDeletedAt: new Date(),
+        status: "PAUSED",
+      },
     });
 
     return NextResponse.json({
       success: true,
-      message: "Campaign deleted successfully",
+      message: "Campaign soft deleted successfully",
     });
   } catch (error) {
     console.error("Campaign delete error:", error);

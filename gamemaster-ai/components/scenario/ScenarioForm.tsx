@@ -72,6 +72,7 @@ export function ScenarioForm({ initialData, onSubmit, isLoading, isEdit = false 
     difficulty: initialData?.difficulty || "Medium",
     startingPrompt: initialData?.startingPrompt || "",
     tags: initialData?.tags ? (typeof initialData.tags === 'string' ? JSON.parse(initialData.tags) : initialData.tags).join(", ") : "",
+    isAIGenerated: initialData?.isAIGenerated || false,
     
     // World Settings Flattened for Form
     worldName: initialWorldSettings.worldName,
@@ -135,34 +136,21 @@ export function ScenarioForm({ initialData, onSubmit, isLoading, isEdit = false 
       
       const data = await res.json();
       if (data.scenario) {
-        const aiWorldSettings = data.scenario.tags && data.scenario.worldSettings ? data.scenario.worldSettings : null; // active-session creates it, generate-scenario creates it.
-        // Actually generate-scenario returns scenario object. We adjusted api to include worldSettings in db create, and return it.
-        // Wait, did I update the return value of generated scenario? Yes, I see `scenario` returned.
-        
-        let newWorldSettings = {};
-        if (data.scenario.tags?.includes('{')) { // It might be parsing failure or something. 
-           // ignore
-        }
-        
-        // The API returns the scenario object created in DB.
-        // It has worldSettings as a string or null (if schema update worked) or we need to check how it returns.
-        // In route.ts: res.json({ scenario: { ...tags: ..., isAIGenerated: true } })
-        // I didn't verify if I added worldSettings to the RETURNED object in POST response.
-        // Let's assume it might not be there yet given the Prisma error.
-        // However, I can check `data.scenario.worldSettings`.
-        
         let parsedWS: any = {};
         if (data.scenario.worldSettings) {
              parsedWS = typeof data.scenario.worldSettings === 'string' 
              ? JSON.parse(data.scenario.worldSettings) 
              : data.scenario.worldSettings;
         }
+        const nextTags = Array.isArray(data.scenario.tags) ? data.scenario.tags.join(", ") : "";
 
         setFormData(prev => ({
           ...prev,
           title: data.scenario.title || prev.title,
           description: data.scenario.description || prev.description,
           startingPrompt: data.scenario.startingPrompt || prev.startingPrompt,
+          tags: nextTags || prev.tags,
+          isAIGenerated: true,
           worldName: parsedWS.worldName || prev.worldName,
           worldType: parsedWS.worldType || prev.worldType,
           tone: parsedWS.tone || prev.tone,
@@ -268,7 +256,7 @@ export function ScenarioForm({ initialData, onSubmit, isLoading, isEdit = false 
                  name="worldName"
                  value={formData.worldName}
                  onChange={handleChange}
-                 placeholder="Forgotten Realms"
+                 placeholder="Eldoria"
                />
                <Select
                   label="Dünya Tipi"
@@ -301,7 +289,7 @@ export function ScenarioForm({ initialData, onSubmit, isLoading, isEdit = false 
                 name="startingLocationName"
                 value={formData.startingLocationName}
                 onChange={handleChange}
-                placeholder="Phandalin Köyü"
+                placeholder="Gri Liman Kasabası"
               />
               <Input
                 label="Mekan Açıklaması (Görsel İçin)"
@@ -344,4 +332,3 @@ export function ScenarioForm({ initialData, onSubmit, isLoading, isEdit = false 
     </Card>
   );
 }
-

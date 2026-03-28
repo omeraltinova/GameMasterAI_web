@@ -265,7 +265,7 @@ export default function NewCampaignPage() {
           </CardContent>
         </Card>
 
-                {/* Scenario Selection */}
+        {/* Scenario Selection */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -362,14 +362,21 @@ export default function NewCampaignPage() {
 
         {/* Summary */}
 
-        {formData.name && (
+        {(formData.name || formData.description || formData.scenarioId) && (
           <Card variant="outline" className="bg-primary/5">
             <CardContent className="p-4">
               <h4 className="font-medium mb-2">Özet</h4>
               <ul className="space-y-1 text-sm text-foreground-secondary">
-                <li>
-                  <strong>Oturum:</strong> {formData.name}
-                </li>
+                {formData.name && (
+                  <li>
+                    <strong>Oturum:</strong> {formData.name}
+                  </li>
+                )}
+                {formData.description && (
+                  <li>
+                    <strong>Açıklama:</strong> {formData.description.length > 80 ? formData.description.slice(0, 80) + "..." : formData.description}
+                  </li>
+                )}
                 <li>
                   <strong>Mod:</strong>{" "}
                   {formData.isMultiplayer

@@ -4,8 +4,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { get, post, put, buildQuery, APIError } from '@/lib/api/client';
+import { useGameStore } from '@/store/gameStore';
 import type {
   Message,
+  Suggestion,
   GameSession,
   GameState,
   Character,
@@ -18,9 +20,16 @@ import type {
  * useGame Hook - Oyun session yönetimi
  */
 export function useGame(sessionId: string) {
-  const [session, setSession] = useState<GameSession | null>(null);
-  const [gameState, setGameState] = useState<GameState | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const session = useGameStore((state) => state.session);
+  const gameState = useGameStore((state) => state.gameState);
+  const messages = useGameStore((state) => state.messages);
+  const setSession = useGameStore((state) => state.setSession);
+  const setGameState = useGameStore((state) => state.setGameState);
+  const setMessages = useGameStore((state) => state.setMessages);
+  const addMessageToStore = useGameStore((state) => state.addMessage);
+  const addMessagesToStore = useGameStore((state) => state.addMessages);
+  const removeMessageFromStore = useGameStore((state) => state.removeMessage);
+  const resetStore = useGameStore((state) => state.reset);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -55,8 +64,10 @@ export function useGame(sessionId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await get<GameState>(`/sessions/${sessionId}/state`);
-      setGameState(data);
+      const data = await get<{ success: boolean; state: GameState }>(`/sessions/${sessionId}/state`);
+      if (data?.state) {
+        setGameState(data.state);
+      }
     } catch (err) {
       setError(err instanceof APIError ? err.message : 'Oyun durumu yüklenemedi');
     } finally {
@@ -96,29 +107,37 @@ export function useGame(sessionId: string) {
    * Son güncellemeleri getir (polling)
    */
   const fetchUpdates = useCallback(async (since?: number) => {
-    setIsLoading(true);
+    // Don't set loading state for polling to avoid UI flicker
     setError(null);
     try {
-      const query = buildQuery({ since });
+      // Convert timestamp to ISO string for API
+      const sinceDate = since ? new Date(since).toISOString() : undefined;
+      const query = buildQuery({ since: sinceDate });
       const data = await get<{
-        messages: Message[];
-        gameState: GameState;
+        success: boolean;
+        updates: {
+          messages: Message[];
+          gameStateChanged: boolean;
+        };
       }>(`/sessions/${sessionId}/updates${query}`);
 
-      if (data.messages.length > 0) {
-        setMessages((prev) => [...prev, ...data.messages]);
+      const updates = data?.updates;
+      if (updates?.messages && updates.messages.length > 0) {
+        addMessagesToStore(updates.messages);
       }
 
-      if (data.gameState) {
-        setGameState(data.gameState);
+      if (updates?.gameStateChanged) {
+        const stateData = await get<{ success: boolean; state: GameState }>(`/sessions/${sessionId}/state`);
+        if (stateData?.state) {
+          setGameState(stateData.state);
+        }
       }
 
       return data;
     } catch (err) {
-      setError(err instanceof APIError ? err.message : 'Güncellemeler yüklenemedi');
+      // Silent error for polling - don't show error to user
+      console.error('Polling error:', err);
       return null;
-    } finally {
-      setIsLoading(false);
     }
   }, [sessionId]);
 
@@ -129,12 +148,15 @@ export function useGame(sessionId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<Message>(`/sessions/${sessionId}/messages`, {
+      const data = await post<{ success: boolean; message: Message }>(`/sessions/${sessionId}/messages`, {
         content,
         senderType: 'PLAYER',
       });
-      setMessages((prev) => [...prev, data]);
-      return data;
+      if (data?.message) {
+        addMessageToStore(data.message);
+        return data.message;
+      }
+      return null;
     } catch (err) {
       setError(err instanceof APIError ? err.message : 'Mesaj gönderilemedi');
       return null;
@@ -165,15 +187,22 @@ export function useGame(sessionId: string) {
    * Mesaj ekle (dışarıdan mesaj ekleme için)
    */
   const addMessage = useCallback((message: Message) => {
-    setMessages((prev) => [...prev, message]);
-  }, []);
+    addMessageToStore(message);
+  }, [addMessageToStore]);
 
   /**
    * Birden fazla mesaj ekle
    */
   const addMessages = useCallback((newMessages: Message[]) => {
-    setMessages((prev) => [...prev, ...newMessages]);
-  }, []);
+    addMessagesToStore(newMessages);
+  }, [addMessagesToStore]);
+
+  /**
+   * Mesaj sil (temp mesajları kaldırmak için)
+   */
+  const removeMessage = useCallback((id: string) => {
+    removeMessageFromStore(id);
+  }, [removeMessageFromStore]);
 
   /**
    * Hata durumunu temizle
@@ -187,11 +216,13 @@ export function useGame(sessionId: string) {
    * Sadece sessionId varsa çağır
    */
   useEffect(() => {
-    if (sessionId) {
-      fetchSession();
-      fetchMessages();
+    if (!sessionId) {
+      return;
     }
-  }, [sessionId, fetchSession, fetchMessages]);
+    resetStore();
+    fetchSession();
+    fetchMessages();
+  }, [sessionId, fetchSession, fetchMessages, resetStore]);
 
   return {
     session,
@@ -207,6 +238,7 @@ export function useGame(sessionId: string) {
     updateSession,
     addMessage,
     addMessages,
+    removeMessage,
     clearError,
   };
 }
@@ -237,6 +269,10 @@ export function useGM(sessionId: string) {
         };
         messageId: string;
         timestamp: string;
+        // Oyuncu mesajı bilgileri
+        playerMessageId?: string;
+        playerMessageTimestamp?: string;
+        playerName?: string;
       }>(
         '/gm/narrate',
         {
@@ -264,7 +300,13 @@ export function useGM(sessionId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<{ message: Message }>(
+      const data = await post<{
+        success: boolean;
+        npcName: string;
+        dialogue: string;
+        messageId: string;
+        timestamp: string;
+      }>(
         '/gm/npc-dialogue',
         {
           sessionId,
@@ -288,12 +330,18 @@ export function useGM(sessionId: string) {
     locationName: string;
     locationType?: string;
     atmosphere?: string;
-    details?: string;
+    details?: string[] | string;
   }) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<{ message: Message; gameState: GameState }>(
+      const data = await post<{
+        success: boolean;
+        locationDescription: string;
+        messageId: string;
+        timestamp: string;
+        gameState: GameState;
+      }>(
         '/gm/describe-location',
         {
           sessionId,
@@ -322,7 +370,13 @@ export function useGM(sessionId: string) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<{ message: Message; gameState: GameState }>(
+      const data = await post<{
+        success: boolean;
+        combatNarration: string;
+        messageId: string;
+        timestamp: string;
+        gameState: GameState;
+      }>(
         '/gm/combat-action',
         {
           sessionId,
@@ -348,14 +402,8 @@ export function useGM(sessionId: string) {
   };
 }
 
-/**
- * Suggestion tipi
- */
-export interface Suggestion {
-  id: string;
-  shortLabel: string;
-  detailedAction: string;
-}
+// Suggestion tipi artık types/index.ts'den geliyor
+export type { Suggestion } from '@/types';
 
 interface LocationImageOptions {
   createMessage?: boolean;
@@ -365,6 +413,7 @@ interface LocationImageOptions {
 
 /**
  * useSuggestions Hook - AI aksiyon önerileri
+ * Kaydedilmiş önerileri mesajdan yükler, yeni önerileri API'den alır ve DB'ye kaydeder
  */
 export function useSuggestions(sessionId: string) {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
@@ -372,9 +421,29 @@ export function useSuggestions(sessionId: string) {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Önerileri getir
+   * Mesajlardan kaydedilmiş önerileri yükle (API çağrısı yapmaz)
    */
-  const fetchSuggestions = useCallback(async (lastGMMessage: string) => {
+  const loadSuggestionsFromMessages = useCallback((messages: Message[]) => {
+    // Son GM mesajını bul
+    const lastGM = [...messages].reverse().find(m => m.senderType === 'GM');
+    if (!lastGM) return;
+
+    // GM zaten aksiyon seçeneği sunmuşsa suggestions gösterme
+    if (lastGM.gmPrompt?.actions && lastGM.gmPrompt.actions.length > 0) {
+      setSuggestions([]);
+      return;
+    }
+
+    // Kaydedilmiş suggestions varsa yükle
+    if (lastGM.suggestions && lastGM.suggestions.length > 0) {
+      setSuggestions(lastGM.suggestions);
+    }
+  }, []);
+
+  /**
+   * Yeni öneriler getir (API çağrısı yapar - Yeniden Öner butonu veya ilk oluşturma)
+   */
+  const fetchSuggestions = useCallback(async (lastGMMessage: string, messageId?: string) => {
     if (!sessionId) return null;
 
     setIsLoading(true);
@@ -390,6 +459,7 @@ export function useSuggestions(sessionId: string) {
         {
           sessionId,
           lastGMMessage,
+          messageId,
         }
       );
 
@@ -417,6 +487,7 @@ export function useSuggestions(sessionId: string) {
     isLoading,
     error,
     fetchSuggestions,
+    loadSuggestionsFromMessages,
     clearSuggestions,
   };
 }
@@ -519,6 +590,13 @@ export function useDice(sessionId: string) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  type DiceRollOptions = {
+    purpose?: string;
+    advantage?: boolean;
+    disadvantage?: boolean;
+    characterId?: string;
+  };
+
   /**
    * Zar at
    */
@@ -526,23 +604,37 @@ export function useDice(sessionId: string) {
     diceType: DiceType,
     count: number = 1,
     modifier: number = 0,
-    purpose?: string
+    options: DiceRollOptions = {}
   ) => {
     setIsLoading(true);
     setError(null);
     try {
       const data = await post<{
+        success: boolean;
         results: number[];
         total: number;
-        message: Message;
+        roll?: {
+          id: string;
+          diceType: DiceType;
+          count: number;
+          results: number[];
+          modifier: number;
+          total: number;
+          purpose?: string;
+          timestamp: string;
+        };
+        message?: Message;
       }>(
         '/dice/roll',
         {
           sessionId,
+          characterId: options.characterId,
           diceType,
           count,
           modifier,
-          purpose,
+          purpose: options.purpose,
+          advantage: options.advantage === true,
+          disadvantage: options.disadvantage === true,
         }
       );
       return data;
@@ -554,10 +646,90 @@ export function useDice(sessionId: string) {
     }
   }, [sessionId]);
 
+  const rollCheck = useCallback(async (params: {
+    diceType?: DiceType;
+    modifier?: number;
+    purpose?: string;
+    ability?: string;
+    skill?: string;
+    dc?: number;
+    advantage?: boolean;
+    disadvantage?: boolean;
+    characterId?: string;
+  }) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await post('/dice/roll-check', {
+        sessionId,
+        ...params,
+      });
+      return data;
+    } catch (err) {
+      setError(err instanceof APIError ? err.message : 'Kontrol zarı atılamadı');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  const rollAttack = useCallback(async (params: {
+    modifier?: number;
+    purpose?: string;
+    weaponName?: string;
+    targetName?: string;
+    advantage?: boolean;
+    disadvantage?: boolean;
+    characterId?: string;
+  }) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await post('/dice/roll-attack', {
+        sessionId,
+        ...params,
+      });
+      return data;
+    } catch (err) {
+      setError(err instanceof APIError ? err.message : 'Saldırı zarı atılamadı');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  const rollDamage = useCallback(async (params: {
+    diceType: DiceType;
+    count?: number;
+    modifier?: number;
+    purpose?: string;
+    weaponName?: string;
+    targetName?: string;
+    characterId?: string;
+  }) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await post('/dice/roll-damage', {
+        sessionId,
+        ...params,
+      });
+      return data;
+    } catch (err) {
+      setError(err instanceof APIError ? err.message : 'Hasar zarı atılamadı');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
   return {
     isLoading,
     error,
     rollDice,
+    rollCheck,
+    rollAttack,
+    rollDamage,
   };
 }
 
@@ -576,9 +748,12 @@ export function useCharacters() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await get<Character[]>('/characters');
-      setCharacters(data);
-      return data;
+      const data = await get<{ success: boolean; characters: Character[] }>('/characters');
+      if (data?.characters) {
+        setCharacters(data.characters);
+        return data.characters;
+      }
+      return [];
     } catch (err) {
       setError(err instanceof APIError ? err.message : 'Karakterler yüklenemedi');
       return [];
@@ -594,9 +769,12 @@ export function useCharacters() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<Character>('/characters', characterData);
-      setCharacters((prev) => [...prev, data]);
-      return data;
+      const data = await post<{ success: boolean; character: Character }>('/characters', characterData);
+      if (data?.character) {
+        setCharacters((prev) => [...prev, data.character]);
+        return data.character;
+      }
+      return null;
     } catch (err) {
       setError(err instanceof APIError ? err.message : 'Karakter oluşturulamadı');
       return null;
@@ -622,7 +800,7 @@ export function useCharacters() {
 }
 
 /**
- * useCampaigns Hook - Kampanya yönetimi
+ * useCampaigns Hook - Oturum yönetimi
  */
 export function useCampaigns() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -630,17 +808,20 @@ export function useCampaigns() {
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Kullanıcının kampanyalarını getir
+   * Kullanıcının oturumlarını getir
    */
   const fetchCampaigns = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await get<Campaign[]>('/campaigns');
-      setCampaigns(data);
-      return data;
+      const data = await get<{ success: boolean; campaigns: Campaign[] }>('/campaigns');
+      if (data?.campaigns) {
+        setCampaigns(data.campaigns);
+        return data.campaigns;
+      }
+      return [];
     } catch (err) {
-      setError(err instanceof APIError ? err.message : 'Kampanyalar yüklenemedi');
+      setError(err instanceof APIError ? err.message : 'Oturumlar yüklenemedi');
       return [];
     } finally {
       setIsLoading(false);
@@ -648,17 +829,20 @@ export function useCampaigns() {
   }, []);
 
   /**
-   * Yeni kampanya oluştur
+   * Yeni oturum oluştur
    */
   const createCampaign = useCallback(async (campaignData: Partial<Campaign>) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await post<Campaign>('/campaigns', campaignData);
-      setCampaigns((prev) => [...prev, data]);
-      return data;
+      const data = await post<{ success: boolean; campaign: Campaign }>('/campaigns', campaignData);
+      if (data?.campaign) {
+        setCampaigns((prev) => [...prev, data.campaign]);
+        return data.campaign;
+      }
+      return null;
     } catch (err) {
-      setError(err instanceof APIError ? err.message : 'Kampanya oluşturulamadı');
+      setError(err instanceof APIError ? err.message : 'Oturum oluşturulamadı');
       return null;
     } finally {
       setIsLoading(false);
@@ -666,7 +850,7 @@ export function useCampaigns() {
   }, []);
 
   /**
-   * Component mount olduğunda kampanyaları getir
+   * Component mount olduğunda oturumları getir
    */
   useEffect(() => {
     fetchCampaigns();
@@ -696,4 +880,188 @@ export function usePolling(
 
     return () => clearInterval(intervalId);
   }, [callback, interval, enabled]);
+}
+
+/**
+ * useMaps Hook - Session harita yönetimi
+ */
+export interface GameMap {
+  id: string;
+  sessionId: string;
+  name?: string;
+  description?: string;
+  imageUrl: string;
+  isAIGenerated: boolean;
+  prompt?: string;
+  createdAt: string;
+}
+
+export function useMaps(sessionId: string) {
+  const [maps, setMaps] = useState<GameMap[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Session haritalarını getir
+   */
+  const fetchMaps = useCallback(async () => {
+    if (!sessionId) return [];
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/maps`);
+      const data = await response.json();
+
+      if (data.success) {
+        setMaps(data.maps);
+        return data.maps;
+      } else {
+        throw new Error(data.message || 'Haritalar yüklenemedi');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Haritalar yüklenemedi');
+      return [];
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  /**
+   * Manuel harita ekle
+   */
+  const addMap = useCallback(async (mapData: { name: string; description?: string; imageUrl: string }) => {
+    if (!sessionId) return null;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/sessions/${sessionId}/maps`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mapData),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMaps((prev) => [data.map, ...prev]);
+        return data.map;
+      } else {
+        throw new Error(data.message || 'Harita eklenemedi');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Harita eklenemedi');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  /**
+   * AI ile harita oluştur
+   */
+  const generateMap = useCallback(async (input: {
+    locationName: string;
+    locationType: string;
+    atmosphere?: string;
+    details?: string[];
+  }) => {
+    if (!sessionId) return null;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/gm/generate-map', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          ...input,
+        }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMaps((prev) => [data.map, ...prev]);
+        return data.map;
+      } else {
+        throw new Error(data.message || 'Harita oluşturulamadı');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Harita oluşturulamadı');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [sessionId]);
+
+  /**
+   * Harita güncelle
+   */
+  const updateMap = useCallback(async (mapId: string, updateData: { name?: string; description?: string }) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/maps/${mapId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMaps((prev) => prev.map((m) => (m.id === mapId ? data.map : m)));
+        return data.map;
+      } else {
+        throw new Error(data.message || 'Harita güncellenemedi');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Harita güncellenemedi');
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /**
+   * Harita sil
+   */
+  const deleteMap = useCallback(async (mapId: string) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/maps/${mapId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setMaps((prev) => prev.filter((m) => m.id !== mapId));
+        return true;
+      } else {
+        throw new Error(data.message || 'Harita silinemedi');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Harita silinemedi');
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  return {
+    maps,
+    isLoading,
+    error,
+    fetchMaps,
+    addMap,
+    generateMap,
+    updateMap,
+    deleteMap,
+  };
 }

@@ -57,7 +57,7 @@ async function main() {
     create: {
       id: 'char_test_1',
       userId: user.id,
-      name: 'Thorin Kalkan',
+      name: 'Borin Kalkan',
       race: 'Dwarf',
       class: 'Fighter',
       level: 3,
@@ -72,19 +72,19 @@ async function main() {
         wisdom: 13,
         charisma: 8,
       }),
-      background: 'Eski bir asker olan Thorin, şimdi maceraperest bir hayat sürüyor.',
-      imageUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Thorin',
+      background: 'Eski bir asker olan Borin, şimdi maceraperest bir hayat sürüyor.',
+      imageUrl: 'https://api.dicebear.com/7.x/adventurer/svg?seed=Borin',
     },
   });
   console.log('✅ Karakter oluşturuldu:', character.name);
 
-  // 4. Test kampanya oluştur
+  // 4. Test oturum oluştur
   const campaign = await prisma.campaign.upsert({
     where: { id: 'campaign_test_1' },
     update: {},
     create: {
       id: 'campaign_test_1',
-      name: 'Thorin\'in Macerası',
+      name: 'Borin\'in Macerası',
       description: 'Kayıp Tapınak senaryosu ile tek oyunculu macera',
       creatorId: user.id,
       scenarioId: scenario.id,
@@ -94,9 +94,9 @@ async function main() {
       status: 'ACTIVE',
     },
   });
-  console.log('✅ Kampanya oluşturuldu:', campaign.name);
+  console.log('✅ Oturum oluşturuldu:', campaign.name);
 
-  // 5. Kampanya-oyuncu ilişkisi oluştur
+  // 5. Oturum-oyuncu ilişkisi oluştur
   const campaignPlayer = await prisma.campaignPlayer.upsert({
     where: { 
       campaignId_userId: {
@@ -112,14 +112,14 @@ async function main() {
       isActive: true,
     },
   });
-  console.log('✅ Kampanya-oyuncu ilişkisi oluşturuldu');
+  console.log('✅ Oturum-oyuncu ilişkisi oluşturuldu');
 
-  // 6. Karakteri kampanyaya atayalım
+  // 6. Karakteri oturuma atayalım
   const updatedCharacter = await prisma.character.update({
     where: { id: character.id },
     data: { campaignId: campaign.id },
   });
-  console.log('✅ Karakter kampanyaya atandı');
+  console.log('✅ Karakter oturuma atandı');
 
   // 7. Test envanter öğeleri oluştur
   const items = [
@@ -188,7 +188,7 @@ async function main() {
       }),
       turnOrder: JSON.stringify([character.id]),
       activePlayer: character.id,
-      aiContext: 'Oyun yeni başladı. Oyuncu Thorin, Kayıp Tapınak\'ın girişinde.',
+      aiContext: 'Oyun yeni başladı. Oyuncu Borin, Kayıp Tapınak\'ın girişinde.',
     },
   });
   console.log('✅ Oyun oturumu oluşturuldu:', session.id);
@@ -232,7 +232,7 @@ async function main() {
   console.log('📝 Test bilgileri:');
   console.log('   Email: test@example.com');
   console.log('   Password: password123');
-  console.log('   Kampanya ID:', campaign.id);
+  console.log('   Oturum ID:', campaign.id);
   console.log('   Session ID:', session.id);
   console.log('   Karakter ID:', character.id);
   console.log('\n🔗 Test URL: http://localhost:3000/campaigns/' + campaign.id + '/play');

@@ -1,18 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
-import { getAIResponseWithContext } from '@/lib/ai/openrouter';
+import { getAIResponseWithContext, resolveSuggestionsModel } from '@/lib/ai/openrouter';
 import { getUserId } from '@/lib/auth/server';
+import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 
 /**
  * Suggestions için özel system prompt - farklı bakış açısı için
  */
-const SUGGESTIONS_SYSTEM_PROMPT = `Sen bir D&D oyun asistanısın. Oyuncuya mevcut duruma göre yaratıcı aksiyon önerileri sunuyorsun.
+const SUGGESTIONS_SYSTEM_PROMPT = `Sen bir TTRPG oyun asistanısın. Oyuncuya mevcut duruma göre yaratıcı aksiyon önerileri sunuyorsun.
 
 **Görevin:**
 - Oyuncunun yapabileceği ilginç ve yaratıcı aksiyonlar öner
 - Her öneri farklı bir oyun tarzını temsil etsin (combat, diplomacy, stealth, exploration, vb.)
 - Öneriler kısa ve anlaşılır olsun
-- D&D 5e kurallarına uygun öneriler sun
+- 5e SRD kurallarına uygun öneriler sun
 
 **Kurallar:**
 - Türkçe yanıt ver
@@ -29,17 +30,25 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
       );
     }
 
+    const rateLimit = await checkAIRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
-    const { sessionId, lastGMMessage } = body;
+    const { sessionId, lastGMMessage, messageId } = body;
 
     if (!sessionId) {
       return NextResponse.json(
-        { message: 'Session ID gerekiyor' },
+        { success: false, error: 'Session ID gerekiyor' },
         { status: 400 }
       );
     }
@@ -63,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     if (!gameSession) {
       return NextResponse.json(
-        { message: 'Session bulunamadı' },
+        { success: false, error: 'Session bulunamadı' },
         { status: 404 }
       );
     }
@@ -76,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     if (!isCreator && !isPlayer) {
       return NextResponse.json(
-        { message: 'Bu session\'a erişim yetkiniz yok' },
+        { success: false, error: 'Bu session\'a erişim yetkiniz yok' },
         { status: 403 }
       );
     }
@@ -131,13 +140,18 @@ Yanıtını aşağıdaki JSON formatında ver:
 - Her öneri farklı bir yaklaşımı temsil etsin (savaş, diplomasi, gizlilik, keşif, vb.)
 - Duruma uygun ve mantıklı öneriler sun`;
 
+    // Suggestions için ayrı model kullan (admin paneli / env ile ayarlanabilir)
+    const suggestionsModel = await resolveSuggestionsModel();
+
     const aiResponse = await getAIResponseWithContext(
       SUGGESTIONS_SYSTEM_PROMPT,
       contextPrompt,
       userPrompt,
       {
+        model: suggestionsModel,
         temperature: 0.9, // Daha yaratıcı öneriler için
         maxTokens: 10000,  // Öneri yanıtları için yeterli
+        userId,
       }
     );
 
@@ -223,6 +237,63 @@ Yanıtını aşağıdaki JSON formatında ver:
       ];
     }
 
+    // Suggestions'ı ilgili GM mesajının metadata'sına kaydet
+    // messageId gönderildiyse onu kullan, yoksa son GM mesajını bul
+    try {
+      let targetMessageId: string | null =
+        typeof messageId === "string" && messageId.trim().length > 0
+          ? messageId.trim()
+          : null;
+      const providedMessageId = targetMessageId;
+
+      if (!targetMessageId) {
+        const lastGM = await prisma.message.findFirst({
+          where: { sessionId, senderType: 'GM', isSoftDeleted: false },
+          orderBy: { timestamp: 'desc' },
+          select: { id: true },
+        });
+        targetMessageId = lastGM?.id || null;
+      }
+
+      if (targetMessageId) {
+        // messageId sağlanmışsa, bu mesajın gerçekten bu session'a ait olduğunu zorunlu doğrula.
+        const targetMsg = await prisma.message.findFirst({
+          where: { id: targetMessageId, sessionId },
+          select: { metadata: true },
+        });
+
+        if (!targetMsg) {
+          if (providedMessageId) {
+            return NextResponse.json(
+              { success: false, error: "Mesaj bu oturuma ait değil" },
+              { status: 403 }
+            );
+          }
+        } else {
+          let existingMetadata: Record<string, unknown> = {};
+          if (targetMsg.metadata) {
+            try {
+              existingMetadata = JSON.parse(targetMsg.metadata);
+            } catch { /* ignore */ }
+          }
+
+          const updateResult = await prisma.message.updateMany({
+            where: { id: targetMessageId, sessionId },
+            data: {
+              metadata: JSON.stringify({ ...existingMetadata, suggestions }),
+            },
+          });
+
+          if (updateResult.count !== 1) {
+            throw new Error("Suggestions metadata update failed");
+          }
+        }
+      }
+    } catch (saveErr) {
+      console.error('Suggestions kaydetme hatası:', saveErr);
+      // Kaydetme başarısız olsa bile önerileri döndür
+    }
+
     return NextResponse.json({
       success: true,
       suggestions,
@@ -230,7 +301,7 @@ Yanıtını aşağıdaki JSON formatında ver:
   } catch (error) {
     console.error('Suggestions error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

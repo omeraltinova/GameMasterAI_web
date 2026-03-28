@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/db/prisma';
 import { getAIResponse } from '@/lib/ai/openrouter';
 import { SCENARIO_GENERATION_PROMPT } from '@/lib/ai/prompts';
 import { getUserId } from '@/lib/auth/server';
+import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 
 /**
  * POST /api/gm/generate-scenario
@@ -14,8 +14,16 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId();
     if (!userId) {
       return NextResponse.json(
-        { message: 'Oturum açmanız gerekiyor' },
+        { success: false, error: 'Oturum açmanız gerekiyor' },
         { status: 401 }
+      );
+    }
+
+    const rateLimit = await checkAIRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { success: false, error: 'AI istek limiti aşıldı. Lütfen biraz sonra tekrar deneyin.' },
+        { status: 429 }
       );
     }
 
@@ -25,20 +33,20 @@ export async function POST(req: NextRequest) {
     // Validation
     if (!genre || typeof genre !== 'string') {
       return NextResponse.json(
-        { message: 'Tür (genre) gerekiyor' },
+        { success: false, error: 'Tür (genre) gerekiyor' },
         { status: 400 }
       );
     }
 
     if (!difficulty || typeof difficulty !== 'string') {
       return NextResponse.json(
-        { message: 'Zorluk (difficulty) gerekiyor' },
+        { success: false, error: 'Zorluk (difficulty) gerekiyor' },
         { status: 400 }
       );
     }
 
     // User prompt oluştur
-    let userPrompt = `Yeni bir D&D 5e senaryosu oluştur:\n`;
+    let userPrompt = `Yeni bir 5e SRD senaryosu oluştur:\n`;
     userPrompt += `**Tür:** ${genre}\n`;
     userPrompt += `**Zorluk:** ${difficulty}\n`;
     
@@ -59,6 +67,7 @@ export async function POST(req: NextRequest) {
       {
         temperature: 0.9,
         maxTokens: 10000,
+        userId,
       }
     );
 
@@ -76,37 +85,21 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       console.error('JSON parse error:', error);
       return NextResponse.json(
-        { message: 'AI yanıtını işlerken hata oluştu', rawResponse: aiResponse },
+        { success: false, error: 'AI yanıtını işlerken hata oluştu', rawResponse: aiResponse },
         { status: 500 }
       );
     }
 
-    // Senaryoyu veritabanına kaydet
-    const scenario = await prisma.scenario.create({
-      data: {
-        title: scenarioData.title || 'Adsız Senaryo',
-        description: scenarioData.description || '',
-        genre: genre,
-        difficulty: difficulty,
-        startingPrompt: scenarioData.startingPrompt || '',
-        isAIGenerated: true,
-        creatorId: userId,
-        tags: JSON.stringify(scenarioData.tags || []),
-        // @ts-ignore - Prisma client out of sync
-        worldSettings: scenarioData.worldSettings ? JSON.stringify(scenarioData.worldSettings) : null,
-      },
-    });
-
+    const tags = Array.isArray(scenarioData.tags) ? scenarioData.tags : [];
     return NextResponse.json({
       success: true,
       scenario: {
-        id: scenario.id,
-        title: scenario.title,
-        description: scenario.description,
-        genre: scenario.genre,
-        difficulty: scenario.difficulty,
-        startingPrompt: scenario.startingPrompt,
-        tags: scenarioData.tags || [],
+        title: scenarioData.title || 'Adsız Senaryo',
+        description: scenarioData.description || '',
+        genre: scenarioData.genre || genre,
+        difficulty: scenarioData.difficulty || difficulty,
+        startingPrompt: scenarioData.startingPrompt || '',
+        tags,
         worldSettings: scenarioData.worldSettings || null,
         isAIGenerated: true,
       },
@@ -114,7 +107,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Scenario generation error:', error);
     return NextResponse.json(
-      { message: 'Sunucu hatası oluştu' },
+      { success: false, error: 'Sunucu hatası oluştu' },
       { status: 500 }
     );
   }

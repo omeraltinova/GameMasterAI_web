@@ -2,16 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle, Badge, Spinner } from "@/components/ui";
+import { Card, CardContent, CardHeader, CardTitle, Badge, Spinner, Progress } from "@/components/ui";
 import {
   Users,
   Swords,
   Map,
   TrendingUp,
   Activity,
-  ArrowRight,
   UserPlus,
   Play,
+  Flag,
+  Settings,
+  BarChart3,
 } from "lucide-react";
 
 interface DashboardData {
@@ -28,6 +30,32 @@ interface DashboardData {
     role: string;
     createdAt: string;
   }>;
+  analytics: {
+    activeUsers: {
+      today: number;
+      last7Days: number;
+      last30Days: number;
+    };
+    dailyActiveUsers: Array<{
+      date: string;
+      count: number;
+    }>;
+    campaignCompletion: {
+      completed: number;
+      total: number;
+      rate: number;
+    };
+    scenarioUsageTrend: Array<{
+      date: string;
+      count: number;
+    }>;
+    topCreators: Array<{
+      id: string;
+      username: string;
+      email: string;
+      scenarios: number;
+    }>;
+  };
 }
 
 export default function AdminDashboardPage() {
@@ -60,6 +88,13 @@ export default function AdminDashboardPage() {
     );
   }
 
+  const colorMap: Record<string, { bg: string; text: string }> = {
+    primary: { bg: "bg-primary/10", text: "text-primary" },
+    secondary: { bg: "bg-secondary/10", text: "text-secondary" },
+    success: { bg: "bg-success/10", text: "text-success" },
+    info: { bg: "bg-info/10", text: "text-info" },
+  };
+
   const stats = [
     {
       title: "Toplam Kullanıcı",
@@ -87,6 +122,13 @@ export default function AdminDashboardPage() {
     },
   ];
 
+  const analytics = data?.analytics;
+  const dailyActive = analytics?.dailyActiveUsers || [];
+  const usageTrend = analytics?.scenarioUsageTrend || [];
+  const completionPercent = Math.round((analytics?.campaignCompletion.rate || 0) * 100);
+  const maxDaily = Math.max(1, ...dailyActive.map((item) => item.count));
+  const maxUsage = Math.max(1, ...usageTrend.map((item) => item.count));
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -111,8 +153,8 @@ export default function AdminDashboardPage() {
                     </p>
                     <p className="text-3xl font-bold">{stat.value}</p>
                   </div>
-                  <div className={`p-3 rounded-xl bg-${stat.color}/10`}>
-                    <Icon className={`h-6 w-6 text-${stat.color}`} />
+                  <div className={`p-3 rounded-xl ${colorMap[stat.color]?.bg}`}>
+                    <Icon className={`h-6 w-6 ${colorMap[stat.color]?.text}`} />
                   </div>
                 </div>
               </CardContent>
@@ -165,14 +207,60 @@ export default function AdminDashboardPage() {
                 </div>
               </Link>
 
-              {/* Aktif Oturumlar (Henüz sayfası yok, placeholder kalabilir) */}
-              <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group opacity-70">
-                <Play className="h-6 w-6 text-warning mb-2 group-hover:scale-110 transition-transform" />
-                <h4 className="font-medium">Aktif Oturumlar</h4>
-                <p className="text-sm text-foreground-secondary">
-                  Canlı oyun oturumlarını izle (Çok yakında)
-                </p>
-              </div>
+              {/* Karakter Yönetimi */}
+              <Link href="/admin/characters">
+                <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
+                  <Users className="h-6 w-6 text-warning mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-medium">Karakter Yönetimi</h4>
+                  <p className="text-sm text-foreground-secondary">
+                    Tüm karakterleri görüntüle ve yönet
+                  </p>
+                </div>
+              </Link>
+
+              {/* Aktif Oturumlar */}
+              <Link href="/admin/active-sessions">
+                <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
+                  <Play className="h-6 w-6 text-danger mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-medium">Aktif Oturumlar</h4>
+                  <p className="text-sm text-foreground-secondary">
+                    Canlı oyun oturumlarını izle ve yönet
+                  </p>
+                </div>
+              </Link>
+
+              {/* Moderasyon */}
+              <Link href="/admin/moderation">
+                <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
+                  <Flag className="h-6 w-6 text-warning mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-medium">Moderasyon</h4>
+                  <p className="text-sm text-foreground-secondary">
+                    Rapor kuyruğunu yönet ve aksiyon al
+                  </p>
+                </div>
+              </Link>
+
+              {/* Sistem Ayarları */}
+              <Link href="/admin/settings">
+                <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
+                  <Settings className="h-6 w-6 text-info mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-medium">Sistem Ayarları</h4>
+                  <p className="text-sm text-foreground-secondary">
+                    Bakım modu ve denetim kayıtları
+                  </p>
+                </div>
+              </Link>
+
+              {/* İstatistikler */}
+              <Link href="/admin/stats">
+                <div className="p-4 rounded-lg border border-border hover:border-primary/50 hover:bg-background-elevated transition-all cursor-pointer group">
+                  <BarChart3 className="h-6 w-6 text-primary mb-2 group-hover:scale-110 transition-transform" />
+                  <h4 className="font-medium">İstatistikler</h4>
+                  <p className="text-sm text-foreground-secondary">
+                    Trendler, aktif kullanıcılar ve tamamlama oranları
+                  </p>
+                </div>
+              </Link>
             </div>
           </CardContent>
         </Card>
@@ -187,7 +275,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {data?.recentUsers.map((user, i) => (
+              {data?.recentUsers.map((user) => (
                 <div
                   key={user.id}
                   className="flex items-start gap-3 pb-4 border-b border-border last:border-0 last:pb-0"
@@ -207,6 +295,128 @@ export default function AdminDashboardPage() {
                 </p>
               )}
             </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Analytics */}
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-xl font-semibold">Analitik Özet</h2>
+          <p className="text-foreground-secondary text-sm">Son 30 günün genel durumu</p>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Aktif Kullanıcılar</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div>
+                  <p className="text-sm text-foreground-secondary">Bugün</p>
+                  <p className="text-2xl font-bold">{analytics?.activeUsers.today || 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-foreground-secondary">7 Gün</p>
+                  <p className="text-2xl font-bold">{analytics?.activeUsers.last7Days || 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-foreground-secondary">30 Gün</p>
+                  <p className="text-2xl font-bold">{analytics?.activeUsers.last30Days || 0}</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {dailyActive.map((item) => (
+                  <div key={item.date} className="flex items-center gap-2">
+                    <span className="text-xs text-foreground-muted w-20">
+                      {new Date(item.date).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })}
+                    </span>
+                    <div className="flex-1 h-2 rounded-full bg-background-elevated overflow-hidden">
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: `${(item.count / maxDaily) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-foreground-secondary w-6 text-right">{item.count}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Oturum Tamamlanma</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-foreground-secondary">Tamamlanan</p>
+                  <p className="text-2xl font-bold">{analytics?.campaignCompletion.completed || 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-foreground-secondary">Toplam</p>
+                  <p className="text-2xl font-bold">{analytics?.campaignCompletion.total || 0}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-foreground-secondary">Oran</p>
+                  <p className="text-2xl font-bold">%{completionPercent}</p>
+                </div>
+              </div>
+              <Progress
+                value={completionPercent}
+                max={100}
+                variant="success"
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Creator</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {(analytics?.topCreators || []).map((creator) => (
+                  <div key={creator.id} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">{creator.username}</p>
+                      <p className="text-xs text-foreground-muted">{creator.email}</p>
+                    </div>
+                    <Badge variant="secondary">{creator.scenarios} senaryo</Badge>
+                  </div>
+                ))}
+                {!analytics?.topCreators?.length && (
+                  <p className="text-sm text-foreground-muted">Henüz veri yok.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Senaryo Kullanım Trendi (14 Gün)</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {usageTrend.map((item) => (
+              <div key={item.date} className="flex items-center gap-2">
+                <span className="text-xs text-foreground-muted w-20">
+                  {new Date(item.date).toLocaleDateString("tr-TR", { day: "2-digit", month: "2-digit" })}
+                </span>
+                <div className="flex-1 h-2 rounded-full bg-background-elevated overflow-hidden">
+                  <div
+                    className="h-full bg-secondary"
+                    style={{ width: `${(item.count / maxUsage) * 100}%` }}
+                  />
+                </div>
+                <span className="text-xs text-foreground-secondary w-6 text-right">{item.count}</span>
+              </div>
+            ))}
+            {!usageTrend.length && (
+              <p className="text-sm text-foreground-muted">Henüz veri yok.</p>
+            )}
           </CardContent>
         </Card>
       </div>

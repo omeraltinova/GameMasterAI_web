@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Sparkles, Loader2, ChevronDown, ChevronUp } from "lucide-react";
-import type { Suggestion } from "@/hooks/useGame";
+import { Sparkles, Loader2, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import type { Suggestion } from "@/types";
 
 interface ActionSuggestionsProps {
   suggestions: Suggestion[];
   isLoading: boolean;
   onSelect: (detailedAction: string) => void;
+  onRefresh?: () => void;
   disabled?: boolean;
 }
 
@@ -16,6 +17,7 @@ export function ActionSuggestions({
   suggestions,
   isLoading,
   onSelect,
+  onRefresh,
   disabled = false,
 }: ActionSuggestionsProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -36,11 +38,29 @@ export function ActionSuggestions({
   return (
     <div className="border-t border-border bg-background-secondary/50">
       <div className="px-4 py-2">
-        <div className="flex items-center gap-2 mb-2">
-          <Sparkles className="h-4 w-4 text-primary" />
-          <span className="text-xs font-medium text-foreground-secondary">
-            Önerilen Aksiyonlar
-          </span>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span className="text-xs font-medium text-foreground-secondary">
+              Önerilen Aksiyonlar
+            </span>
+          </div>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              disabled={disabled}
+              className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
+                "border border-border bg-background hover:border-primary/50 hover:bg-primary/5",
+                "transition-all duration-200 text-foreground-secondary hover:text-foreground",
+                disabled && "opacity-50 cursor-not-allowed"
+              )}
+              title="Yeni öneriler oluştur"
+            >
+              <RefreshCw className="h-3 w-3" />
+              <span>Yeniden Öner</span>
+            </button>
+          )}
         </div>
         
         <div className="flex flex-wrap gap-2">

@@ -1,28 +1,41 @@
 # GameMaster AI
 
-5e SRD tabanlı AI Game Master web uygulaması. Yapay zeka destekli anlatıcı ile solo veya grup halinde interaktif hikaye deneyimi sunar.
+GameMaster AI is a 5e SRD-based digital Game Master application powered by AI. It enables solo or group players to experience interactive storytelling with an AI-driven narrator that handles narrative, NPCs, and game mechanics.
+
+> **⚠️ IMPORTANT — Copyright & Licensing Rules**
+>
+> This project is built around the **5e Systems Reference Document (SRD)**, which is published under the **Creative Commons Attribution 4.0 International License (CC BY 4.0)**.
+>
+> **The following rules MUST be followed at all times:**
+>
+> 1. **No copyrighted or trademarked content may be used.** Do not reference, reproduce, or include any content that is NOT part of the 5e SRD. This includes proprietary monster names, spells, classes, subclasses, items, or lore that belong to official sourcebooks beyond the SRD.
+> 2. **Do not use trademarked names.** Any trademarked terms belonging to game publishers or other rights holders must NEVER appear in code, UI text, prompts, generated content, or any other part of the application. This includes game system names, setting names, publisher names, and proprietary creature or character names.
+> 3. **Always use SRD-equivalent or original terms.** When referencing game mechanics, races, classes, spells, or monsters, only use terms available in the 5e SRD or create original alternatives.
+> 4. **AI-generated content must also comply.** All AI prompts and system instructions must explicitly instruct the AI model to avoid generating copyrighted or trademarked content. The prompts should guide the AI to stay within SRD boundaries and use original creative content.
+> 5. **No third-party licensed assets.** Do not include images, sounds, fonts, or any media that violates copyright. All assets must be either original, AI-generated, or properly licensed under permissive licenses (MIT, Apache 2.0, CC0, CC BY 4.0, etc.).
+> 6. **When in doubt, create original content.** If you're unsure whether something is copyrighted or trademarked, do NOT use it. Create an original alternative instead.
 
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router)
 - **Database**: PostgreSQL 18 + Prisma ORM
-- **Styling**: TailwindCSS 4 (Neon Arcane teması)
+- **Styling**: TailwindCSS 4 (Neon Arcane theme)
 - **UI**: Radix UI + Framer Motion
 - **Auth**: NextAuth.js
 - **AI**: OpenRouter API
 - **State**: Zustand + React Context
 
-## Kurulum
+## Setup
 
-### 1. Bağımlılıkları Kur
+### 1. Install Dependencies
 
 ```bash
 npm install
 ```
 
-### 2. PostgreSQL Kurulumu
+### 2. PostgreSQL Setup
 
-PostgreSQL kurulu ve çalışıyor olmalıdır.
+PostgreSQL must be installed and running.
 
 **macOS (Homebrew):**
 ```bash
@@ -32,152 +45,150 @@ createdb gamemaster
 ```
 
 **Windows:**
-1. [PostgreSQL](https://www.postgresql.org/download/windows/) indir ve kur
-2. Cluster'ı initialize et (kurulum sırasında otomatik yapılır)
-3. `gamemaster` veritabanını oluştur:
+1. Download and install [PostgreSQL](https://www.postgresql.org/download/windows/)
+2. Initialize the cluster (done automatically during setup)
+3. Create the `gamemaster` database:
 ```bash
 psql -U postgres -c "CREATE DATABASE gamemaster;"
 ```
 
-**Not:** Development ortamında `pg_hba.conf` dosyasında localhost bağlantıları `trust` olarak ayarlanmıştır (şifresiz bağlantı). Bu sayede connection string'de şifre belirtmeye gerek yoktur.
+**Note:** In development, `pg_hba.conf` is configured with `trust` for localhost connections (no password required), so you don’t need to include a password in the connection string.
 
 ### 3. Environment Variables
 
-`.env.example` dosyasını `.env.local` olarak kopyalayın:
+Copy `.env.example` to `.env.local`:
 
 ```bash
 cp .env.example .env.local
 ```
 
-Ayrıca Prisma'nın kullanması için `.env` dosyası da oluşturun (sadece `DATABASE_URL` yeterli):
+Also create `.env` for Prisma (only `DATABASE_URL` is required):
 
 ```bash
 cp .env.example .env
 ```
 
-Gerekli değerleri doldurun (API key'ler, vs).
+Fill in required values (API keys, etc.).
 
-### 4. Veritabanı Migration
+### 4. Database Migrations
 
 ```bash
-npx prisma migrate dev    # Migration'ları çalıştır + Prisma Client oluştur
-npx prisma generate       # Prisma Client'ı yeniden oluştur (gerekirse)
+npx prisma migrate dev    # Run migrations + generate Prisma Client
+npx prisma generate       # Regenerate Prisma Client (if needed)
 ```
 
-### 5. Uygulamayı Başlat
+### 5. Start the App
 
 ```bash
 npm run dev
 ```
 
-[http://localhost:3000](http://localhost:3000) adresinde açılır.
+Open [http://localhost:3000](http://localhost:3000).
 
-## Dokümantasyon
+## Documentation
 
-- Katkı rehberi: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- Doküman indeksi: [`docs/README.md`](./docs/README.md)
-- Kurulum detayı: [`docs/SETUP_GUIDE.md`](./docs/SETUP_GUIDE.md)
-- Prompt mimarisi: [`docs/AI_PROMPT_LOGIC.md`](./docs/AI_PROMPT_LOGIC.md)
-- API tanımı (OpenAPI): [`docs/OPENAPI.yaml`](./docs/OPENAPI.yaml)
+- Contribution guide: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Docs index: [`docs/README.md`](./docs/README.md)
+- Setup guide: [`docs/SETUP_GUIDE.md`](./docs/SETUP_GUIDE.md)
+- Prompt architecture: [`docs/AI_PROMPT_LOGIC.md`](./docs/AI_PROMPT_LOGIC.md)
+- API definition (OpenAPI): [`docs/OPENAPI.yaml`](./docs/OPENAPI.yaml)
 
-## Komutlar
+## Commands
 
 ```bash
-npm run dev          # Development server (localhost:3000)
-npm run build        # Production build
-npm start            # Production server
-npm run lint         # ESLint
+npm run dev           # Development server (localhost:3000)
+npm run build         # Production build
+npm start             # Production server
+npm run lint          # ESLint
 
-npm test             # Unit testler (Vitest)
-npm run test:ui      # Test UI
-npm run test:coverage # Coverage raporu
-npm run test:e2e     # E2E testler (Playwright)
+npm run test          # Unit tests (Vitest)
+npm run test:ui       # Test UI
+npm run test:coverage # Coverage report
+npm run test:e2e      # E2E tests (Playwright)
 
-npx prisma migrate dev    # Migration çalıştır
-npx prisma generate       # Prisma Client oluştur
-npx prisma studio         # Veritabanı GUI
+npx prisma migrate dev  # Run migrations
+npx prisma generate     # Generate Prisma Client
+npx prisma studio       # Database GUI
 ```
 
-## Veritabanı
+## Database
 
-### SQLite'dan PostgreSQL'e Geçiş
+### Migration from SQLite to PostgreSQL
 
-Proje başlangıçta SQLite kullanıyordu. PostgreSQL'e geçiş yapılmıştır:
+The project originally used SQLite and has been migrated to PostgreSQL:
 
-- `prisma/schema.prisma` -> provider: `postgresql`
-- Tüm migration'lar PostgreSQL uyumlu SQL ile yeniden oluşturuldu
-- Mevcut veriler SQLite'dan PostgreSQL'e taşındı
-- `prisma/dev.db` (SQLite dosyası) artık kullanılmıyor
+- `prisma/schema.prisma` now uses `postgresql`
+- All migrations were recreated with PostgreSQL-compatible SQL
+- Existing data was migrated from SQLite
+- `prisma/dev.db` (SQLite file) is no longer used
 
-### Development Bağlantısı
+### Development Connection
 
 ```
 postgresql://postgres@localhost:5432/gamemaster?schema=public
 ```
 
-localhost bağlantıları `trust` auth kullandığından şifre gerekmez.
+Localhost uses `trust` auth, so a password isn’t required.
 
 ---
 
-## Production'a Çıkış Kontrol Listesi
+## Production Deployment Checklist
 
-Production ortamına deploy ederken aşağıdaki adımlar uygulanmalıdır:
+### Database
 
-### Veritabanı
+- [ ] Provision production PostgreSQL (AWS RDS, Supabase, Neon, etc.)
+- [ ] Create a PostgreSQL user with a strong password
+- [ ] Enable SSL (`?sslmode=require` in the connection string)
+- [ ] Use `scram-sha-256` instead of `trust` in `pg_hba.conf`
+- [ ] Configure connection pooling (PgBouncer or Prisma Accelerate)
+- [ ] Set up automated backups
+- [ ] Move `@prisma/client` from `devDependencies` to `dependencies`
 
-- [ ] Production PostgreSQL sunucusu kur (AWS RDS, Supabase, Neon, vs.)
-- [ ] Güçlü şifre ile PostgreSQL kullanıcısı oluştur
-- [ ] SSL bağlantısını aktifleştir (`?sslmode=require` connection string'e ekle)
-- [ ] `pg_hba.conf`'ta `trust` yerine `scram-sha-256` kullan
-- [ ] Connection pooling ayarla (PgBouncer veya Prisma Accelerate)
-- [ ] Otomatik backup planı oluştur
-- [ ] `@prisma/client`'ı `devDependencies`'den `dependencies`'e taşı
+### Security
 
-### Güvenlik
-
-- [ ] `NEXTAUTH_SECRET` için güçlü, rastgele bir key oluştur: `openssl rand -base64 32`
-- [ ] `NEXTAUTH_URL`'yi production domain'ine ayarla
-- [ ] HTTPS zorunlu kıl
-- [ ] Rate limiting ekle (API routes için)
-- [ ] CORS ayarlarını kontrol et
+- [ ] Generate a strong `NEXTAUTH_SECRET`: `openssl rand -base64 32`
+- [ ] Set `NEXTAUTH_URL` to the production domain
+- [ ] Enforce HTTPS
+- [ ] Add rate limiting (API routes)
+- [ ] Review CORS configuration
 
 ### Environment Variables
 
-- [ ] Tüm API key'lerin production key'leri ile değiştirildiğinden emin ol
-- [ ] `NODE_ENV=production` ayarla
-- [ ] `DATABASE_URL`'de SSL ve güçlü şifre kullan:
+- [ ] Ensure all API keys are production keys
+- [ ] Set `NODE_ENV=production`
+- [ ] Use SSL and a strong password in `DATABASE_URL`:
   ```
-  postgresql://USER:GUCLU_SIFRE@HOST:5432/gamemaster?schema=public&sslmode=require
+  postgresql://USER:STRONG_PASSWORD@HOST:5432/gamemaster?schema=public&sslmode=require
   ```
 
 ### Build & Deploy
 
-- [ ] `npm run build` hatasız tamamlanmalı
-- [ ] `npm run lint` hatasız geçmeli
-- [ ] Testler geçmeli: `npm test`
-- [ ] `npx prisma migrate deploy` ile production migration'larını çalıştır (dev değil!)
-- [ ] Prisma Client'ın production'da generate edildiğinden emin ol
+- [ ] `npm run build` completes without errors
+- [ ] `npm run lint` passes
+- [ ] Tests pass: `npm test`
+- [ ] Run production migrations with `npx prisma migrate deploy` (not `dev`)
+- [ ] Ensure Prisma Client is generated in production
 
-### Performans
+### Performance
 
 - [x] Image optimization (Next.js Image component)
-- [ ] Bundle size analizi
-- [ ] Veritabanı index'lerini kontrol et
-- [ ] CDN konfigürasyonu
+- [ ] Analyze bundle size
+- [ ] Review database indexes
+- [ ] Configure CDN
 
 ---
 
-## Proje Yapısı
+## Project Structure
 
 ```
 app/
-├── (public)/      # Landing, about, rules, demo (auth gerektirmez)
+├── (public)/      # Landing, about, rules, demo (no auth)
 ├── (auth)/        # Login, register
 ├── (protected)/   # Dashboard, characters, campaigns (member+)
-└── (admin)/       # Admin paneli (admin only)
+└── (admin)/       # Admin panel (admin only)
 
 components/
-├── ui/            # Button, Input, Card, Modal, vs.
+├── ui/            # Button, Input, Card, Modal, etc.
 ├── layout/        # Header, Sidebar, Footer
 ├── auth/          # LoginForm, RegisterForm
 ├── character/     # CharacterCard
@@ -185,9 +196,9 @@ components/
 └── game/          # ChatWindow, DiceRoller, MessageInput
 
 prisma/
-├── schema.prisma  # Veritabanı şeması
-└── migrations/    # PostgreSQL migration dosyaları
+├── schema.prisma  # Database schema
+└── migrations/    # PostgreSQL migration files
 
 types/
-└── index.ts       # Tüm TypeScript tipleri
+└── index.ts       # All TypeScript types
 ```

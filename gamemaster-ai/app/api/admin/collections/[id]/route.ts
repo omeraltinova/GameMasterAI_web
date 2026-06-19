@@ -16,7 +16,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(session.user.id, "PATCH:/api/admin/collections/[id]", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "PATCH:/api/admin/collections/[id]", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const { id } = await params;
@@ -113,7 +113,7 @@ export async function DELETE(
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(session.user.id, "DELETE:/api/admin/collections/[id]", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "DELETE:/api/admin/collections/[id]", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const { id } = await params;

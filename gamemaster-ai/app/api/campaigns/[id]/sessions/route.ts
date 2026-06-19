@@ -21,7 +21,7 @@ export async function GET(
       );
     }
 
-    const limited = rateLimitResponse(userId, "GET:/api/campaigns/[id]/sessions", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(userId, "GET:/api/campaigns/[id]/sessions", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     const { id: campaignId } = await params;
@@ -121,7 +121,7 @@ export async function POST(
       );
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/sessions", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "POST:/api/campaigns/[id]/sessions", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const { id: campaignId } = await params;

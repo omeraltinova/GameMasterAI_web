@@ -13,6 +13,59 @@ export interface ToolExecutionResult {
     error?: string;
 }
 
+// ── Tool-argument safety bounds ──────────────────────────────────────────────
+// AI tool args originate from JSON.parse(model output) and are therefore
+// attacker-influenceable via prompt injection. These helpers coerce every value
+// to a safe, bounded representation before it reaches the database, regardless
+// of what the model emits.
+const MAX_ITEM_NAME_LENGTH = 80;
+const MAX_ITEM_DESCRIPTION_LENGTH = 500;
+const MIN_ITEM_QUANTITY = 1;
+const MAX_ITEM_QUANTITY = 20;
+const MAX_NPC_NAME_LENGTH = 80;
+const MAX_NPC_ROLE_LENGTH = 80;
+const MAX_NPC_PERSONALITY_LENGTH = 500;
+const MAX_DIALOGUE_LENGTH = 1000;
+const MAX_SKILL_LENGTH = 60;
+const MAX_REASON_LENGTH = 200;
+const MIN_DC = 1;
+const MAX_DC = 40;
+
+const ALLOWED_ITEM_TYPES = new Set([
+    'Weapon', 'Armor', 'Shield', 'Potion', 'Scroll',
+    'Tool', 'Treasure', 'Key', 'Consumable', 'Misc',
+]);
+const ALLOWED_NPC_RACES = new Set([
+    'Human', 'Elf', 'Dwarf', 'Halfling', 'Gnome',
+    'Half-Elf', 'Half-Orc', 'Tiefling', 'Dragonborn', 'Other',
+]);
+const ALLOWED_DICE_TYPES = new Set(['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100']);
+
+function asUnknownRecord(args: unknown): Record<string, unknown> {
+    return (args && typeof args === 'object' ? args : {}) as Record<string, unknown>;
+}
+
+function cleanString(value: unknown, max: number): string {
+    if (typeof value !== 'string') return '';
+    return value.slice(0, max);
+}
+
+function optionalString(value: unknown, max: number): string | null {
+    if (value === undefined || value === null) return null;
+    if (typeof value !== 'string') return null;
+    const trimmed = value.slice(0, max);
+    return trimmed.length === 0 ? null : trimmed;
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+    const n = typeof value === 'number' && Number.isFinite(value) ? Math.floor(value) : fallback;
+    return Math.min(max, Math.max(min, n));
+}
+
+function coerceBoolean(value: unknown): boolean {
+    return value === true;
+}
+
 /**
  * Execute a single tool call
  */
@@ -77,11 +130,28 @@ async function executeCreateNpc(
     args: CreateNpcArgs,
     sessionId: string
 ): Promise<ToolExecutionResult> {
+    const a = asUnknownRecord(args);
+    const name = cleanString(a.name, MAX_NPC_NAME_LENGTH).trim();
+    const role = cleanString(a.role, MAX_NPC_ROLE_LENGTH).trim();
+
+    if (!name || !role) {
+        return {
+            success: false,
+            toolName: 'create_npc',
+            error: 'Geçersiz NPC adı veya rolü',
+        };
+    }
+
+    const rawRace = typeof a.race === 'string' ? (a.race as string) : '';
+    const race = rawRace && ALLOWED_NPC_RACES.has(rawRace) ? rawRace : null;
+    const personality = optionalString(a.personality, MAX_NPC_PERSONALITY_LENGTH);
+    const isHostile = coerceBoolean(a.isHostile);
+
     // Check if NPC with same name already exists in session
     const existingNpc = await prisma.nPC.findFirst({
         where: {
             sessionId,
-            name: args.name,
+            name,
         },
     });
 
@@ -94,7 +164,7 @@ async function executeCreateNpc(
                 npcId: existingNpc.id,
                 name: existingNpc.name,
                 isNew: false,
-                message: `NPC "${args.name}" already exists`,
+                message: `NPC "${name}" already exists`,
             },
         };
     }
@@ -103,16 +173,16 @@ async function executeCreateNpc(
     const npc = await prisma.nPC.create({
         data: {
             sessionId,
-            name: args.name,
-            role: args.role,
-            race: args.race || null,
-            personality: args.personality || null,
-            isHostile: args.isHostile || false,
+            name,
+            role,
+            race,
+            personality,
+            isHostile,
             dialogue: JSON.stringify([]),
         },
     });
 
-    console.log(`[AI Tool] Created NPC: ${args.name} (${args.role})`);
+    console.log(`[AI Tool] Created NPC: ${name} (${role})`);
 
     return {
         success: true,
@@ -133,8 +203,19 @@ async function executeUpdateNpc(
     args: UpdateNpcArgs,
     sessionId: string
 ): Promise<ToolExecutionResult> {
+    const a = asUnknownRecord(args);
+    const npcId = typeof a.npcId === 'string' ? a.npcId : '';
+
+    if (!npcId) {
+        return {
+            success: false,
+            toolName: 'update_npc',
+            error: 'NPC not found',
+        };
+    }
+
     const npc = await prisma.nPC.findUnique({
-        where: { id: args.npcId },
+        where: { id: npcId },
     });
 
     if (!npc || npc.sessionId !== sessionId) {
@@ -148,33 +229,36 @@ async function executeUpdateNpc(
     // Build update data
     const updateData: any = {};
 
-    if (args.personality !== undefined) {
-        updateData.personality = args.personality;
+    if (a.personality !== undefined) {
+        updateData.personality = optionalString(a.personality, MAX_NPC_PERSONALITY_LENGTH);
     }
 
-    if (args.isHostile !== undefined) {
-        updateData.isHostile = args.isHostile;
+    if (a.isHostile !== undefined) {
+        updateData.isHostile = coerceBoolean(a.isHostile);
     }
 
-    if (args.addDialogue) {
-        const existingDialogue = npc.dialogue ? JSON.parse(npc.dialogue) : [];
-        existingDialogue.push({
-            text: args.addDialogue,
-            timestamp: new Date().toISOString(),
-        });
-        updateData.dialogue = JSON.stringify(existingDialogue);
+    if (a.addDialogue !== undefined && a.addDialogue !== null) {
+        const dialogueLine = cleanString(a.addDialogue, MAX_DIALOGUE_LENGTH);
+        if (dialogueLine.length > 0) {
+            const existingDialogue = npc.dialogue ? JSON.parse(npc.dialogue) : [];
+            existingDialogue.push({
+                text: dialogueLine,
+                timestamp: new Date().toISOString(),
+            });
+            updateData.dialogue = JSON.stringify(existingDialogue);
+        }
     }
 
     if (Object.keys(updateData).length === 0) {
         return {
             success: true,
             toolName: 'update_npc',
-            result: { npcId: args.npcId, updated: false },
+            result: { npcId, updated: false },
         };
     }
 
     await prisma.nPC.update({
-        where: { id: args.npcId },
+        where: { id: npcId },
         data: updateData,
     });
 
@@ -184,7 +268,7 @@ async function executeUpdateNpc(
         success: true,
         toolName: 'update_npc',
         result: {
-            npcId: args.npcId,
+            npcId,
             updated: true,
         },
     };
@@ -205,6 +289,22 @@ async function executeGiveItem(
         };
     }
 
+    const a = asUnknownRecord(args);
+    const itemName = cleanString(a.itemName, MAX_ITEM_NAME_LENGTH).trim();
+    const rawType = typeof a.itemType === 'string' ? (a.itemType as string) : '';
+    const itemType = rawType && ALLOWED_ITEM_TYPES.has(rawType) ? rawType : 'Misc';
+
+    if (!itemName) {
+        return {
+            success: false,
+            toolName: 'give_item',
+            error: 'Geçersiz eşya adı',
+        };
+    }
+
+    const description = optionalString(a.description, MAX_ITEM_DESCRIPTION_LENGTH);
+    const quantity = clampInt(a.quantity, MIN_ITEM_QUANTITY, MAX_ITEM_QUANTITY, 1);
+
     // Check if character exists
     const character = await prisma.character.findUnique({
         where: { id: characterId },
@@ -222,16 +322,16 @@ async function executeGiveItem(
     const item = await prisma.inventoryItem.create({
         data: {
             characterId,
-            name: args.itemName,
-            type: args.itemType,
-            description: args.description || null,
-            quantity: args.quantity || 1,
+            name: itemName,
+            type: itemType,
+            description,
+            quantity,
             equipped: false,
             weight: 0,
         },
     });
 
-    console.log(`[AI Tool] Gave item "${args.itemName}" to character ${character.name}`);
+    console.log(`[AI Tool] Gave item "${itemName}" (x${quantity}) to character ${character.name}`);
 
     return {
         success: true,
@@ -250,16 +350,23 @@ async function executeGiveItem(
 function executeRequestDiceRoll(
     args: RequestDiceRollArgs
 ): ToolExecutionResult {
-    console.log(`[AI Tool] Requesting dice roll: ${args.diceType} for ${args.skill} (DC ${args.dc})`);
+    const a = asUnknownRecord(args);
+    const rawDiceType = typeof a.diceType === 'string' ? (a.diceType as string) : '';
+    const diceType = rawDiceType && ALLOWED_DICE_TYPES.has(rawDiceType) ? rawDiceType : 'd20';
+    const skill = cleanString(a.skill, MAX_SKILL_LENGTH).trim() || 'Bilinmeyen';
+    const dc = clampInt(a.dc, MIN_DC, MAX_DC, 10);
+    const reason = cleanString(a.reason, MAX_REASON_LENGTH).trim();
+
+    console.log(`[AI Tool] Requesting dice roll: ${diceType} for ${skill} (DC ${dc})`);
 
     return {
         success: true,
         toolName: 'request_dice_roll',
         result: {
-            diceType: args.diceType,
-            skill: args.skill,
-            dc: args.dc,
-            reason: args.reason,
+            diceType,
+            skill,
+            dc,
+            reason,
         },
     };
 }

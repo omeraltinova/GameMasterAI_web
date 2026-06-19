@@ -16,7 +16,7 @@ interface RouteParams {
 export async function GET(req: Request, { params }: RouteParams) {
   try {
     const ip = getClientIp(req);
-    const limited = rateLimitResponse(ip, "GET:/api/scenarios/[id]", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(ip, "GET:/api/scenarios/[id]", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     const { id } = await params;
@@ -56,7 +56,7 @@ export async function PUT(req: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const limited = rateLimitResponse(session.user.email, "PUT:/api/scenarios/[id]", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(session.user.email, "PUT:/api/scenarios/[id]", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const body = await req.json();
@@ -130,7 +130,7 @@ export async function DELETE(req: Request, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const limited = rateLimitResponse(session.user.email, "DELETE:/api/scenarios/[id]", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(session.user.email, "DELETE:/api/scenarios/[id]", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const scenario = await prisma.scenario.findFirst({

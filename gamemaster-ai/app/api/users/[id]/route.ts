@@ -22,7 +22,7 @@ export async function GET(
       );
     }
 
-    const limited = rateLimitResponse(currentUserId, "GET:/api/users/[id]", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(currentUserId, "GET:/api/users/[id]", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     const { id: userId } = await params;

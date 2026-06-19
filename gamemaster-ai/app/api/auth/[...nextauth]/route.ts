@@ -64,23 +64,23 @@ const authConfig = {
         const ip = getClientIp(req);
         const ipRateLimitKey = ip !== "unknown" ? ip : "unknown";
 
-        const globalRateLimit = checkRateLimit("login-global", LOGIN_GLOBAL_LIMIT);
+        const globalRateLimit = await checkRateLimit("login-global", LOGIN_GLOBAL_LIMIT);
         if (!globalRateLimit.allowed) {
           throw new Error(buildThrottleMessage("Giriş denemeleri geçici olarak sınırlandı.", globalRateLimit.resetAt));
         }
 
-        const ipRateLimit = checkRateLimit(`login-ip:${ipRateLimitKey}`, LOGIN_IP_LIMIT);
+        const ipRateLimit = await checkRateLimit(`login-ip:${ipRateLimitKey}`, LOGIN_IP_LIMIT);
         if (!ipRateLimit.allowed) {
           throw new Error(buildThrottleMessage("IP bazlı giriş limiti aşıldı.", ipRateLimit.resetAt));
         }
 
-        const accountRateLimit = checkRateLimit(`login-account:${normalizedEmail}`, LOGIN_ACCOUNT_LIMIT);
+        const accountRateLimit = await checkRateLimit(`login-account:${normalizedEmail}`, LOGIN_ACCOUNT_LIMIT);
         if (!accountRateLimit.allowed) {
           throw new Error(buildThrottleMessage("Hesap bazlı giriş limiti aşıldı.", accountRateLimit.resetAt));
         }
 
         // Progressive backoff for rapid repeated attempts on the same account.
-        const accountBackoffRateLimit = checkRateLimit(
+        const accountBackoffRateLimit = await checkRateLimit(
           `login-account-backoff:${normalizedEmail}`,
           LOGIN_ACCOUNT_BACKOFF_LIMIT,
         );

@@ -14,7 +14,7 @@ export async function PUT(
       return NextResponse.json({ success: false, error: "Oturum acmaniz gerekiyor" }, { status: 401 });
     }
 
-    const limited = rateLimitResponse(userId, "PUT:/api/characters/[id]/hp", RATE_LIMIT_TIERS.GAME_ACTION);
+    const limited = await rateLimitResponse(userId, "PUT:/api/characters/[id]/hp", RATE_LIMIT_TIERS.GAME_ACTION);
     if (limited) return limited;
 
     const { id } = await params;

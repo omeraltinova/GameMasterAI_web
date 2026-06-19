@@ -87,7 +87,7 @@ export async function checkAIRateLimit(
   const minuteLimit =
     maxRequests <= 0
       ? { allowed: true, remaining: Infinity, resetAt: Date.now() + WINDOW_MS }
-      : checkRateLimit(`ai:${userId}`, {
+      : await checkRateLimit(`ai:${userId}`, {
         windowMs: WINDOW_MS,
         max: maxRequests,
       });

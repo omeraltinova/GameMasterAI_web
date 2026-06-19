@@ -86,7 +86,7 @@ export async function POST(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(
+    const limited = await rateLimitResponse(
       userId,
       "POST:/api/sessions/[id]/combat/start",
       RATE_LIMIT_TIERS.GAME_ACTION,

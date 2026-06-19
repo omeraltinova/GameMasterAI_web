@@ -17,7 +17,7 @@ export async function DELETE(
             );
         }
 
-        const limited = rateLimitResponse(userId, "DELETE:/api/campaigns/[id]/players", RATE_LIMIT_TIERS.WRITE);
+        const limited = await rateLimitResponse(userId, "DELETE:/api/campaigns/[id]/players", RATE_LIMIT_TIERS.WRITE);
         if (limited) return limited;
 
         const { id: campaignId, playerId } = await params;

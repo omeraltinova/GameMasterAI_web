@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     const ip = getClientIp(req);
-    const limited = rateLimitResponse(ip, "GET:/api/scenarios/collections/[id]", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(ip, "GET:/api/scenarios/collections/[id]", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     const { id } = await params;

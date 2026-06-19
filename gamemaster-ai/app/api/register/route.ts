@@ -52,26 +52,26 @@ export async function POST(req: Request) {
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedUsername = username.trim().toLowerCase();
 
-    const usernameRateLimit = checkRateLimit(`register-username:${normalizedUsername}`, { windowMs: 60 * 60 * 1000, max: 10 });
+    const usernameRateLimit = await checkRateLimit(`register-username:${normalizedUsername}`, { windowMs: 60 * 60 * 1000, max: 10 });
     if (!usernameRateLimit.allowed) {
       return NextResponse.json({ success: false, error: "Çok fazla deneme. Lütfen daha sonra tekrar deneyin." }, { status: 429 });
     }
 
-    const emailRateLimit = checkRateLimit(`register-email:${normalizedEmail}`, { windowMs: 60 * 60 * 1000, max: 10 });
+    const emailRateLimit = await checkRateLimit(`register-email:${normalizedEmail}`, { windowMs: 60 * 60 * 1000, max: 10 });
     if (!emailRateLimit.allowed) {
       return NextResponse.json({ success: false, error: "Çok fazla deneme. Lütfen daha sonra tekrar deneyin." }, { status: 429 });
     }
 
     const ip = getClientIp(req);
     if (ip !== "unknown") {
-      const ipRateLimit = checkRateLimit(`register-ip:${ip}`, { windowMs: 60 * 60 * 1000, max: 40 });
+      const ipRateLimit = await checkRateLimit(`register-ip:${ip}`, { windowMs: 60 * 60 * 1000, max: 40 });
       if (!ipRateLimit.allowed) {
         return NextResponse.json({ success: false, error: "Çok fazla deneme. Lütfen daha sonra tekrar deneyin." }, { status: 429 });
       }
 
       const subnet = getIpSubnetKey(ip);
       if (subnet) {
-        const subnetRateLimit = checkRateLimit(`register-subnet:${subnet}`, { windowMs: 60 * 60 * 1000, max: 120 });
+        const subnetRateLimit = await checkRateLimit(`register-subnet:${subnet}`, { windowMs: 60 * 60 * 1000, max: 120 });
         if (!subnetRateLimit.allowed) {
           return NextResponse.json({ success: false, error: "Çok fazla deneme. Lütfen daha sonra tekrar deneyin." }, { status: 429 });
         }

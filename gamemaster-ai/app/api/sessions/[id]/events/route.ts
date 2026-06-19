@@ -82,7 +82,7 @@ export async function GET(
   }
 
   const { id: sessionId } = await params;
-  const openLimited = rateLimitResponse(
+  const openLimited = await rateLimitResponse(
     userId,
     "GET:/api/sessions/[id]/events",
     STREAM_OPEN_LIMIT,

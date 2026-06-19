@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(session.user.id, "GET:/api/admin/characters", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "GET:/api/admin/characters", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const { searchParams } = new URL(req.url);
@@ -117,7 +117,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(session.user.id, "DELETE:/api/admin/characters", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "DELETE:/api/admin/characters", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const { searchParams } = new URL(req.url);

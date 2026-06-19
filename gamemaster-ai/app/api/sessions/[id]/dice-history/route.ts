@@ -44,7 +44,7 @@ export async function GET(
             );
         }
 
-        const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/dice-history", RATE_LIMIT_TIERS.READ);
+        const limited = await rateLimitResponse(userId, "GET:/api/sessions/[id]/dice-history", RATE_LIMIT_TIERS.READ);
         if (limited) return limited;
 
         const { id: sessionId } = await params;

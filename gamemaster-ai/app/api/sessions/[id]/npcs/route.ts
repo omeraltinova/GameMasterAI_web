@@ -21,7 +21,7 @@ export async function GET(
             );
         }
 
-        const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/npcs", RATE_LIMIT_TIERS.READ);
+        const limited = await rateLimitResponse(userId, "GET:/api/sessions/[id]/npcs", RATE_LIMIT_TIERS.READ);
         if (limited) return limited;
 
         const { id: sessionId } = await params;
@@ -94,7 +94,7 @@ export async function POST(
             );
         }
 
-        const limited = rateLimitResponse(userId, "POST:/api/sessions/[id]/npcs", RATE_LIMIT_TIERS.WRITE);
+        const limited = await rateLimitResponse(userId, "POST:/api/sessions/[id]/npcs", RATE_LIMIT_TIERS.WRITE);
         if (limited) return limited;
 
         const { id: sessionId } = await params;

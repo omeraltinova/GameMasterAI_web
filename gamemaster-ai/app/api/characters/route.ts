@@ -18,7 +18,7 @@ export async function GET() {
       );
     }
 
-    const limited = rateLimitResponse(userId, "GET:/api/characters", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(userId, "GET:/api/characters", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     // Kullanıcının karakterlerini al
@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/characters", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "POST:/api/characters", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const body = await req.json();

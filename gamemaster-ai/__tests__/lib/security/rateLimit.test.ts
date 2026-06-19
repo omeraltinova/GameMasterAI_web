@@ -23,15 +23,15 @@ describe("checkRateLimit", () => {
     const { checkRateLimit } = await freshImport();
     const config = { windowMs: 60_000, max: 3 };
 
-    const r1 = checkRateLimit("user1", config);
+    const r1 = await checkRateLimit("user1", config);
     expect(r1.allowed).toBe(true);
     expect(r1.remaining).toBe(2);
 
-    const r2 = checkRateLimit("user1", config);
+    const r2 = await checkRateLimit("user1", config);
     expect(r2.allowed).toBe(true);
     expect(r2.remaining).toBe(1);
 
-    const r3 = checkRateLimit("user1", config);
+    const r3 = await checkRateLimit("user1", config);
     expect(r3.allowed).toBe(true);
     expect(r3.remaining).toBe(0);
   });
@@ -40,9 +40,9 @@ describe("checkRateLimit", () => {
     const { checkRateLimit } = await freshImport();
     const config = { windowMs: 60_000, max: 2 };
 
-    checkRateLimit("user2", config);
-    checkRateLimit("user2", config);
-    const r3 = checkRateLimit("user2", config);
+    await checkRateLimit("user2", config);
+    await checkRateLimit("user2", config);
+    const r3 = await checkRateLimit("user2", config);
     expect(r3.allowed).toBe(false);
     expect(r3.remaining).toBe(0);
   });
@@ -51,18 +51,18 @@ describe("checkRateLimit", () => {
     const { checkRateLimit } = await freshImport();
     const config = { windowMs: 60_000, max: 1 };
 
-    const rA = checkRateLimit("keyA", config);
+    const rA = await checkRateLimit("keyA", config);
     expect(rA.allowed).toBe(true);
 
-    const rB = checkRateLimit("keyB", config);
+    const rB = await checkRateLimit("keyB", config);
     expect(rB.allowed).toBe(true);
 
     // keyA is now exhausted
-    const rA2 = checkRateLimit("keyA", config);
+    const rA2 = await checkRateLimit("keyA", config);
     expect(rA2.allowed).toBe(false);
 
     // keyB is also exhausted
-    const rB2 = checkRateLimit("keyB", config);
+    const rB2 = await checkRateLimit("keyB", config);
     expect(rB2.allowed).toBe(false);
   });
 
@@ -70,16 +70,16 @@ describe("checkRateLimit", () => {
     const { checkRateLimit } = await freshImport();
     const config = { windowMs: 100, max: 1 };
 
-    const r1 = checkRateLimit("user3", config);
+    const r1 = await checkRateLimit("user3", config);
     expect(r1.allowed).toBe(true);
 
-    const r2 = checkRateLimit("user3", config);
+    const r2 = await checkRateLimit("user3", config);
     expect(r2.allowed).toBe(false);
 
     // Wait for window to expire
     await new Promise((res) => setTimeout(res, 150));
 
-    const r3 = checkRateLimit("user3", config);
+    const r3 = await checkRateLimit("user3", config);
     expect(r3.allowed).toBe(true);
   });
 
@@ -87,7 +87,7 @@ describe("checkRateLimit", () => {
     const { checkRateLimit } = await freshImport();
     const config = { windowMs: 60_000, max: 5 };
     const before = Date.now();
-    const r = checkRateLimit("ts-test", config);
+    const r = await checkRateLimit("ts-test", config);
     expect(r.resetAt).toBeGreaterThan(before);
     expect(r.resetAt).toBeLessThanOrEqual(before + config.windowMs + 50); // small tolerance
   });
@@ -136,7 +136,7 @@ describe("RATE_LIMIT_TIERS", () => {
 describe("applyRateLimit", () => {
   it("returns limited: false when under the limit", async () => {
     const { applyRateLimit } = await freshImport();
-    const result = applyRateLimit("u1", "POST:/test", { windowMs: 60_000, max: 5 });
+    const result = await applyRateLimit("u1", "POST:/test", { windowMs: 60_000, max: 5 });
     expect(result.limited).toBe(false);
     expect(result.remaining).toBe(4);
   });
@@ -145,8 +145,8 @@ describe("applyRateLimit", () => {
     const { applyRateLimit } = await freshImport();
     const config = { windowMs: 60_000, max: 1 };
 
-    applyRateLimit("u2", "POST:/test", config);
-    const r2 = applyRateLimit("u2", "POST:/test", config);
+    await applyRateLimit("u2", "POST:/test", config);
+    const r2 = await applyRateLimit("u2", "POST:/test", config);
     expect(r2.limited).toBe(true);
     expect(r2.remaining).toBe(0);
   });
@@ -156,8 +156,8 @@ describe("applyRateLimit", () => {
     const config = { windowMs: 60_000, max: 1 };
 
     // Same user, different endpoints — should be independent
-    const r1 = applyRateLimit("u3", "GET:/a", config);
-    const r2 = applyRateLimit("u3", "GET:/b", config);
+    const r1 = await applyRateLimit("u3", "GET:/a", config);
+    const r2 = await applyRateLimit("u3", "GET:/b", config);
     expect(r1.limited).toBe(false);
     expect(r2.limited).toBe(false);
   });
@@ -246,7 +246,7 @@ describe("getClientIp", () => {
 describe("rateLimitResponse", () => {
   it("returns null when under the limit", async () => {
     const { rateLimitResponse } = await freshImport();
-    const result = rateLimitResponse("u-ok", "GET:/ok", { windowMs: 60_000, max: 10 });
+    const result = await rateLimitResponse("u-ok", "GET:/ok", { windowMs: 60_000, max: 10 });
     expect(result).toBeNull();
   });
 
@@ -254,8 +254,8 @@ describe("rateLimitResponse", () => {
     const { rateLimitResponse } = await freshImport();
     const config = { windowMs: 60_000, max: 1 };
 
-    rateLimitResponse("u-block", "GET:/block", config);
-    const res = rateLimitResponse("u-block", "GET:/block", config);
+    await rateLimitResponse("u-block", "GET:/block", config);
+    const res = await rateLimitResponse("u-block", "GET:/block", config);
 
     expect(res).not.toBeNull();
     expect(res!.status).toBe(429);
@@ -265,8 +265,8 @@ describe("rateLimitResponse", () => {
     const { rateLimitResponse } = await freshImport();
     const config = { windowMs: 60_000, max: 1 };
 
-    rateLimitResponse("u-hdr", "GET:/hdr", config);
-    const res = rateLimitResponse("u-hdr", "GET:/hdr", config);
+    await rateLimitResponse("u-hdr", "GET:/hdr", config);
+    const res = await rateLimitResponse("u-hdr", "GET:/hdr", config);
 
     expect(res!.headers.get("Retry-After")).toBeTruthy();
     expect(res!.headers.get("X-RateLimit-Remaining")).toBe("0");
@@ -277,8 +277,8 @@ describe("rateLimitResponse", () => {
     const { rateLimitResponse } = await freshImport();
     const config = { windowMs: 60_000, max: 1 };
 
-    rateLimitResponse("u-msg", "GET:/msg", config);
-    const res = rateLimitResponse("u-msg", "GET:/msg", config);
+    await rateLimitResponse("u-msg", "GET:/msg", config);
+    const res = await rateLimitResponse("u-msg", "GET:/msg", config);
     const body = await res!.json();
     expect(body.message).toBeTruthy();
   });
@@ -287,8 +287,8 @@ describe("rateLimitResponse", () => {
     const { rateLimitResponse } = await freshImport();
     const config = { windowMs: 60_000, max: 1 };
 
-    rateLimitResponse("u-cust", "GET:/cust", config, "custom msg");
-    const res = rateLimitResponse("u-cust", "GET:/cust", config, "custom msg");
+    await rateLimitResponse("u-cust", "GET:/cust", config, "custom msg");
+    const res = await rateLimitResponse("u-cust", "GET:/cust", config, "custom msg");
     const body = await res!.json();
     expect(body.message).toBe("custom msg");
   });

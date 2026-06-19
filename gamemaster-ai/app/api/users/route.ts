@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     }
     const includeRoleInResponse = currentUser.role === 'ADMIN';
 
-    const limited = rateLimitResponse(currentUserId, "GET:/api/users", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(currentUserId, "GET:/api/users", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     const { searchParams } = new URL(req.url);

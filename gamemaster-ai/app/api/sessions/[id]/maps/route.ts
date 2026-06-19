@@ -21,7 +21,7 @@ export async function GET(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/maps", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(userId, "GET:/api/sessions/[id]/maps", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     // Session'ı bul ve yetki kontrolü yap
@@ -96,7 +96,7 @@ export async function POST(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/sessions/[id]/maps", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "POST:/api/sessions/[id]/maps", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const body = await req.json();

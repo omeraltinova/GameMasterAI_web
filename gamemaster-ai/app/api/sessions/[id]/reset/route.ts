@@ -22,7 +22,7 @@ export async function POST(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/sessions/[id]/reset", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "POST:/api/sessions/[id]/reset", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const { id: sessionId } = await params;

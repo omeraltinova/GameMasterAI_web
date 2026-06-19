@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/dice/roll", RATE_LIMIT_TIERS.GAME_ACTION);
+    const limited = await rateLimitResponse(userId, "POST:/api/dice/roll", RATE_LIMIT_TIERS.GAME_ACTION);
     if (limited) return limited;
 
     const body = await req.json();

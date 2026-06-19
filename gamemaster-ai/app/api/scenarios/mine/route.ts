@@ -14,7 +14,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const limited = rateLimitResponse(
+    const limited = await rateLimitResponse(
       session.user.email,
       "GET:/api/scenarios/mine",
       RATE_LIMIT_TIERS.READ

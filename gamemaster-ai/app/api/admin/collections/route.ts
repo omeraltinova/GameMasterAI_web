@@ -13,7 +13,7 @@ export async function GET() {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(session.user.id, "GET:/api/admin/collections", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "GET:/api/admin/collections", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const collections = await prisma.scenarioCollection.findMany({
@@ -52,7 +52,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(session.user.id, "POST:/api/admin/collections", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "POST:/api/admin/collections", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const body = await req.json();

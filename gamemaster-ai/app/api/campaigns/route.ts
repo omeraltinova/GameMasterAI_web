@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "GET:/api/campaigns", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(userId, "GET:/api/campaigns", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     // Kullanıcının oturumlarını al
@@ -145,11 +145,14 @@ export async function POST(req: NextRequest) {
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/campaigns", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "POST:/api/campaigns", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const multiplayer = Boolean(isMultiplayer);
-    const inviteCode = multiplayer ? randomBytes(4).toString('hex').toUpperCase() : null;
+    // 9 bytes = 72 bits of entropy (18 hex chars). High enough to make
+    // brute-force enumeration of invite codes infeasible even under weak
+    // rate limiting. Lookup normalizes via toUpperCase(), so hex stays valid.
+    const inviteCode = multiplayer ? randomBytes(9).toString('hex').toUpperCase() : null;
 
     // Yeni oturum oluştur
     // Not: CampaignPlayer kaydı karakter seçildikten sonra oluşturulacak

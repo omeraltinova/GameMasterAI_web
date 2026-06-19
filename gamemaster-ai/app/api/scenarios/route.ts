@@ -11,7 +11,7 @@ import { Prisma } from "@prisma/client";
 export async function GET(req: Request) {
   try {
     const ip = getClientIp(req);
-    const limited = rateLimitResponse(ip, "GET:/api/scenarios", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(ip, "GET:/api/scenarios", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     const { searchParams } = new URL(req.url);
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const limited = rateLimitResponse(session.user.email, "POST:/api/scenarios", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(session.user.email, "POST:/api/scenarios", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const body = await req.json();

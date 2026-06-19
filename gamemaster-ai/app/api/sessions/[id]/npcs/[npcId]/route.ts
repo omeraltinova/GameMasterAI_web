@@ -21,7 +21,7 @@ export async function GET(
             );
         }
 
-        const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/npcs/[npcId]", RATE_LIMIT_TIERS.READ);
+        const limited = await rateLimitResponse(userId, "GET:/api/sessions/[id]/npcs/[npcId]", RATE_LIMIT_TIERS.READ);
         if (limited) return limited;
 
         const { id: sessionId, npcId } = await params;
@@ -96,7 +96,7 @@ export async function PUT(
             );
         }
 
-        const limited = rateLimitResponse(userId, "PUT:/api/sessions/[id]/npcs/[npcId]", RATE_LIMIT_TIERS.WRITE);
+        const limited = await rateLimitResponse(userId, "PUT:/api/sessions/[id]/npcs/[npcId]", RATE_LIMIT_TIERS.WRITE);
         if (limited) return limited;
 
         const { id: sessionId, npcId } = await params;
@@ -209,7 +209,7 @@ export async function DELETE(
             );
         }
 
-        const limited = rateLimitResponse(userId, "DELETE:/api/sessions/[id]/npcs/[npcId]", RATE_LIMIT_TIERS.WRITE);
+        const limited = await rateLimitResponse(userId, "DELETE:/api/sessions/[id]/npcs/[npcId]", RATE_LIMIT_TIERS.WRITE);
         if (limited) return limited;
 
         const { id: sessionId, npcId } = await params;

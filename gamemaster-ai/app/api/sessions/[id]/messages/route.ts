@@ -26,7 +26,7 @@ export async function GET(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/messages", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(userId, "GET:/api/sessions/[id]/messages", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     // Session'ı kontrol et
@@ -145,7 +145,7 @@ export async function POST(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/sessions/[id]/messages", RATE_LIMIT_TIERS.GAME_ACTION);
+    const limited = await rateLimitResponse(userId, "POST:/api/sessions/[id]/messages", RATE_LIMIT_TIERS.GAME_ACTION);
     if (limited) return limited;
 
     // Session'ı kontrol et (karakter bilgisi için players'ı dahil et)

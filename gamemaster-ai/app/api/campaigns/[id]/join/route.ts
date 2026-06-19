@@ -37,7 +37,7 @@ export async function POST(
       );
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/join", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "POST:/api/campaigns/[id]/join", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const { id: campaignId } = await params;
@@ -233,7 +233,7 @@ export async function DELETE(
       );
     }
 
-    const limited = rateLimitResponse(userId, "DELETE:/api/campaigns/[id]/join", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "DELETE:/api/campaigns/[id]/join", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const { id: campaignId } = await params;

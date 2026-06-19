@@ -18,7 +18,7 @@ export async function POST(
       );
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/invite", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "POST:/api/campaigns/[id]/invite", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const { id: campaignId } = await params;
@@ -50,8 +50,8 @@ export async function POST(
       );
     }
 
-    // Yeni benzersiz davet kodu oluştur
-    const newInviteCode = randomBytes(4).toString('hex').toUpperCase();
+    // Yeni benzersiz davet kodu oluştur (72-bit entropy)
+    const newInviteCode = randomBytes(9).toString('hex').toUpperCase();
 
     // Oturumu güncelle
     const updatedCampaign = await prisma.campaign.update({

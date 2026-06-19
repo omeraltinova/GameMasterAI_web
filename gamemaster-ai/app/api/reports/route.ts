@@ -23,7 +23,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Oturum açmanız gerekiyor" }, { status: 401 });
     }
 
-    const limited = rateLimitResponse(session.user.id, "POST:/api/reports", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(session.user.id, "POST:/api/reports", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const body = await req.json();

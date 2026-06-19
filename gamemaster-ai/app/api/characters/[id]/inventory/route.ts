@@ -25,7 +25,7 @@ export async function GET(
             );
         }
 
-        const limited = rateLimitResponse(userId, "GET:/api/characters/[id]/inventory", RATE_LIMIT_TIERS.READ);
+        const limited = await rateLimitResponse(userId, "GET:/api/characters/[id]/inventory", RATE_LIMIT_TIERS.READ);
         if (limited) return limited;
 
         const { id: characterId } = await params;
@@ -102,7 +102,7 @@ export async function POST(
             );
         }
 
-        const limited = rateLimitResponse(userId, "POST:/api/characters/[id]/inventory", RATE_LIMIT_TIERS.WRITE);
+        const limited = await rateLimitResponse(userId, "POST:/api/characters/[id]/inventory", RATE_LIMIT_TIERS.WRITE);
         if (limited) return limited;
 
         const { id: characterId } = await params;

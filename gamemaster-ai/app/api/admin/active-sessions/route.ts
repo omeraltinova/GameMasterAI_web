@@ -20,7 +20,7 @@ export async function GET() {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(session.user.id, "GET:/api/admin/active-sessions", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "GET:/api/admin/active-sessions", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const campaigns = await prisma.campaign.findMany({

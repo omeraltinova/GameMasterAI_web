@@ -43,7 +43,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(
+    const limited = await rateLimitResponse(
       session.user.id,
       "PATCH:/api/admin/moderation/reports/[id]",
       RATE_LIMIT_TIERS.ADMIN

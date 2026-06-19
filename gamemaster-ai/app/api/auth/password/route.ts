@@ -12,7 +12,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Oturum acmaniz gerekiyor" }, { status: 401 });
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/auth/password", RATE_LIMIT_TIERS.AUTH_SENSITIVE);
+    const limited = await rateLimitResponse(userId, "POST:/api/auth/password", RATE_LIMIT_TIERS.AUTH_SENSITIVE);
     if (limited) return limited;
 
     const payload = await req.json();

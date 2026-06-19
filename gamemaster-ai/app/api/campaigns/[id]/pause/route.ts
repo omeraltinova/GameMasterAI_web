@@ -18,7 +18,7 @@ export async function POST(
       );
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/campaigns/[id]/pause", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "POST:/api/campaigns/[id]/pause", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     // Verify ownership

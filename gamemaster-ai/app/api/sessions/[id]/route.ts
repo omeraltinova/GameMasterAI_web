@@ -21,7 +21,7 @@ export async function GET(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(userId, "GET:/api/sessions/[id]", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     // Session'ı al
@@ -156,7 +156,7 @@ export async function PUT(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "PUT:/api/sessions/[id]", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "PUT:/api/sessions/[id]", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     // Session'ı kontrol et

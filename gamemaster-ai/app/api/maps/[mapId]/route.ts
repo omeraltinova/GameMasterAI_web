@@ -92,7 +92,7 @@ export async function PUT(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "PUT:/api/maps/[mapId]", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "PUT:/api/maps/[mapId]", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const body = await req.json();
@@ -177,7 +177,7 @@ export async function DELETE(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "DELETE:/api/maps/[mapId]", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "DELETE:/api/maps/[mapId]", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     // Haritayı bul

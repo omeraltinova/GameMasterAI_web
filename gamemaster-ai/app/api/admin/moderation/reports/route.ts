@@ -17,7 +17,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(
+    const limited = await rateLimitResponse(
       session.user.id,
       "GET:/api/admin/moderation/reports",
       RATE_LIMIT_TIERS.ADMIN

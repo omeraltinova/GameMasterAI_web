@@ -17,7 +17,7 @@ async function updateMessage(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "PATCH:/api/messages/[id]", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "PATCH:/api/messages/[id]", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const { id: messageId } = await params;

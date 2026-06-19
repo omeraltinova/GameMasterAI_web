@@ -10,7 +10,7 @@ export async function GET(req: Request) {
     const session = await getServerSession(authOptions);
     if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
 
-    const limited = rateLimitResponse(session.user.id, "GET:/api/admin/campaigns", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "GET:/api/admin/campaigns", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const { searchParams } = new URL(req.url);
@@ -61,7 +61,7 @@ export async function DELETE(req: Request) {
     const session = await getServerSession(authOptions);
     if (session?.user?.role !== "ADMIN") return NextResponse.json({ error: "Yetkisiz" }, { status: 403 });
 
-    const limited = rateLimitResponse(session.user.id, "DELETE:/api/admin/campaigns", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "DELETE:/api/admin/campaigns", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const { searchParams } = new URL(req.url);

@@ -13,7 +13,7 @@ export async function GET() {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(session.user.id, "GET:/api/admin/scenarios", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "GET:/api/admin/scenarios", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const scenarios = await prisma.scenario.findMany({
@@ -46,7 +46,7 @@ export async function DELETE(req: Request) {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(session.user.id, "DELETE:/api/admin/scenarios", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "DELETE:/api/admin/scenarios", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const { searchParams } = new URL(req.url);
@@ -96,7 +96,7 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Yetkisiz erişim" }, { status: 403 });
     }
 
-    const limited = rateLimitResponse(session.user.id, "PATCH:/api/admin/scenarios", RATE_LIMIT_TIERS.ADMIN);
+    const limited = await rateLimitResponse(session.user.id, "PATCH:/api/admin/scenarios", RATE_LIMIT_TIERS.ADMIN);
     if (limited) return limited;
 
     const body = await req.json();

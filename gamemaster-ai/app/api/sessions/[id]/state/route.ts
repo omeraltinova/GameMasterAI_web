@@ -21,7 +21,7 @@ export async function GET(
       return unauthorizedResponse();
     }
 
-    const limited = rateLimitResponse(userId, "GET:/api/sessions/[id]/state", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(userId, "GET:/api/sessions/[id]/state", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     // Session'ı al

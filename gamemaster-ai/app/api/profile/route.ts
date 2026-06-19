@@ -17,7 +17,7 @@ export async function GET() {
       return unauthorizedResponse("Oturum açmanız gerekiyor");
     }
 
-    const limited = rateLimitResponse(userId, "GET:/api/profile", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(userId, "GET:/api/profile", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     const user = await prisma.user.findUnique({
@@ -324,7 +324,7 @@ export async function PATCH(req: Request) {
       return unauthorizedResponse("Oturum açmanız gerekiyor");
     }
 
-    const limited = rateLimitResponse(userId, "PATCH:/api/profile", RATE_LIMIT_TIERS.WRITE);
+    const limited = await rateLimitResponse(userId, "PATCH:/api/profile", RATE_LIMIT_TIERS.WRITE);
     if (limited) return limited;
 
     const currentUser = await prisma.user.findUnique({
@@ -450,7 +450,7 @@ export async function DELETE(req: Request) {
       return unauthorizedResponse("Oturum açmanız gerekiyor");
     }
 
-    const limited = rateLimitResponse(userId, "DELETE:/api/profile", RATE_LIMIT_TIERS.AUTH_SENSITIVE);
+    const limited = await rateLimitResponse(userId, "DELETE:/api/profile", RATE_LIMIT_TIERS.AUTH_SENSITIVE);
     if (limited) return limited;
 
     const body = await req.json().catch(() => ({}));

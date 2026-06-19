@@ -20,7 +20,7 @@ export async function PUT(
             );
         }
 
-        const limited = rateLimitResponse(userId, "PUT:/api/characters/[id]/inventory/[itemId]/equip", RATE_LIMIT_TIERS.GAME_ACTION);
+        const limited = await rateLimitResponse(userId, "PUT:/api/characters/[id]/inventory/[itemId]/equip", RATE_LIMIT_TIERS.GAME_ACTION);
         if (limited) return limited;
 
         const { id: characterId, itemId } = await params;

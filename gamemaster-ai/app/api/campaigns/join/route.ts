@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const limited = rateLimitResponse(userId, "POST:/api/campaigns/join", RATE_LIMIT_TIERS.AUTH_SENSITIVE);
+    const limited = await rateLimitResponse(userId, "POST:/api/campaigns/join", RATE_LIMIT_TIERS.AUTH_SENSITIVE);
     if (limited) return limited;
 
     const body = await req.json();

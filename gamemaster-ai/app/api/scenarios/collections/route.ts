@@ -7,7 +7,7 @@ import { rateLimitResponse, getClientIp, RATE_LIMIT_TIERS } from "@/lib/security
 export async function GET(req: Request) {
   try {
     const ip = getClientIp(req);
-    const limited = rateLimitResponse(ip, "GET:/api/scenarios/collections", RATE_LIMIT_TIERS.READ);
+    const limited = await rateLimitResponse(ip, "GET:/api/scenarios/collections", RATE_LIMIT_TIERS.READ);
     if (limited) return limited;
 
     const collections = await prisma.scenarioCollection.findMany({

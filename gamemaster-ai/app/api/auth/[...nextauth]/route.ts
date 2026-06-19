@@ -24,7 +24,10 @@ const LOGIN_ACCOUNT_LIMIT = { windowMs: 15 * 60 * 1000, max: 10 };
 const LOGIN_ACCOUNT_BACKOFF_LIMIT = { windowMs: 2 * 60 * 1000, max: 5 };
 
 function buildPasswordSignature(passwordHash: string) {
-  const secret = process.env.NEXTAUTH_SECRET || "local-dev-secret";
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) {
+    throw new Error("NEXTAUTH_SECRET environment variable is not set");
+  }
   return createHash("sha256")
     .update(`${passwordHash}:${secret}`)
     .digest("hex");

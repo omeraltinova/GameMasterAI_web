@@ -13,8 +13,8 @@ import { NextRequest } from "next/server";
 import { middleware } from "@/middleware";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-function makeRequest(path: string) {
-  return new NextRequest(new URL(path, "http://localhost:3000"));
+function makeRequest(path: string, init?: ConstructorParameters<typeof NextRequest>[1]) {
+  return new NextRequest(new URL(path, "http://localhost:3000"), init);
 }
 
 beforeEach(() => {
@@ -162,10 +162,46 @@ describe("middleware", () => {
       expect(location.searchParams.get("from")).toBe("/dashboard/stats");
     });
 
-    it("does not redirect API routes (not in matcher)", async () => {
+    it("allows public API routes without token", async () => {
       mocks.getToken.mockResolvedValue(null);
       const res = await middleware(makeRequest("/api/register"));
       expect(res.status).toBe(200);
+    });
+
+    it("requires auth for protected API routes with JSON 401", async () => {
+      mocks.getToken.mockResolvedValue(null);
+      const res = await middleware(makeRequest("/api/characters"));
+      expect(res.status).toBe(401);
+      expect(res.headers.get("Location")).toBeNull();
+      await expect(res.json()).resolves.toMatchObject({ success: false });
+    });
+
+    it("keeps public scenario GET routes open", async () => {
+      mocks.getToken.mockResolvedValue(null);
+      await expect(middleware(makeRequest("/api/scenarios"))).resolves.toHaveProperty("status", 200);
+      await expect(middleware(makeRequest("/api/scenarios/scenario-1"))).resolves.toHaveProperty("status", 200);
+      await expect(middleware(makeRequest("/api/scenarios/official"))).resolves.toHaveProperty("status", 200);
+      await expect(middleware(makeRequest("/api/scenarios/collections"))).resolves.toHaveProperty("status", 200);
+      await expect(middleware(makeRequest("/api/scenarios/collections/featured"))).resolves.toHaveProperty("status", 200);
+    });
+
+    it("requires auth for protected scenario API routes and mutating scenario methods", async () => {
+      mocks.getToken.mockResolvedValue(null);
+      const mine = await middleware(makeRequest("/api/scenarios/mine"));
+      expect(mine.status).toBe(401);
+
+      const create = await middleware(makeRequest("/api/scenarios", { method: "POST" }));
+      expect(create.status).toBe(401);
+    });
+
+    it("requires ADMIN for admin API routes", async () => {
+      mocks.getToken.mockResolvedValue({ role: "MEMBER", sub: "user-1" });
+      const member = await middleware(makeRequest("/api/admin/users"));
+      expect(member.status).toBe(403);
+
+      mocks.getToken.mockResolvedValue({ role: "ADMIN", sub: "admin-1" });
+      const admin = await middleware(makeRequest("/api/admin/users"));
+      expect(admin.status).toBe(200);
     });
   });
 });

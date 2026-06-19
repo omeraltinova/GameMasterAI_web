@@ -1,13 +1,17 @@
 import { z } from "zod";
 import { isSafeImageUrl } from "@/lib/security/imageUrl";
 
+export const MIN_CHARACTER_STAT = 3;
+export const MAX_CHARACTER_STAT = 20;
+export const MAX_CHARACTER_GOLD = 1_000_000;
+
 export const characterStatsSchema = z.object({
-  strength: z.number().int(),
-  dexterity: z.number().int(),
-  constitution: z.number().int(),
-  intelligence: z.number().int(),
-  wisdom: z.number().int(),
-  charisma: z.number().int(),
+  strength: z.number().int().min(MIN_CHARACTER_STAT).max(MAX_CHARACTER_STAT),
+  dexterity: z.number().int().min(MIN_CHARACTER_STAT).max(MAX_CHARACTER_STAT),
+  constitution: z.number().int().min(MIN_CHARACTER_STAT).max(MAX_CHARACTER_STAT),
+  intelligence: z.number().int().min(MIN_CHARACTER_STAT).max(MAX_CHARACTER_STAT),
+  wisdom: z.number().int().min(MIN_CHARACTER_STAT).max(MAX_CHARACTER_STAT),
+  charisma: z.number().int().min(MIN_CHARACTER_STAT).max(MAX_CHARACTER_STAT),
 });
 
 export const characterCreateSchema = z.object({
@@ -18,7 +22,7 @@ export const characterCreateSchema = z.object({
   experience: z.number().int().min(0).optional(),
   hp: z.number().int().min(0).optional(),
   maxHp: z.number().int().min(1).optional(),
-  gold: z.number().int().min(0).optional(),
+  gold: z.number().int().min(0).max(MAX_CHARACTER_GOLD).optional(),
   stats: characterStatsSchema.optional(),
   background: z.string().optional().nullable(),
   appearance: z.string().optional().nullable(),

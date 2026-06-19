@@ -7,6 +7,72 @@ import { getUserId } from '@/lib/auth/server';
 import { checkAIRateLimit } from '@/lib/security/aiRateLimit';
 import type { GMPrompt, GMAction, LocationChange } from '@/types';
 
+const ALLOWED_GM_ACTION_TYPES = new Set([
+  'dice_roll',
+  'choice',
+  'confirm',
+  'free_text',
+  'skill_check',
+  'saving_throw',
+  'attack_roll',
+]);
+const ALLOWED_DICE_TYPES = new Set(['d4', 'd6', 'd8', 'd10', 'd12', 'd20', 'd100']);
+const MAX_GM_PROMPT_ACTIONS = 6;
+
+function cleanPromptString(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim().slice(0, maxLength);
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function clampInt(value: unknown, min: number, max: number, fallback: number) {
+  const numeric = typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : fallback;
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function sanitizeGmPrompt(value: unknown): GMPrompt | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const rawPrompt = value as { actions?: unknown; isMandatory?: unknown; promptText?: unknown };
+  if (!Array.isArray(rawPrompt.actions) || rawPrompt.actions.length === 0) {
+    return null;
+  }
+
+  const actions = rawPrompt.actions
+    .slice(0, MAX_GM_PROMPT_ACTIONS)
+    .map((rawAction, index) => {
+      const action = rawAction && typeof rawAction === 'object'
+        ? rawAction as Record<string, unknown>
+        : {};
+
+      const rawType = typeof action.type === 'string' ? action.type : '';
+      const type = ALLOWED_GM_ACTION_TYPES.has(rawType) ? rawType : 'choice';
+      const rawDiceType = typeof action.diceType === 'string' ? action.diceType : undefined;
+      const diceType = rawDiceType && ALLOWED_DICE_TYPES.has(rawDiceType) ? rawDiceType : undefined;
+
+      return {
+        id: cleanPromptString(action.id, 80) || `action_${Date.now()}_${index}`,
+        type,
+        label: cleanPromptString(action.label, 80) || 'Seç',
+        description: cleanPromptString(action.description, 240),
+        diceType,
+        diceCount: clampInt(action.diceCount, 1, 20, 1),
+        modifier: clampInt(action.modifier, -100, 100, 0),
+        skill: cleanPromptString(action.skill, 60),
+        ability: cleanPromptString(action.ability, 60),
+        dc: action.dc === undefined ? undefined : clampInt(action.dc, 1, 40, 10),
+        value: cleanPromptString(action.value, 500),
+        isMandatory: action.isMandatory === true,
+      } as GMAction;
+    });
+
+  return {
+    actions,
+    isMandatory: rawPrompt.isMandatory === true,
+    promptText: cleanPromptString(rawPrompt.promptText, 240),
+  };
+}
+
 /**
  * POST /api/gm/narrate
  * Hikaye anlatımı için AI endpoint'i
@@ -151,26 +217,7 @@ export async function POST(req: NextRequest) {
           };
         }
 
-        if (parsed.gmPrompt && parsed.gmPrompt.actions && parsed.gmPrompt.actions.length > 0) {
-          gmPrompt = {
-            actions: parsed.gmPrompt.actions.map((action: any, index: number) => ({
-              id: action.id || `action_${Date.now()}_${index}`,
-              type: action.type || 'choice',
-              label: action.label || 'Seç',
-              description: action.description,
-              diceType: action.diceType,
-              diceCount: action.diceCount || 1,
-              modifier: action.modifier || 0,
-              skill: action.skill,
-              ability: action.ability,
-              dc: action.dc,
-              value: action.value,
-              isMandatory: action.isMandatory || false,
-            })) as GMAction[],
-            isMandatory: parsed.gmPrompt.isMandatory || false,
-            promptText: parsed.gmPrompt.promptText,
-          };
-        }
+        gmPrompt = sanitizeGmPrompt(parsed.gmPrompt);
       }
     } catch (parseError) {
       // JSON parse hatası

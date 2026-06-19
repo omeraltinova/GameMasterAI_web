@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getUserId } from "@/lib/auth/server";
 import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 import { normalizeImageUrl } from "@/lib/security/imageUrl";
+import { characterStatsSchema, MAX_CHARACTER_GOLD } from "@/lib/validators/characters";
 
 const defaultStats = {
   strength: 10,
@@ -208,15 +209,22 @@ export async function PUT(
       data.imageUrl = normalizedImageUrl;
     }
 
-    if (stats && typeof stats === "object") {
-      data.stats = JSON.stringify(stats);
+    if (stats !== undefined) {
+      const parsedStats = characterStatsSchema.safeParse(stats);
+      if (!parsedStats.success) {
+        return NextResponse.json(
+          { success: false, error: "Stat değerleri 3 ile 20 arasında tam sayı olmalıdır" },
+          { status: 400 }
+        );
+      }
+      data.stats = JSON.stringify(parsedStats.data);
     }
 
     if (gold !== undefined) {
       const numericGold = Number(gold);
-      if (!Number.isInteger(numericGold) || numericGold < 0) {
+      if (!Number.isInteger(numericGold) || numericGold < 0 || numericGold > MAX_CHARACTER_GOLD) {
         return NextResponse.json(
-          { success: false, error: "Gold alanı 0 veya daha büyük tam sayı olmalıdır" },
+          { success: false, error: `Gold alanı 0 ile ${MAX_CHARACTER_GOLD} arasında tam sayı olmalıdır` },
           { status: 400 }
         );
       }

@@ -176,16 +176,6 @@ export async function POST(
     const shouldEndCombat = aliveEnemies.length === 0 || alivePlayers.length === 0;
     const nextStatus = shouldEndCombat ? "ended" : "active";
 
-    const updatedCombat = await prisma.combat.update({
-      where: { id: combatId },
-      data: {
-        participants: serializeParticipants(participants),
-        turnOrder: serializeParticipants(syncTurnOrder),
-        status: nextStatus,
-        log: serializeLog(nextLog),
-      },
-    });
-
     let currentState: Record<string, unknown> = {};
     try {
       currentState = JSON.parse(combat.session.currentState || "{}") as Record<string, unknown>;
@@ -193,33 +183,74 @@ export async function POST(
       currentState = {};
     }
 
-    await prisma.gameSession.update({
-      where: { id: combat.session.id },
-      data: {
-        currentState: JSON.stringify({
-          ...currentState,
-          inCombat: nextStatus === "active",
-        }),
-        updatedAt: new Date(),
-      },
+    const serializedParticipants = serializeParticipants(participants);
+    const serializedTurnOrder = serializeParticipants(syncTurnOrder);
+    const serializedLog = serializeLog(nextLog);
+
+    const updatedCombat = await prisma.$transaction(async (tx) => {
+      const updateResult = await tx.combat.updateMany({
+        where: {
+          id: combatId,
+          participants: combat.participants,
+          turnOrder: combat.turnOrder,
+          status: combat.status,
+          currentTurn: combat.currentTurn,
+          log: combat.log,
+        },
+        data: {
+          participants: serializedParticipants,
+          turnOrder: serializedTurnOrder,
+          status: nextStatus,
+          log: serializedLog,
+        },
+      });
+
+      if (updateResult.count !== 1) {
+        return null;
+      }
+
+      const nextCombat = await tx.combat.findUnique({ where: { id: combatId } });
+      if (!nextCombat) {
+        return null;
+      }
+
+      await tx.gameSession.update({
+        where: { id: combat.session.id },
+        data: {
+          currentState: JSON.stringify({
+            ...currentState,
+            inCombat: nextStatus === "active",
+          }),
+          updatedAt: new Date(),
+        },
+      });
+
+      await tx.message.create({
+        data: {
+          sessionId: combat.session.id,
+          senderType: "COMBAT",
+          senderName: "Combat Tracker",
+          content: shouldEndCombat ? `${actionSummary}. ⚔️ Savaş sona erdi.` : actionSummary,
+          metadata: JSON.stringify({
+            type: "combat_action",
+            combatId,
+            action: actionText,
+            actorId: actionActor.id,
+            targetId: targetId || null,
+            damage,
+          }),
+        },
+      });
+
+      return nextCombat;
     });
 
-    await prisma.message.create({
-      data: {
-        sessionId: combat.session.id,
-        senderType: "COMBAT",
-        senderName: "Combat Tracker",
-        content: shouldEndCombat ? `${actionSummary}. ⚔️ Savaş sona erdi.` : actionSummary,
-        metadata: JSON.stringify({
-          type: "combat_action",
-          combatId,
-          action: actionText,
-          actorId: actionActor.id,
-          targetId: targetId || null,
-          damage,
-        }),
-      },
-    });
+    if (!updatedCombat) {
+      return NextResponse.json(
+        { success: false, error: "Savaş durumu değişti. Lütfen tekrar deneyin." },
+        { status: 409 },
+      );
+    }
 
     return NextResponse.json({
       success: true,

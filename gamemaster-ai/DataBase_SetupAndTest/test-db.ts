@@ -6,6 +6,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
@@ -15,11 +16,12 @@ async function main() {
     try {
         // 1. USER OLUŞTUR
         console.log("📝 1. User oluşturuluyor...");
+        const hashedPassword = await bcrypt.hash("test_password_123", 10);
         const user = await prisma.user.create({
             data: {
                 email: "test@gamemaster.ai",
                 username: "TestAdventurer",
-                password: "hashed_password_123",
+                password: hashedPassword,
                 role: "MEMBER",
             },
         });

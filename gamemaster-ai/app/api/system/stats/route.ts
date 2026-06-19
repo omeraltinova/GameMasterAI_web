@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
+import { getClientIp, rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
 
 /**
  * GET /api/system/stats
@@ -10,8 +11,12 @@ import { prisma } from '@/lib/db/prisma';
 let cachedStats: { data: Record<string, number>; timestamp: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 dakika
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const ip = getClientIp(req);
+    const limited = await rateLimitResponse(ip, "GET:/api/system/stats", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
+
     // Cache kontrolü
     if (cachedStats && Date.now() - cachedStats.timestamp < CACHE_TTL) {
       return NextResponse.json({ success: true, stats: cachedStats.data });

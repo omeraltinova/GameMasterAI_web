@@ -1,11 +1,16 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { getClientIp, rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
 
 // GET /api/scenarios/official
 // Get only official scenarios
 export async function GET(req: Request) {
   try {
+    const ip = getClientIp(req);
+    const limited = await rateLimitResponse(ip, "GET:/api/scenarios/official", RATE_LIMIT_TIERS.READ);
+    if (limited) return limited;
+
     const { searchParams } = new URL(req.url);
     const limitParam = parseInt(searchParams.get("limit") || "10");
     const limitBase = Number.isFinite(limitParam) ? limitParam : 10;

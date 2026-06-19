@@ -74,6 +74,7 @@ function getAuthorize() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.NEXTAUTH_SECRET = "test-nextauth-secret";
   mocks.checkRateLimit.mockReturnValue({ allowed: true, remaining: 9, resetAt: Date.now() + 60_000 });
   mocks.getClientIp.mockReturnValue("unknown");
   mocks.bcryptCompare.mockResolvedValue(true);

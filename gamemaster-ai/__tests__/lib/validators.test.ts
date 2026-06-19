@@ -180,9 +180,14 @@ describe('characterStatsSchema', () => {
     expect(result.success).toBe(false)
   })
 
-  it('negatif değer kabul eder (schema sınırı yok)', () => {
+  it('minimum altı stat reddeder', () => {
     const result = characterStatsSchema.safeParse({ ...validStats, strength: -1 })
-    expect(result.success).toBe(true)
+    expect(result.success).toBe(false)
+  })
+
+  it('maksimum üstü stat reddeder', () => {
+    const result = characterStatsSchema.safeParse({ ...validStats, strength: 21 })
+    expect(result.success).toBe(false)
   })
 })
 
@@ -263,6 +268,11 @@ describe('characterCreateSchema', () => {
 
   it('maxHp 0 reddeder (min 1)', () => {
     const result = characterCreateSchema.safeParse({ ...validCharacter, maxHp: 0 })
+    expect(result.success).toBe(false)
+  })
+
+  it('aşırı gold değerini reddeder', () => {
+    const result = characterCreateSchema.safeParse({ ...validCharacter, gold: 1_000_001 })
     expect(result.success).toBe(false)
   })
 

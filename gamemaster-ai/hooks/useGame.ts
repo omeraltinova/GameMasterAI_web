@@ -366,6 +366,14 @@ export function useGM(sessionId: string) {
     target?: string;
     rollResult?: number;
     damage?: number;
+    // Grounding fields from the mechanical combat engine (combat/[id]/action)
+    combatId?: string;
+    hit?: boolean;
+    crit?: boolean;
+    defeated?: boolean;
+    combatEnded?: boolean;
+    targetHpRemaining?: number;
+    targetMaxHp?: number;
   }) => {
     setIsLoading(true);
     setError(null);

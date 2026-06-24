@@ -135,8 +135,42 @@ describe('executeToolCall - create_npc', () => {
         race: null,
         personality: null,
         isHostile: false,
+        // Non-hostile NPC with no stats → null (not auto-statted)
+        stats: null,
       }),
     })
+  })
+
+  it('düşman NPC için sağlanan hp/ac değerlerini sınırlandırarak saklar', async () => {
+    mockNPC.findFirst.mockResolvedValue(null)
+    mockNPC.create.mockResolvedValue({ id: 'npc-4', name: 'Ogre' })
+
+    await executeToolCall(
+      makeToolCall('create_npc', {
+        name: 'Ogre',
+        role: 'Brute',
+        isHostile: true,
+        hp: 59,
+        ac: 14,
+      }),
+      sessionId
+    )
+
+    const createArg = mockNPC.create.mock.calls[0][0]
+    expect(JSON.parse(createArg.data.stats)).toEqual({ hp: 59, maxHp: 59, ac: 14 })
+  })
+
+  it('düşman NPC stat vermezse varsayılan savaş bloğu atanır', async () => {
+    mockNPC.findFirst.mockResolvedValue(null)
+    mockNPC.create.mockResolvedValue({ id: 'npc-5', name: 'Goblin' })
+
+    await executeToolCall(
+      makeToolCall('create_npc', { name: 'Goblin', role: 'Scout', isHostile: true }),
+      sessionId
+    )
+
+    const createArg = mockNPC.create.mock.calls[0][0]
+    expect(JSON.parse(createArg.data.stats)).toEqual({ hp: 10, maxHp: 10, ac: 10 })
   })
 })
 
@@ -348,6 +382,31 @@ describe('executeToolCall - give_item', () => {
       data: expect.objectContaining({
         description: 'A mysterious ring',
       }),
+    })
+  })
+
+  it('equip-slot tiplerini (Helmet) korur, geçersiz tipi Misc yapar', async () => {
+    mockCharacter.findUnique.mockResolvedValue({ id: characterId, name: 'Hero' })
+    mockInventoryItem.create.mockResolvedValue({ id: 'item-4', name: 'Iron Helm', quantity: 1 })
+
+    await executeToolCall(
+      makeToolCall('give_item', { itemName: 'Iron Helm', itemType: 'Helmet' }),
+      sessionId,
+      characterId
+    )
+    expect(mockInventoryItem.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ name: 'Iron Helm', type: 'Helmet' }),
+    })
+
+    mockInventoryItem.create.mockClear()
+    mockInventoryItem.create.mockResolvedValue({ id: 'item-5', name: 'Junk', quantity: 1 })
+    await executeToolCall(
+      makeToolCall('give_item', { itemName: 'Junk', itemType: 'NotARealType' }),
+      sessionId,
+      characterId
+    )
+    expect(mockInventoryItem.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ type: 'Misc' }),
     })
   })
 })

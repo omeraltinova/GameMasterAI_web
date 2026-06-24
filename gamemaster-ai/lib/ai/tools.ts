@@ -46,6 +46,22 @@ export const createNpcTool: ToolDefinition = {
                     type: 'boolean',
                     description: 'Whether the NPC is hostile/enemy to the player. Default is false.',
                 },
+                hp: {
+                    type: 'number',
+                    description: 'Combat hit points for this NPC (used when combat starts). Scale to the threat: weak foe ~6-12, tough foe ~25-60, boss ~80-150. Only meaningful for hostile NPCs.',
+                },
+                ac: {
+                    type: 'number',
+                    description: 'Combat armor class (defense) for this NPC, typically 10-18. Only meaningful for hostile NPCs.',
+                },
+                attackBonus: {
+                    type: 'number',
+                    description: 'Bonus added to this NPC\'s attack rolls (d20 + bonus vs target AC). Typically +2 to +8 by threat. Only meaningful for hostile NPCs.',
+                },
+                damageDice: {
+                    type: 'string',
+                    description: 'This NPC\'s damage dice on a hit, as "NdM" (e.g. "1d6", "2d8"). Only meaningful for hostile NPCs.',
+                },
             },
             required: ['name', 'role'],
         },
@@ -98,8 +114,8 @@ export const giveItemTool: ToolDefinition = {
                 },
                 itemType: {
                     type: 'string',
-                    description: 'The type of item',
-                    enum: ['Weapon', 'Armor', 'Shield', 'Potion', 'Scroll', 'Tool', 'Treasure', 'Key', 'Consumable', 'Misc'],
+                    description: 'The type of item. Use the equip-slot types (Helmet, Boots, Gloves, Cloak, Ring, Amulet) for wearable gear so it can fill the matching equipment slot.',
+                    enum: ['Weapon', 'Armor', 'Shield', 'Helmet', 'Boots', 'Gloves', 'Cloak', 'Ring', 'Amulet', 'Accessory', 'Potion', 'Scroll', 'Tool', 'Treasure', 'Key', 'Consumable', 'Misc'],
                 },
                 description: {
                     type: 'string',
@@ -172,6 +188,11 @@ export interface CreateNpcArgs {
     race?: string;
     personality?: string;
     isHostile?: boolean;
+    hp?: number;
+    maxHp?: number;
+    ac?: number;
+    attackBonus?: number;
+    damageDice?: string;
 }
 
 export interface UpdateNpcArgs {

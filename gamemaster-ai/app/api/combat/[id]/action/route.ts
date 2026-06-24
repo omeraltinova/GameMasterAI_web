@@ -3,8 +3,15 @@ import { prisma } from "@/lib/db/prisma";
 import { getUserId, forbiddenResponse, unauthorizedResponse } from "@/lib/auth/server";
 import { canManageCampaign, getCampaignActorRole, hasCampaignAccess } from "@/lib/auth/permissions";
 import { rateLimitResponse, RATE_LIMIT_TIERS } from "@/lib/security/rateLimit";
+import type { CombatParticipant } from "@/types";
 import {
+  calculateModifier,
   normalizeCombatRecord,
+  parseCharacterStats,
+  parseDamageDice,
+  proficiencyBonus,
+  resolveAttack,
+  sanitizeNpcCombatStats,
   sanitizeParticipants,
   serializeLog,
   serializeParticipants,
@@ -15,6 +22,8 @@ type CombatActionBody = {
   actorId?: string;
   targetId?: string;
   damage?: number;
+  attack?: boolean;
+  actionType?: string;
 };
 
 function toSafeDamage(value: unknown) {
@@ -23,6 +32,60 @@ function toSafeDamage(value: unknown) {
     return 0;
   }
   return Math.max(0, Math.min(200, Math.round(numeric)));
+}
+
+/**
+ * Computes a combatant's attack profile (attack bonus, damage dice, damage bonus)
+ * server-side so attack resolution can never be influenced by the client.
+ * - Players: best of STR/DEX modifier + proficiency; weapon damage from the
+ *   equipped weapon's `properties.damage` ("NdM") or a sensible default.
+ * - Enemies/NPCs: bounded `attackBonus`/`damageDice` from NPC stats, with defaults.
+ */
+async function getAttackProfile(actor: CombatParticipant, _sessionId: string) {
+  if (actor.type === "player") {
+    const character = await prisma.character.findUnique({
+      where: { id: actor.id },
+      select: {
+        stats: true,
+        level: true,
+        inventoryItems: {
+          where: { equipped: true, type: "Weapon" },
+          select: { properties: true },
+          take: 1,
+        },
+      },
+    });
+
+    const stats = parseCharacterStats(character?.stats ?? null);
+    const strMod = calculateModifier(Number(stats.strength ?? 10));
+    const dexMod = calculateModifier(Number(stats.dexterity ?? 10));
+    const abilityMod = Math.max(strMod, dexMod);
+    const attackBonus = abilityMod + proficiencyBonus(character?.level ?? 1);
+
+    const weapon = character?.inventoryItems?.[0];
+    let damageSpec: string | undefined;
+    if (weapon?.properties) {
+      try {
+        const props = JSON.parse(weapon.properties);
+        if (typeof props?.damage === "string") damageSpec = props.damage;
+      } catch {
+        /* ignore malformed properties */
+      }
+    }
+    // Armed → 1d8 default, unarmed → 1d4.
+    const damageDice = parseDamageDice(damageSpec, { count: 1, sides: weapon ? 8 : 4 });
+    return { attackBonus, damageDice, damageBonus: abilityMod };
+  }
+
+  // Enemy / ally → NPC stat block.
+  const npc = await prisma.nPC.findUnique({
+    where: { id: actor.id },
+    select: { stats: true },
+  });
+  const npcStats = sanitizeNpcCombatStats(parseCharacterStats(npc?.stats ?? null));
+  const attackBonus = npcStats?.attackBonus ?? 3;
+  const damageDice = parseDamageDice(npcStats?.damageDice, { count: 1, sides: 6 });
+  return { attackBonus, damageDice, damageBonus: 0 };
 }
 
 export async function POST(
@@ -133,17 +196,48 @@ export async function POST(
     }
 
     let actionSummary = `${actionActor.name}: ${actionText}`;
-    const damage = canManageCampaign(actorRole) ? toSafeDamage(payload.damage) : 0;
     const targetId = payload.targetId;
+    const target = targetId
+      ? participants.find((participant) => participant.id === targetId)
+      : undefined;
+    const isAttack = payload.attack === true || payload.actionType === "attack";
 
-    if (targetId && damage > 0) {
-      const target = participants.find((participant) => participant.id === targetId);
-      if (target) {
-        target.hp = Math.max(0, target.hp - damage);
+    let damage = 0;
+    let attackHit = false;
+    let attackCrit = false;
+    let attackRollTotal: number | null = null;
+    if (isAttack && target) {
+      // Server-authoritative attack resolution: roll d20 + attack bonus vs the
+      // target's AC and roll damage on a hit. This is what finally lets PLAYERS
+      // deal damage on their own turn (previously only the GM could move HP).
+      const profile = await getAttackProfile(actionActor, combat.session.id);
+      const outcome = resolveAttack({
+        attackBonus: profile.attackBonus,
+        targetAc: target.ac,
+        damageDice: profile.damageDice,
+        damageBonus: profile.damageBonus,
+        attackerName: actionActor.name,
+        targetName: target.name,
+      });
+      actionSummary += ` — ${outcome.breakdown}`;
+      attackHit = outcome.hit;
+      attackCrit = outcome.crit;
+      attackRollTotal = outcome.attackRoll;
+      if (outcome.hit) {
+        damage = outcome.damage;
+      }
+    } else if (canManageCampaign(actorRole)) {
+      // GM narrative/manual damage (no attack roll).
+      damage = toSafeDamage(payload.damage);
+    }
+
+    if (target && damage > 0) {
+      target.hp = Math.max(0, target.hp - damage);
+      if (!isAttack) {
         actionSummary += ` → ${target.name} ${damage} hasar aldı`;
-        if (target.hp <= 0) {
-          actionSummary += ` ve etkisiz hale geldi`;
-        }
+      }
+      if (target.hp <= 0) {
+        actionSummary += ` — ${target.name} etkisiz hale geldi`;
       }
     }
 
@@ -255,6 +349,24 @@ export async function POST(
     return NextResponse.json({
       success: true,
       combat: normalizeCombatRecord(updatedCombat),
+      // Structured truth of what happened, so the narration layer can describe the
+      // real mechanical outcome instead of guessing (unifies the two combat paths).
+      resolution: {
+        actorId: actionActor.id,
+        actorName: actionActor.name,
+        targetId: target?.id ?? null,
+        targetName: target?.name ?? null,
+        action: actionText,
+        isAttack,
+        hit: isAttack ? attackHit : damage > 0,
+        crit: attackCrit,
+        attackRoll: attackRollTotal,
+        damage,
+        targetHpRemaining: target?.hp ?? null,
+        targetMaxHp: target?.maxHp ?? null,
+        targetDefeated: target ? target.hp <= 0 : false,
+        combatEnded: shouldEndCombat,
+      },
     });
   } catch (error) {
     console.error("Combat action error:", error);

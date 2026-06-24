@@ -47,6 +47,22 @@ export async function buildSessionContext(sessionId: string): Promise<GameContex
   // Game state'i parse et
   const gameState = JSON.parse(session.currentState || '{}');
 
+  // Parti karakterleri iki ilişkiden de gelebilir: doğrudan `Character.campaignId`
+  // back-relation'ı (`campaign.characters`) ve davet/katılım pivotu
+  // (`campaign.players[].character`). Multiplayer akışlarında karakterler pivot
+  // üzerinden eklendiği için yalnızca birine bakmak partinin bir kısmını AI'dan
+  // gizlerdi. Her ikisini birleştirip id'ye göre tekilleştiriyoruz.
+  const partyById = new Map<string, any>();
+  for (const char of session.campaign.characters || []) {
+    if (char?.id) partyById.set(char.id, char);
+  }
+  for (const player of session.campaign.players || []) {
+    const char = (player as any).character;
+    if (char?.id && !partyById.has(char.id)) {
+      partyById.set(char.id, char);
+    }
+  }
+
   // Context'i oluştur
   const context: GameContext = {
     scenario: session.campaign.scenario?.title || 'Özel Oturum',
@@ -59,7 +75,7 @@ export async function buildSessionContext(sessionId: string): Promise<GameContex
       personality: npc.personality || undefined,
       isHostile: npc.isHostile,
     })),
-    playerCharacters: session.campaign.characters.map((char: any) => ({
+    playerCharacters: Array.from(partyById.values()).map((char: any) => ({
       name: char.name,
       race: char.race,
       class: char.class,

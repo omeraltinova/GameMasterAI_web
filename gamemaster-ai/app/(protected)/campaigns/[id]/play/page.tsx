@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import { Button, Card, CardContent, CardHeader, CardTitle, Badge, ConfirmDialog } from "@/components/ui";
-import { ChatWindow, MessageInput, CharacterModal, GameSetupWizard, ActionSuggestions, LocationImage, DiceModal, NPCModal, CombatTracker, DiceHistory } from "@/components/game";
+import { ChatWindow, MessageInput, CharacterModal, GameSetupWizard, ActionSuggestions, LocationImage, DiceModal, NPCModal, CombatTracker, TargetSelector, DiceHistory } from "@/components/game";
 import { InventoryModal } from "@/components/character";
 import { MapModal } from "@/components/map";
 import { useGame, useGM, useDice, useSuggestions, useLocationImage, useMaps } from "@/hooks/useGame";
@@ -49,6 +49,25 @@ interface WorldSettings {
   hooks: string[];
   openingNarration: string;
 }
+
+// Structured outcome of a mechanical combat action (mirrors the action route's
+// `resolution`). Used to feed the narration layer the real numbers.
+type CombatResolution = {
+  actorId?: string | null;
+  actorName?: string | null;
+  targetId?: string | null;
+  targetName?: string | null;
+  action?: string;
+  isAttack?: boolean;
+  hit?: boolean;
+  crit?: boolean;
+  attackRoll?: number | null;
+  damage?: number;
+  targetHpRemaining?: number | null;
+  targetMaxHp?: number | null;
+  targetDefeated?: boolean;
+  combatEnded?: boolean;
+};
 
 function parseCombatValue(combatData: unknown): Combat | null {
   if (!combatData || typeof combatData !== "object") return null;
@@ -180,6 +199,7 @@ export default function PlayPage() {
   const [showCharacterModal, setShowCharacterModal] = useState(false);
   const [worldSettings, setWorldSettings] = useState<WorldSettings | null>(null);
   const [activeCombat, setActiveCombat] = useState<Combat | null>(null);
+  const [selectedTargetId, setSelectedTargetId] = useState<string | null>(null);
   const [isCombatLoading, setIsCombatLoading] = useState(false);
   const [diceHistoryRefreshSignal, setDiceHistoryRefreshSignal] = useState(0);
 
@@ -399,13 +419,17 @@ export default function PlayPage() {
     actionText: string,
     options?: {
       targetName?: string;
+      targetId?: string;
       damage?: number;
+      attack?: boolean;
     }
-  ) => {
-    if (!activeCombat) return false;
+  ): Promise<CombatResolution | null> => {
+    if (!activeCombat) return null;
 
     const normalizedTargetName = options?.targetName?.trim().toLowerCase();
-    const targetParticipant = normalizedTargetName
+    const targetParticipant = options?.targetId
+      ? activeCombat.participants.find((participant) => participant.id === options.targetId)
+      : normalizedTargetName
       ? activeCombat.participants.find(
           (participant) => participant.name.trim().toLowerCase() === normalizedTargetName
         )
@@ -421,18 +445,21 @@ export default function PlayPage() {
       );
 
     try {
-      const response = await post<{ success: boolean; combat?: unknown }>(
+      const response = await post<{ success: boolean; combat?: unknown; resolution?: CombatResolution }>(
         `/combat/${activeCombat.id}/action`,
         {
           action: actionText,
           actorId: actorParticipant?.id,
           targetId: targetParticipant?.id,
           damage: options?.damage,
+          // When the player targets an enemy, resolve it as a real attack
+          // (server rolls d20 vs AC and applies damage on a hit).
+          attack: options?.attack ?? (targetParticipant?.type === "enemy"),
         }
       );
 
       if (!response?.success) {
-        return false;
+        return null;
       }
 
       const parsedCombat = response.combat ? parseCombatValue(response.combat) : null;
@@ -443,12 +470,60 @@ export default function PlayPage() {
       }
 
       await fetchMessages();
-      return true;
+      return response.resolution ?? ({} as CombatResolution);
     } catch (err) {
       console.error("Combat action endpoint error:", err);
-      return false;
+      return null;
     }
   }, [activeCombat, character?.id, character?.name, playerName, fetchMessages, syncActiveCombat]);
+
+  // Unifies the two combat paths: after the mechanical engine resolves an action,
+  // ask the AI to narrate the REAL outcome (hit/miss, damage, remaining HP) rather
+  // than inventing a separate, disconnected result.
+  const narrateCombatResolution = useCallback(async (
+    resolution: CombatResolution,
+    actionText: string,
+  ) => {
+    const combatResult = await combatAction({
+      action: actionText,
+      attacker: resolution.actorName || character?.name || playerName,
+      target: resolution.targetName || undefined,
+      rollResult: resolution.attackRoll ?? undefined,
+      damage: resolution.damage,
+      combatId: activeCombat?.id,
+      hit: resolution.hit,
+      crit: resolution.crit,
+      defeated: resolution.targetDefeated,
+      combatEnded: resolution.combatEnded,
+      targetHpRemaining: resolution.targetHpRemaining ?? undefined,
+      targetMaxHp: resolution.targetMaxHp ?? undefined,
+    });
+
+    if (combatResult?.success && combatResult.combatNarration) {
+      addMessage({
+        id: combatResult.messageId || `combat-${Date.now()}`,
+        sessionId: sessionId || "",
+        senderType: "GM",
+        senderName: "Game Master",
+        content: combatResult.combatNarration,
+        timestamp: combatResult.timestamp || new Date().toISOString(),
+      });
+    }
+  }, [combatAction, activeCombat?.id, character?.name, playerName, addMessage, sessionId]);
+
+  // Resolves which enemy a combat action targets: the player's selection if it is
+  // still alive, otherwise the first living enemy.
+  const getCombatTarget = useCallback(() => {
+    if (!activeCombat) return undefined;
+    const aliveEnemies = activeCombat.participants.filter(
+      (participant) => participant.type === "enemy" && participant.hp > 0,
+    );
+    if (selectedTargetId) {
+      const chosen = aliveEnemies.find((participant) => participant.id === selectedTargetId);
+      if (chosen) return chosen;
+    }
+    return aliveEnemies[0];
+  }, [activeCombat, selectedTargetId]);
 
   // SSE real-time + polling fallback
   const lastSyncTime = useRef<number>(Date.now());
@@ -914,28 +989,32 @@ export default function PlayPage() {
     const actionContent = `[${action.label}] ${action.description || action.value || ''}`.trim();
 
     if (activeCombat?.status === "active") {
-      const combatTarget = activeCombat.participants.find(
-        (participant) => participant.type === "enemy" && participant.hp > 0,
-      );
-      const combatApplied = await performCombatAction(actionContent, {
+      const combatTarget = getCombatTarget();
+      const resolution = await performCombatAction(actionContent, {
+        targetId: combatTarget?.id,
         targetName: combatTarget?.name,
       });
-      if (combatApplied) {
+      if (resolution) {
+        // Mechanical action succeeded → narrate the real resolved outcome.
+        await narrateCombatResolution(resolution, actionContent);
         return;
       }
 
+      // Mechanical action did not apply (e.g. not your turn): plain AI narration,
+      // still linked to the real combat so its state stays consistent.
       const combatResult = await combatAction({
         action: actionContent,
         attacker: character?.name || playerName,
         target: combatTarget?.name,
+        combatId: activeCombat.id,
       });
 
       if (combatResult?.success && combatResult.combatNarration) {
         addMessage({
           id: combatResult.messageId || `combat-${Date.now()}`,
           sessionId: sessionId || "",
-          senderType: "COMBAT",
-          senderName: "Combat Tracker",
+          senderType: "GM",
+          senderName: "Game Master",
           content: combatResult.combatNarration,
           timestamp: combatResult.timestamp || new Date().toISOString(),
         });
@@ -1121,13 +1200,13 @@ export default function PlayPage() {
     }`;
 
     if (activeCombat?.status === "active") {
-      const combatTarget = activeCombat.participants.find(
-        (participant) => participant.type === "enemy" && participant.hp > 0,
-      );
-      const combatApplied = await performCombatAction(actionText, {
+      const combatTarget = getCombatTarget();
+      const resolution = await performCombatAction(actionText, {
+        targetId: combatTarget?.id,
         targetName: combatTarget?.name,
       });
-      if (combatApplied) {
+      if (resolution) {
+        await narrateCombatResolution(resolution, actionText);
         return;
       }
 
@@ -1136,14 +1215,15 @@ export default function PlayPage() {
         attacker: character?.name || playerName,
         target: combatTarget?.name,
         rollResult: diceResponse.total,
+        combatId: activeCombat.id,
       });
 
       if (combatResult?.success && combatResult.combatNarration) {
         addMessage({
           id: combatResult.messageId || `combat-${Date.now()}`,
           sessionId: sessionId || "",
-          senderType: "COMBAT",
-          senderName: "Combat Tracker",
+          senderType: "GM",
+          senderName: "Game Master",
           content: combatResult.combatNarration,
           timestamp: combatResult.timestamp || new Date().toISOString(),
         });
@@ -1470,6 +1550,16 @@ export default function PlayPage() {
                 onNextTurn={handleNextCombatTurn}
                 onEndCombat={handleEndCombat}
               />
+              {/* Players pick which enemy their next action targets. */}
+              {!isCreator && (
+                <div className="mt-2">
+                  <TargetSelector
+                    combat={activeCombat}
+                    selectedTargetId={selectedTargetId}
+                    onSelect={setSelectedTargetId}
+                  />
+                </div>
+              )}
             </div>
           )}
           {/* Location Image - Mekan değiştiğinde göster */}

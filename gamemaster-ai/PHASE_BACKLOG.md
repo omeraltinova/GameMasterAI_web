@@ -78,3 +78,31 @@ Last update: 2026-03-15
 | Durum | Is | Amac | Neden | Mevcut |
 | --- | --- | --- | --- | --- |
 | [ ] | Dokuman drift kontrolu (opsiyonel CI) | Route/OpenAPI/backlog uyumsuzlugunu erken yakalamak | Dokumanlar hizla eskiyor | Otomatik kontrol yok |
+
+## 2026-06-24 Oyun Tarafi Bugfix & Iyilestirmeler (tamamlandi)
+| Durum | Is | Detay |
+| --- | --- | --- |
+| [x] | KRITIK: Combat tur/aksiyon tamamen kirikti | `next-turn` ve `action` rotalari `participants`/`turnOrder` JSON string'lerini dogrudan `sanitizeParticipants`'a veriyordu; bu fonksiyon array disi girdiyi `[]` donduruyordu -> her tur ilerletme ve her savas aksiyonu `400` veriyordu. `sanitizeParticipants` artik JSON string'i de cozuyor (`lib/combat/utils.ts`). |
+| [x] | next-turn olu katilimcilari atliyor | 0 HP katilimcilar artik tur almiyor; tur sarmasinda round dogru artiyor. |
+| [x] | CombatTracker sira senkron hatasi | Istemci `turnOrder`'i tekrar siralamiyor; sunucu sirasini birebir kullaniyor. |
+| [x] | AI context multiplayer partiyi goremiyordu | `buildSessionContext` artik `campaign.characters` + `players[].character` birlesimini (tekil) kullaniyor. |
+| [x] | AI tool-call cagrisi dayanikli degildi | `callOpenRouterWithTools` artik retry + fallback model kullaniyor (primary + follow-up). |
+| [x] | AI NPC'leri hep ayni statla (10/10/10) | `create_npc` tool'u hp/ac alabilir; dusman NPC'ler icin sinirli savas blogu uretiliyor. |
+| [x] | Yetenek-modifierli zar atislari | `/api/dice/roll` opsiyonel `ability`+`proficient` ile karakter statindan modifier hesapliyor (roll-check/attack/damage forward eder). |
+| [x] | Equipment slot dolulugu zorlanmiyordu | Equip endpointi ayni tipte fazla esyayi (1 zirh, 2 yuzuk vb.) otomatik cikariyor; tip kelime dagarcigi birlesti (`lib/game/items.ts`). |
+| [x] | Oyuncular savasta hasar veremiyordu (en buyuk oyun eksigi) | Sunucu-otoriteli **saldiri cozumlemesi** eklendi: d20 + saldiri bonusu vs hedef AC -> isabet/kritik -> hasar zari. Hem oyuncular (kendi turunda) hem GM kullanir. `resolveAttack`/`parseDamageDice`/`proficiencyBonus` (`lib/combat/utils.ts`), `combat/[id]/action` saldiri modu, play page `attack:true`. |
+| [x] | NPC saldiri gucu ayarlanabilir | `create_npc` ve NPC POST artik `attackBonus`/`damageDice` alabiliyor (sinirli). |
+| [x] | Guvenlik: NPC olusturma GM-only + stat siniri; karakter create/hp sinirlari; envanter tip allowlist | bkz. `sast/final-report.md` Re-scan 2026-06-24 (NEW-1..NEW-4). |
+
+## Iki Combat Yolunun Birlestirilmesi + TargetSelector (2026-06-24, tamamlandi)
+| Durum | Is | Detay |
+| --- | --- | --- |
+| [x] | `/api/gm/combat-action` ile gercek combat motoru birlestirildi | Anlatim katmani artik mekanik motorun **gercek** sonucunu (isabet/ışkalama, hasar, kalan HP) anlatiyor; `gm/combat-action` `combatId` ile gercek `Combat` kaydini okuyor ve `inCombat`'i statüden türetiyor (artik körü körüne `true` yapmiyor). `combat/[id]/action` yapilandirilmis `resolution` donduruyor. Play page basarili mekanik aksiyondan sonra erken `return` etmek yerine gercek sonucu anlattiriyor. |
+| [x] | TargetSelector ile hedef secimi | Oyuncu savasta saldiracagi dusmani secebiliyor (`components/game/TargetSelector.tsx`); secim yoksa ilk yasayan dusman. |
+
+## Buyuk Eksik Ozellikler (gelecek faz — kapsam/urun karari gerektirir)
+| Durum | Is | Amac | Not |
+| --- | --- | --- | --- |
+| [~] | Tam 5e aksiyon ekonomisi (action/bonus/reaction/movement takibi) | Oynanis derinligi | Attack-roll-vs-AC + hasar **tamamlandi**; geriye action/bonus/reaction/movement *sayaclari* kaldi |
+| [~] | Manuel savas katilimcisi yonetimi | GM kontrolu | TargetSelector (hedef secimi) **tamamlandi**; ad-hoc dusman ekleme / initiative set UI hala yok |
+| [ ] | Buyu kitabi / agirlik-tasima (encumbrance) / parti loot | Envanter derinligi | Plan "Gelecek Gelistirmeler" |

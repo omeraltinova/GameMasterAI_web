@@ -276,6 +276,21 @@ describe('characterCreateSchema', () => {
     expect(result.success).toBe(false)
   })
 
+  it('aşırı maxHp değerini reddeder (NEW-2)', () => {
+    const result = characterCreateSchema.safeParse({ ...validCharacter, maxHp: 999999, hp: 999999 })
+    expect(result.success).toBe(false)
+  })
+
+  it('aşırı experience değerini reddeder (NEW-2)', () => {
+    const result = characterCreateSchema.safeParse({ ...validCharacter, experience: 2_000_000_000 })
+    expect(result.success).toBe(false)
+  })
+
+  it('hp > maxHp olduğunda reddeder (NEW-2)', () => {
+    const result = characterCreateSchema.safeParse({ ...validCharacter, hp: 50, maxHp: 10 })
+    expect(result.success).toBe(false)
+  })
+
   it('background null kabul eder', () => {
     const result = characterCreateSchema.safeParse({ ...validCharacter, background: null })
     expect(result.success).toBe(true)
@@ -347,6 +362,16 @@ describe('characterHpUpdateSchema', () => {
 
   it('ondalıklı HP reddeder', () => {
     const result = characterHpUpdateSchema.safeParse({ hp: 25.5 })
+    expect(result.success).toBe(false)
+  })
+
+  it('sınırsız maxHp artışını reddeder (NEW-3)', () => {
+    const result = characterHpUpdateSchema.safeParse({ hp: 999999, maxHp: 999999 })
+    expect(result.success).toBe(false)
+  })
+
+  it('hp > maxHp olduğunda reddeder (NEW-3)', () => {
+    const result = characterHpUpdateSchema.safeParse({ hp: 50, maxHp: 10 })
     expect(result.success).toBe(false)
   })
 })

@@ -359,6 +359,59 @@ describe("POST /api/dice/roll", () => {
     expect(data.total).toBeLessThanOrEqual(20);
   });
 
+  it("adds ability modifier + proficiency bonus when ability/proficient supplied", async () => {
+    mocks.getUserId.mockResolvedValue("user-1");
+    mocks.prisma.gameSession.findUnique.mockResolvedValue({
+      id: "s1",
+      campaignId: "camp-1",
+      campaign: { creatorId: "user-1", players: [] },
+    });
+    // dexterity 18 → +4 ability mod; level 5 → +3 proficiency
+    mocks.prisma.character.findFirst.mockResolvedValue({
+      id: "char-1",
+      campaignId: "camp-1",
+      level: 5,
+      stats: JSON.stringify({
+        strength: 10, dexterity: 18, constitution: 12,
+        intelligence: 10, wisdom: 10, charisma: 10,
+      }),
+    });
+    mocks.prisma.diceRoll.create.mockResolvedValue({ id: "roll-ab", sessionId: "s1", timestamp: new Date() });
+    mocks.prisma.message.create.mockResolvedValue({ id: "msg-ab", sessionId: "s1", senderType: "DICE", timestamp: new Date() });
+
+    const res = await rollDice(
+      makePOSTRequest("http://localhost:3000/api/dice/roll", {
+        sessionId: "s1",
+        characterId: "char-1",
+        diceType: "d20",
+        ability: "dex",
+        proficient: true,
+      })
+    );
+    expect(res.status).toBe(200);
+
+    const data = await res.json();
+    expect(data.abilityBonus).toBe(7); // +4 dex, +3 proficiency
+    expect(data.abilityBonusInfo).toEqual({ ability: "dexterity", abilityMod: 4, proficiencyBonus: 3 });
+    // total = single d20 + 7 (no manual modifier)
+    expect(data.total).toBe(data.results[0] + 7);
+    expect(data.roll.modifier).toBe(7);
+  });
+
+  it("rejects an invalid ability value", async () => {
+    mocks.getUserId.mockResolvedValue("user-1");
+    const res = await rollDice(
+      makePOSTRequest("http://localhost:3000/api/dice/roll", {
+        sessionId: "s1",
+        characterId: "char-1",
+        diceType: "d20",
+        ability: "luck",
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(mocks.prisma.diceRoll.create).not.toHaveBeenCalled();
+  });
+
   it("rolls multiple dice correctly", async () => {
     mocks.getUserId.mockResolvedValue("user-1");
     mocks.prisma.gameSession.findUnique.mockResolvedValue({

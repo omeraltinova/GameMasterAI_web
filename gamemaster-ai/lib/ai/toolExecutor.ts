@@ -4,6 +4,8 @@
  */
 
 import { prisma } from '@/lib/db/prisma';
+import { ALLOWED_ITEM_TYPES } from '@/lib/game/items';
+import { sanitizeNpcCombatStats } from '@/lib/combat/utils';
 import type { ToolCall, CreateNpcArgs, UpdateNpcArgs, GiveItemArgs, RequestDiceRollArgs } from './tools';
 
 export interface ToolExecutionResult {
@@ -31,10 +33,6 @@ const MAX_REASON_LENGTH = 200;
 const MIN_DC = 1;
 const MAX_DC = 40;
 
-const ALLOWED_ITEM_TYPES = new Set([
-    'Weapon', 'Armor', 'Shield', 'Potion', 'Scroll',
-    'Tool', 'Treasure', 'Key', 'Consumable', 'Misc',
-]);
 const ALLOWED_NPC_RACES = new Set([
     'Human', 'Elf', 'Dwarf', 'Halfling', 'Gnome',
     'Half-Elf', 'Half-Orc', 'Tiefling', 'Dragonborn', 'Other',
@@ -146,6 +144,17 @@ async function executeCreateNpc(
     const race = rawRace && ALLOWED_NPC_RACES.has(rawRace) ? rawRace : null;
     const personality = optionalString(a.personality, MAX_NPC_PERSONALITY_LENGTH);
     const isHostile = coerceBoolean(a.isHostile);
+    // Bounded combat stats so AI-created enemies are not all identical (10/10/10)
+    // when combat seeds HP/AC from NPC.stats. Defaults to a sensible block for
+    // hostile NPCs even if the model omits stats.
+    const providedStats = sanitizeNpcCombatStats({
+        hp: a.hp,
+        maxHp: a.maxHp,
+        ac: a.ac,
+        attackBonus: a.attackBonus,
+        damageDice: a.damageDice,
+    });
+    const combatStats = providedStats ?? (isHostile ? { hp: 10, maxHp: 10, ac: 10 } : null);
 
     // Check if NPC with same name already exists in session
     const existingNpc = await prisma.nPC.findFirst({
@@ -178,6 +187,7 @@ async function executeCreateNpc(
             race,
             personality,
             isHostile,
+            stats: combatStats ? JSON.stringify(combatStats) : null,
             dialogue: JSON.stringify([]),
         },
     });

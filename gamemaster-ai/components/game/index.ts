@@ -12,4 +12,5 @@ export { ActionSuggestions } from "./ActionSuggestions";
 export { LocationImage } from './LocationImage';
 export { CharacterModal } from './CharacterModal';
 export { CombatTracker } from './CombatTracker';
+export { TargetSelector } from './TargetSelector';
 

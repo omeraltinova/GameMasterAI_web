@@ -29,7 +29,22 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { sessionId, action, attacker, target, rollResult, damage } = body;
+    const {
+      sessionId,
+      action,
+      attacker,
+      target,
+      rollResult,
+      damage,
+      // Grounding fields from the mechanical combat engine (combat/[id]/action)
+      combatId,
+      hit,
+      crit,
+      defeated,
+      combatEnded,
+      targetHpRemaining,
+      targetMaxHp,
+    } = body;
 
     // Validation
     if (!sessionId) {
@@ -82,29 +97,65 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Mekanik savaş motoru gerçeğine demirle: combatId verildiyse gerçek Combat
+    // kaydını oku. Savaş durumu artık uydurulmuyor — gerçek statüden türetiliyor.
+    let linkedCombat: { id: string; sessionId: string; status: string } | null = null;
+    if (combatId && typeof combatId === 'string') {
+      const found = await prisma.combat.findUnique({
+        where: { id: combatId },
+        select: { id: true, sessionId: true, status: true },
+      });
+      if (found && found.sessionId === sessionId) {
+        linkedCombat = found;
+      }
+    }
+
     // User prompt oluştur
     let userPrompt = `**Savaş Aksiyonu:**\n`;
     userPrompt += `Saldıran: ${attacker}\n`;
     userPrompt += `Aksiyon: ${action}\n`;
-    
+
     if (target) {
       userPrompt += `Hedef: ${target}\n`;
     }
-    
-    if (rollResult !== undefined) {
-      userPrompt += `Zar Sonucu: ${rollResult}\n`;
+
+    // Mekanik sonuç (varsa) — AI bunu birebir anlatmalı, kendi sonuç uydurmamalı.
+    if (typeof hit === 'boolean') {
+      userPrompt += `Sonuç: ${hit ? (crit ? 'KRİTİK İSABET' : 'İsabet') : 'Işkalama'}\n`;
     }
-    
-    if (damage !== undefined) {
+    if (rollResult !== undefined && rollResult !== null) {
+      userPrompt += `Saldırı Zarı: ${rollResult}\n`;
+    }
+    if (damage !== undefined && damage !== null) {
       userPrompt += `Hasar: ${damage}\n`;
+    }
+    if (typeof targetHpRemaining === 'number') {
+      const maxPart = typeof targetMaxHp === 'number' ? `/${targetMaxHp}` : '';
+      userPrompt += `Hedefin Kalan HP: ${targetHpRemaining}${maxPart}\n`;
+    }
+    if (defeated === true) {
+      userPrompt += `Hedef etkisiz hale geldi.\n`;
+    }
+    if (combatEnded === true) {
+      userPrompt += `Bu aksiyonla savaş sona erdi.\n`;
     }
 
     userPrompt += `\nBu savaş aksiyonunu 5e SRD kurallarına uygun olarak betimle.`;
+    userPrompt += `\nYukarıda verilen mekanik sonuçlara (isabet/ışkalama, hasar, kalan HP) sadık kal; yeni sonuç veya hasar uydurma.`;
     userPrompt += `\nSonuçları açıkla ve hikayeyi ilerlet.`;
 
     // Basit context (oyuncular ve durum)
     const gameState = JSON.parse(gameSession.currentState || '{}');
-    let contextPrompt = `**Savaş Durumu:** ${gameState.inCombat ? 'Savaşta' : 'Savaşta değil'}\n`;
+
+    // Gerçek savaş durumu: bağlı Combat kaydı varsa onun statüsü; yoksa eski
+    // davranışa (gameState.inCombat / true) düş.
+    const computedInCombat = linkedCombat
+      ? linkedCombat.status === 'active'
+      : combatEnded === true
+        ? false
+        : (typeof gameState.inCombat === 'boolean' ? gameState.inCombat : true);
+
+    let contextPrompt = `**Savaş Durumu:** ${computedInCombat ? 'Savaşta' : 'Savaşta değil'}\n`;
     
     if (gameState.activeQuests && gameState.activeQuests.length > 0) {
       contextPrompt += `**Aktif Görev:** ${gameState.activeQuests[0]}\n`;
@@ -139,16 +190,20 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Game state'i güncelle (savaş durumunu işaretle)
+    // Game state'i güncelle — savaş durumu gerçek Combat kaydından türetiliyor,
+    // artık körü körüne true yapılmıyor (iki savaş yolu birleştirildi).
     const updatedGameState = {
       ...gameState,
-      inCombat: true,
+      inCombat: computedInCombat,
       lastCombatAction: {
         action,
         attacker,
         target,
         rollResult,
         damage,
+        hit: typeof hit === 'boolean' ? hit : undefined,
+        defeated: defeated === true ? true : undefined,
+        combatId: linkedCombat?.id,
         timestamp: new Date().toISOString(),
       },
     };

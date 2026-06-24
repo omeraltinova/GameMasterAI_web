@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
 import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
+import { ITEM_TYPES, isAllowedItemType } from '@/lib/game/items';
 
 const MIN_ITEM_QUANTITY = 1;
 const MAX_ITEM_QUANTITY = 999;
@@ -120,6 +121,16 @@ export async function POST(
         if (!type || typeof type !== 'string') {
             return NextResponse.json(
                 { success: false, error: 'Item tipi gerekiyor' },
+                { status: 400 }
+            );
+        }
+
+        if (!isAllowedItemType(type)) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: `Geçersiz item tipi. İzin verilenler: ${ITEM_TYPES.join(', ')}`,
+                },
                 { status: 400 }
             );
         }

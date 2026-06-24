@@ -88,13 +88,37 @@ export async function POST(
       );
     }
 
-    const nextTurn = (combat.currentTurn + 1) % turnOrder.length;
-    const nextRound = nextTurn === 0 ? combat.round + 1 : combat.round;
+    // Advance to the next *living* combatant, skipping those at 0 HP. Each time the
+    // index wraps past the top of the order we begin a new round. If every other
+    // combatant is down we just advance a single slot (combat is about to end).
+    const turnCount = turnOrder.length;
+    const startIndex = Math.max(0, combat.currentTurn) % turnCount;
+    let nextTurn = startIndex;
+    let nextRound = combat.round;
+    let foundLiving = false;
+
+    for (let step = 0; step < turnCount; step++) {
+      nextTurn = (nextTurn + 1) % turnCount;
+      if (nextTurn === 0) {
+        nextRound += 1;
+      }
+      if ((turnOrder[nextTurn]?.hp ?? 0) > 0) {
+        foundLiving = true;
+        break;
+      }
+    }
+
+    if (!foundLiving) {
+      nextTurn = (startIndex + 1) % turnCount;
+      nextRound = nextTurn === 0 ? combat.round + 1 : combat.round;
+    }
+
     const nextActor = turnOrder[nextTurn];
+    const startedNewRound = nextRound > combat.round;
 
     const existingLog = parseLog(combat.log);
     const logEntry =
-      nextTurn === 0
+      startedNewRound
         ? `Round ${nextRound} başladı. Sıra: ${nextActor?.name || "Bilinmiyor"}`
         : `Sıra: ${nextActor?.name || "Bilinmiyor"}`;
     const nextLog = [...existingLog, logEntry];

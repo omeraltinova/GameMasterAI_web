@@ -34,11 +34,15 @@ export function CombatTracker({
 
     if (!combat || combat.status === "ended") return null;
 
-    const sortedParticipants = [...combat.turnOrder].sort(
-        (a, b) => b.initiative - a.initiative
-    );
-
-    const currentParticipant = sortedParticipants[combat.currentTurn % sortedParticipants.length];
+    // The server already stores `turnOrder` pre-sorted by initiative and advances
+    // `currentTurn` as an index into that exact array. Re-sorting on the client can
+    // diverge from the server's ordering on initiative ties, pointing the "current
+    // turn" highlight at the wrong combatant — so render the server order verbatim.
+    const orderedParticipants = combat.turnOrder;
+    const activeIndex = orderedParticipants.length > 0
+        ? combat.currentTurn % orderedParticipants.length
+        : 0;
+    const currentParticipant = orderedParticipants[activeIndex];
 
     const getTypeIcon = (type: CombatParticipant["type"]) => {
         switch (type) {
@@ -96,7 +100,7 @@ export function CombatTracker({
 
                 <div className="flex items-center gap-2">
                     <span className="text-xs text-foreground-muted">
-                        {sortedParticipants.length} katılımcı
+                        {orderedParticipants.length} katılımcı
                     </span>
                     <ChevronRight
                         className={`h-4 w-4 text-foreground-muted transition-transform duration-200 ${isCollapsed ? "" : "rotate-90"
@@ -126,9 +130,8 @@ export function CombatTracker({
 
                     {/* Participant List */}
                     <div className="divide-y divide-border">
-                        {sortedParticipants.map((participant, index) => {
-                            const isActive =
-                                index === combat.currentTurn % sortedParticipants.length;
+                        {orderedParticipants.map((participant, index) => {
+                            const isActive = index === activeIndex;
                             const isDead = participant.hp <= 0;
 
                             return (

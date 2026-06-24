@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { getUserId } from '@/lib/auth/server';
 import { rateLimitResponse, RATE_LIMIT_TIERS } from '@/lib/security/rateLimit';
+import { EQUIPPABLE_TYPES, isEquippableType, maxEquippedForType } from '@/lib/game/items';
 
 /**
  * PUT /api/characters/:id/inventory/:itemId/equip
@@ -52,23 +53,62 @@ export async function PUT(
             );
         }
 
-        // Kuşanılabilir tipler
-        const equippableTypes = ['Weapon', 'Armor', 'Shield', 'Accessory', 'Ring', 'Amulet', 'Helmet', 'Boots', 'Gloves', 'Cloak'];
+        // Toggle equipped status
+        const newEquipped = equipped !== undefined ? equipped : !existingItem.equipped;
 
-        if (equipped && !equippableTypes.includes(existingItem.type)) {
+        if (newEquipped && !isEquippableType(existingItem.type)) {
             return NextResponse.json(
-                { success: false, error: 'Bu item kuşanılamaz' },
+                {
+                    success: false,
+                    error: `Bu item kuşanılamaz. Kuşanılabilir tipler: ${EQUIPPABLE_TYPES.join(', ')}`,
+                },
                 { status: 400 }
             );
         }
 
-        // Toggle equipped status
-        const newEquipped = equipped !== undefined ? equipped : !existingItem.equipped;
+        let item;
+        if (newEquipped) {
+            // Slot-occupancy enforcement: only a bounded number of items of a given
+            // type may be equipped at once (e.g. one body armor, two rings). If
+            // equipping this item would exceed the limit, unequip the oldest
+            // conflicting item(s) so the slot can never silently hold extras.
+            const limit = maxEquippedForType(existingItem.type);
+            item = await prisma.$transaction(async (tx) => {
+                const sameTypeEquipped = await tx.inventoryItem.findMany({
+                    where: {
+                        characterId,
+                        type: existingItem.type,
+                        equipped: true,
+                        NOT: { id: itemId },
+                    },
+                    orderBy: { id: 'asc' },
+                    select: { id: true },
+                });
 
-        const item = await prisma.inventoryItem.update({
-            where: { id: itemId },
-            data: { equipped: newEquipped },
-        });
+                const keep = Math.max(0, limit - 1);
+                const toUnequip = sameTypeEquipped.slice(
+                    0,
+                    Math.max(0, sameTypeEquipped.length - keep),
+                );
+
+                if (toUnequip.length > 0) {
+                    await tx.inventoryItem.updateMany({
+                        where: { id: { in: toUnequip.map((i) => i.id) } },
+                        data: { equipped: false },
+                    });
+                }
+
+                return tx.inventoryItem.update({
+                    where: { id: itemId },
+                    data: { equipped: true },
+                });
+            });
+        } else {
+            item = await prisma.inventoryItem.update({
+                where: { id: itemId },
+                data: { equipped: false },
+            });
+        }
 
         return NextResponse.json({
             success: true,

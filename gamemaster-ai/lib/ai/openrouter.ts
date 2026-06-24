@@ -423,6 +423,61 @@ export interface OpenRouterResponseWithTools {
 }
 
 /**
+ * Tek bir chat-completion isteği gönderir; geçici hatalarda (429/5xx/timeout)
+ * üstel geri çekilmeyle yeniden dener. Başarısız olursa hata fırlatır.
+ */
+async function postChatCompletion(
+  apiKey: string,
+  body: Record<string, unknown>,
+): Promise<OpenRouterResponseWithTools> {
+  let lastError = 'AI service unavailable';
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    let response: Response;
+    try {
+      response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+          'X-Title': 'GameMaster AI',
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (networkError) {
+      lastError = networkError instanceof Error ? networkError.message : 'Network error';
+      if (attempt < MAX_RETRIES) {
+        await sleep(INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1));
+        continue;
+      }
+      throw new Error(lastError);
+    }
+
+    if (!response.ok) {
+      let errorMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData?.error?.message || errorMessage;
+      } catch {
+        /* response body was not JSON */
+      }
+      lastError = errorMessage;
+
+      if (isRetryableError(response.status, errorMessage) && attempt < MAX_RETRIES) {
+        await sleep(INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1));
+        continue;
+      }
+      throw new Error(errorMessage);
+    }
+
+    return (await response.json()) as OpenRouterResponseWithTools;
+  }
+
+  throw new Error(lastError);
+}
+
+/**
  * AI Tool Calling ile çağrı yapar
  * NPC oluşturma, item verme gibi işlemleri AI otomatik yapabilir
  */
@@ -450,35 +505,37 @@ export async function callOpenRouterWithTools(
 
   const modelConfig = await resolveAIModelConfig();
   const model = options?.model || modelConfig.primaryModel;
+  const fallbackModel = modelConfig.fallbackModel;
   const temperature = options?.temperature || 0.7;
   const maxTokens = options?.maxTokens || 10000;
   const tools = options?.tools || gmTools;
 
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-        'X-Title': 'GameMaster AI',
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-        tools,
-        tool_choice: 'auto', // Let AI decide when to use tools
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error?.message || response.statusText);
+  // The primary tool-calling request is the most important AI call in the game
+  // loop, so give it the same resilience as callOpenRouter: retry transient
+  // failures and fall back to the secondary model before giving up.
+  const runCompletion = async (body: Record<string, unknown>) => {
+    try {
+      return await postChatCompletion(apiKey, { ...body, model });
+    } catch (primaryError) {
+      if (fallbackModel && fallbackModel !== model) {
+        console.warn(
+          `[AI tools] primary model (${model}) failed, trying fallback (${fallbackModel}):`,
+          primaryError instanceof Error ? primaryError.message : primaryError,
+        );
+        return await postChatCompletion(apiKey, { ...body, model: fallbackModel });
+      }
+      throw primaryError;
     }
+  };
 
-    const data: OpenRouterResponseWithTools = await response.json();
+  try {
+    const data = await runCompletion({
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+      tools,
+      tool_choice: 'auto', // Let AI decide when to use tools
+    });
     await trackTokenUsage(options?.userId, data.usage?.total_tokens);
     const choice = data.choices[0];
 
@@ -529,28 +586,23 @@ export async function callOpenRouterWithTools(
           },
         ];
 
-        const followUpResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-            'X-Title': 'GameMaster AI',
-          },
-          body: JSON.stringify({
-            model,
+        // Follow-up narration is best-effort: if it fails we keep the tool-only
+        // content rather than failing the whole turn.
+        try {
+          const followUpData = await runCompletion({
             messages: followUpMessages,
             temperature,
             max_tokens: maxTokens,
             // No tools in follow-up to force text response
-          }),
-        });
-
-        if (followUpResponse.ok) {
-          const followUpData: OpenRouterResponseWithTools = await followUpResponse.json();
+          });
           await trackTokenUsage(options?.userId, followUpData.usage?.total_tokens);
-          content = followUpData.choices[0]?.message?.content || '';
+          content = followUpData.choices[0]?.message?.content || content;
           console.log('[AI] Got follow-up response with content');
+        } catch (followUpError) {
+          console.warn(
+            '[AI] Follow-up response failed; keeping tool-only content:',
+            followUpError instanceof Error ? followUpError.message : followUpError,
+          );
         }
       }
 

@@ -9,6 +9,37 @@ const MIN_DICE_MODIFIER = -100;
 const MAX_DICE_MODIFIER = 100;
 const MAX_PURPOSE_LENGTH = 120;
 
+// Maps ability short/long names to the canonical key stored on Character.stats.
+const ABILITY_ALIASES: Record<string, string> = {
+  str: 'strength', strength: 'strength',
+  dex: 'dexterity', dexterity: 'dexterity',
+  con: 'constitution', constitution: 'constitution',
+  int: 'intelligence', intelligence: 'intelligence',
+  wis: 'wisdom', wisdom: 'wisdom',
+  cha: 'charisma', charisma: 'charisma',
+};
+
+function safeParseStats(raw: string | null): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+// 5e ability modifier: floor((score - 10) / 2)
+function abilityModifier(score: number): number {
+  return Number.isFinite(score) ? Math.floor((score - 10) / 2) : 0;
+}
+
+// 5e proficiency bonus by character level: +2 at 1-4, +3 at 5-8, ...
+function proficiencyBonus(level: number): number {
+  const safeLevel = Number.isFinite(level) && level > 0 ? Math.floor(level) : 1;
+  return 2 + Math.floor((safeLevel - 1) / 4);
+}
+
 /**
  * POST /api/dice/roll
  * Zar atma endpoint'i
@@ -28,7 +59,7 @@ export async function POST(req: NextRequest) {
     if (limited) return limited;
 
     const body = await req.json();
-    const { sessionId, characterId, diceType, count, modifier, purpose, advantage, disadvantage } = body;
+    const { sessionId, characterId, diceType, count, modifier, purpose, advantage, disadvantage, ability, proficient } = body;
 
     // Validation
     if (!diceType || typeof diceType !== 'string') {
@@ -82,6 +113,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    let normalizedAbility: string | null = null;
+    if (ability !== undefined && ability !== null) {
+      if (typeof ability !== 'string' || !ABILITY_ALIASES[ability.toLowerCase()]) {
+        return NextResponse.json(
+          { success: false, error: 'Geçersiz yetenek (ability) değeri' },
+          { status: 400 }
+        );
+      }
+      normalizedAbility = ABILITY_ALIASES[ability.toLowerCase()];
+    }
+
+    if (proficient !== undefined && typeof proficient !== 'boolean') {
+      return NextResponse.json(
+        { success: false, error: 'proficient alanı boolean olmalı' },
+        { status: 400 }
+      );
+    }
+
     const normalizedPurpose = typeof purpose === 'string' ? purpose.trim() : undefined;
     if (purpose !== undefined && typeof purpose !== 'string') {
       return NextResponse.json(
@@ -127,10 +176,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Optional ability/proficiency bonus computed server-side from the character.
+    let abilityBonus = 0;
+    let abilityBonusInfo: { ability: string; abilityMod: number; proficiencyBonus: number } | null = null;
+
     if (characterId) {
       const character = await prisma.character.findFirst({
         where: { id: characterId, userId },
-        select: { id: true, campaignId: true },
+        select: { id: true, campaignId: true, stats: true, level: true },
       });
 
       if (!character) {
@@ -146,11 +199,21 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+
+      if (normalizedAbility) {
+        const stats = safeParseStats(character.stats);
+        const score = Number(stats[normalizedAbility] ?? 10);
+        const abilityMod = abilityModifier(score);
+        const profBonus = proficient === true ? proficiencyBonus(character.level) : 0;
+        abilityBonus = abilityMod + profBonus;
+        abilityBonusInfo = { ability: normalizedAbility, abilityMod, proficiencyBonus: profBonus };
+      }
     }
 
     // Zar at
     const diceCount = parsedDiceCount;
-    const diceModifier = parsedModifier;
+    // Player-supplied modifier (clamped) plus any computed ability/proficiency bonus.
+    const diceModifier = parsedModifier + abilityBonus;
     const hasAdvantage = advantage === true;
     const hasDisadvantage = disadvantage === true;
 
@@ -227,6 +290,15 @@ export async function POST(req: NextRequest) {
       rollMessage += ` = **${total}**`;
     }
 
+    if (abilityBonusInfo) {
+      const abilityLabel = abilityBonusInfo.ability.slice(0, 3).toUpperCase();
+      const fmt = (n: number) => `${n >= 0 ? '+' : ''}${n}`;
+      const breakdown = abilityBonusInfo.proficiencyBonus > 0
+        ? `${abilityLabel} ${fmt(abilityBonusInfo.abilityMod)}, yeterlilik +${abilityBonusInfo.proficiencyBonus}`
+        : `${abilityLabel} ${fmt(abilityBonusInfo.abilityMod)}`;
+      rollMessage += ` 〔${breakdown}〕`;
+    }
+
     if (normalizedPurpose) {
       rollMessage += ` (${normalizedPurpose})`;
     }
@@ -267,6 +339,8 @@ export async function POST(req: NextRequest) {
       success: true,
       results,
       total,
+      abilityBonus,
+      abilityBonusInfo,
       roll: {
         id: diceRoll.id,
         sessionId: diceRoll.sessionId,
